@@ -1,0 +1,52 @@
+Text-Editor-Easy
+
+Version 0.01.
+Several demos to see if a pure perl
+editor can be usable, and more...
+
+
+INSTALLATION
+
+This is not yet an installable module. I have no namespace.
+
+It contains a pure perl module and program. So it shouldn't be
+hard to install it and run the demos.
+
+It's compatible with Windows and UNIX. I use perl 5.8.8 on Windows
+and perl 5.8.7 on Linux.
+
+In order to execute the demos, save the archive file on
+your computer (tar.gz file).
+Uncompress, untar...
+
+Now install the following modules from where you should, according to
+your system (you shoud already have most of them) :
+		- Tk
+		- Syntax::Highlight::Perl
+		- Data::Dump
+		- Time::HiRes
+		- IO::File
+		- File::Basename
+		- Scalar::Util
+		- Devel::Size
+		- SDBM_File
+		- Fcntl
+		- File::Copy
+
+Once finished, execute the "Editor.pl" program of the "/lib/Text/Editor"
+directory. I know, this is not a clean place for a program...
+
+SUPPORT AND DOCUMENTATION
+
+There is neither support, nor documentation because it's moving fast.
+
+Here are a few screen copies of what you should get when running the demos :
+http://sgrommier.free.fr/perl
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2008 Sébastien Grommier
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
