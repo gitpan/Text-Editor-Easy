@@ -10,11 +10,15 @@
 # the lines are sure (apart from the bugs)
 # to be correctly formatted
 #
+# To execute it ... press F5, again !
+#
 
-use lib '.';
-use Editor;
+use strict;
+use lib 'lib';
 
-Editor->new(
+use Text::Editor::Easy;
+
+Text::Editor::Easy->new(
     {
         'file'      => 'account.hst',
         'highlight' => { 'sub' => 'highlight', },
@@ -25,7 +29,7 @@ Editor->new(
     }
 );
 
-Editor->manage_event();
+Text::Editor::Easy->manage_event();
 
 sub highlight {
     my ($text) = @_;

@@ -1,3 +1,20 @@
+package Text::Editor::Easy::Trace::Print;
+
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Trace::Print - Print management.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
 #   La liste des print (thread, liste d'appels ayant générée ce print, heure)
@@ -5,21 +22,13 @@
 #   La liste des débuts de réponse (call_id)
 #   La liste des fins de réponse (call_id, paramètres de retour ?)
 
-package Easy::Trace::Print;
-use strict;
-
-#use Easy::Comm;
-use Comm;
 use Fcntl;
 use SDBM_File;
 
 use Devel::Size qw(size total_size);
 use IO::File;
-use File::Basename;
-my $name        = fileparse($0);
-my $trace_print = "tmp/${name}_Trace_Print.trc";
-open( DBG, ">$trace_print" ) or die "Impossible d'ouvrir $trace_print : $!\n";
-autoflush DBG;
+
+Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 
 use constant {
 
@@ -32,13 +41,22 @@ use constant {
     DBG_DESC  => 3,
 };
 
+=head1 FUNCTIONS
+
+=head2 init_trace_print
+
+This function is called just after the Trace::Print thread has been created. It initializes the files that will make possible to link a print and the
+code that generated it.
+
+=cut
+
 sub init_trace_print {
-    my ( $self, $file_name ) = @_;
+    my ( $self, $reference, $file_name ) = @_;
 
 # Faire de même avec le fichier info. Référencer également
 # le nom initial du fichier STDOUT (pour analyse : ouverture et réouverture régulières dans full_trace)
 #$self = 'Bidon';
-    print DBG "Dans init_trace_print ", total_size($self), " : $file_name\n";
+    print DBG "Dans init_trace_print ", total_size($self), " : $file_name|\n";
     my %h;
 
     # Ménage de l'ancien
@@ -53,9 +71,17 @@ sub init_trace_print {
     autoflush { $self->[INFO_DESC] };
 }
 
+=head2 trace_full
+
+This function saves the link between a print and the code that generated it.
+
+=cut
+
 sub trace_full {
     my ( $self, $seek_start, $seek_end, $tid, $call_id, $calls_dump, $data ) =
       @_;
+
+    return if ( !$self->[INFO_DESC] );
 
     # Valeur de la clé (ou des clés de hachage)
     my $value = tell $self->[INFO_DESC];
@@ -123,6 +149,12 @@ sub trace_full {
     close FIC;
 }
 
+=head2 get_info_for_display 
+
+This function recovers the link between a print and the code that generated it.
+
+=cut
+
 sub get_info_for_display {
     my ( $self, $start_of_line ) = @_;
 
@@ -135,6 +167,12 @@ sub get_info_for_display {
     return;
 }
 
+=head2 trace_display_calls
+
+This function is not used.
+
+=cut
+
 # Internal
 sub trace_display_calls {
     my @calls = @_;
@@ -144,5 +182,15 @@ sub trace_display_calls {
         #print ENC "\tF|$file|L|$line|P|$pack\n";
     }
 }
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

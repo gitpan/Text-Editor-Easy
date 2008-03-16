@@ -10,6 +10,19 @@
 #
 #######################################
 
+use warnings;
+use strict;
+
+=head1 NAME
+
+Automatic indentation, addition of characters,...
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
 my %opt = (
     "for"   => \&for,
     "while" => \&if,
@@ -107,5 +120,15 @@ sub indent_on_return {
         $self->insert( " " x length($indent), { 'insert' => 1 } );
     }
 }
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

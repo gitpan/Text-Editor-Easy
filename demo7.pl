@@ -7,7 +7,7 @@
 #    - debug (requests on data followed
 #      by a display : to be in an editor
 #      can sometimes be helpful)
-#    - learn the interface of the Editor
+#    - learn the interface of the Text::Editor::Easy
 #      module interactively
 #    - extend the editor or configure it...
 #    - debug (Don't tell me !)
@@ -31,7 +31,7 @@
 # on the middle right panel
 #
 # The actions of the macro instructions
-# modify the 'stack_calls' editor object
+# modify the 'stack_calls' Text::Editor::Easy object
 # which is the bottom right panel
 #
 # Once F5 has been pressed, you can

@@ -1,18 +1,28 @@
-package Line;
+package Text::Editor::Easy::Line;
 
-# Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
-# pas dans les hachages gérés par AUTOLOAD de Editor) car susceptibles de changer
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Line - Object oriented interface a file line (managed by "Text::Editor::Easy::Abstract" and "Text::Editor::Easy::File_manager").
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
 
-use strict;
 use Scalar::Util qw(refaddr weaken);
 use Devel::Size qw(size total_size);
 
-#use Easy::Comm;
-use Comm;
-use Easy::Display;
+use Text::Editor::Easy::Comm;
+use Text::Editor::Easy::Display;
 
 # 2 attributs pour un objet "Line"
 my %ref_Editor;    # Une ligne appartient à un éditeur unique
@@ -61,7 +71,7 @@ sub next {
     my $ref       = refaddr $self;
     my $editor    = $ref_Editor{$ref};
     my ($next_id) = $editor->next_line( $ref_id{$ref} );
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $next_id,
@@ -74,7 +84,7 @@ sub previous {
     my $ref           = refaddr $self;
     my $editor        = $ref_Editor{$ref};
     my ($previous_id) = $editor->previous_line( $ref_id{$ref} );
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $previous_id,
@@ -99,9 +109,17 @@ sub DESTROY {
     my ($self) = @_;
 
     my $ref = refaddr $self;
-    delete $ref_line{ $ref_Editor{$ref} }{ $ref_id{$ref} };
-    delete $ref_Editor{$ref};
-    delete $ref_id{$ref};
+    if ( defined $ref ) {
+        if ( defined $ref_id{$ref} ) {
+            if ( defined $ref_Editor{$ref} ) {
+                delete $ref_line{ $ref_Editor{$ref} }{ $ref_id{$ref} };
+            }
+            delete $ref_id{$ref};
+        }
+        if ( defined $ref_Editor{$ref} ) {
+            delete $ref_Editor{$ref};
+        }
+    }
 }
 
 sub displayed {
@@ -118,7 +136,7 @@ sub displayed {
         # Création des "lignes d'écran"
         my @display;
         for (@ref) {
-            push @display, Display->new(
+            push @display, Text::Editor::Easy::Display->new(
                 $ref_editor
                 , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
                 $_,
@@ -144,7 +162,8 @@ sub set {
     return $editor->modify_line( $ref_id{$ref} );
 }
 
-my %sub = ( 'select' => [ 'graphic', \&Abstract::line_select ], );
+my %sub =
+  ( 'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], );
 
 sub AUTOLOAD {
     return if our $AUTOLOAD =~ /::DESTROY/;
@@ -152,10 +171,11 @@ sub AUTOLOAD {
     my ( $self, @param ) = @_;
 
     my $what = $AUTOLOAD;
-    $what =~ s/^(\w+):://;
+    $what =~ s/^Text::Editor::Easy::Line:://;
 
     if ( !$sub{$what} ) {
-        print STDERR "La méthode $what n'est pas connue de l'objet Line\n";
+        print STDERR
+"La méthode $what n'est pas connue de l'objet Text::Editor::Easy::Line\n";
         return;
     }
 
@@ -182,4 +202,37 @@ sub linesize {
     print "TAILLE ref_id     : ", total_size( \%ref_id ),     "\n";
     print "TAILLE ref_line   : ", total_size( \%ref_line ),   "\n";
 }
+
+=head1 FUNCTIONS
+
+=head2 count
+
+=head2 displayed
+
+=head2 linesize
+
+=head2 new
+
+=head2 next
+
+=head2 previous
+
+=head2 ref
+
+=head2 seek_start
+
+=head2 set
+
+=head2 text
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
+
 1;

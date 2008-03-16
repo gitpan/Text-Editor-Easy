@@ -1,38 +1,63 @@
-package Easy::Program::Search;
+package Text::Editor::Easy::Program::Search;
 
-#use Easy::Comm;
-use Comm;
-
-#sub anything_for_me {};
-use strict;
 use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Program::Search - Bad named module (initially searching text) : used to answer to
+user modification in the Eval tab of the Editor.pl program.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+use Text::Editor::Easy::Comm;
 
 my $out;
 my $eval_thread;
 my $eval_print;
 
 sub init_eval {
-    my ( $self, $other_ref, $unique_ref ) = @_;
+    my ( $self, $reference, $other_ref, $unique_ref ) = @_;
     print "============>INIT de Search .. $self, $unique_ref\n";
-    $out = bless \do { my $anonymous_scalar }, "Editor";
+    $out = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
     $out->reference($unique_ref);
 
     #$out->insert('Bonjour');
     #$self, $package, $tab_methods_ref, $self_server
-    my $eval_thread =
-      Editor->create_standard_server_thread( "Easy::Program::Eval::Exec",
-        [ 'exec_eval', 'idle_eval_exec' ], [] );
+    my $eval_thread = Text::Editor::Easy->create_new_server(
+        {
+            'use'     => "Text::Editor::Easy::Program::Eval::Exec",
+            'package' => "Text::Editor::Easy::Program::Eval::Exec",
+            'methods' => [ 'exec_eval', 'idle_eval_exec' ],
+            'object'  => []
+        }
+    );
 
     #print "EVAL _TJREAD = $eval_thread\n";
-    #Editor->exec_eval('Bonjour');
-    $eval_print =
-      Editor->create_standard_server_thread( "Easy::Program::Eval::Print",
-        [ 'print_eval', 'init_print_eval', 'idle_eval_print' ], [] );
-    Editor->init_print_eval($unique_ref);
+    #Text::Editor::Easy->exec_eval('Bonjour');
+
+    $eval_print = Text::Editor::Easy->create_new_server(
+        {
+            'use'     => "Text::Editor::Easy::Program::Eval::Print",
+            'package' => "Text::Editor::Easy::Program::Eval::Print",
+            'methods' => [ 'print_eval', 'idle_eval_print' ],
+            'object'  => [],
+            'init'    => [
+                'Text::Editor::Easy::Program::Eval::Print::init_print_eval',
+                $unique_ref
+            ],
+        }
+    );
     print "FIN DE INIT EVAL = $eval_thread\n";
 
     # Référencer dans Data le thread $eval_thread en arborescence...
-    my $redirect_id = Editor->reference_print_redirection(
+    my $redirect_id = Text::Editor::Easy->reference_print_redirection(
         {
             'thread'  => $eval_thread,
             'type'    => 'tree',
@@ -40,8 +65,6 @@ sub init_eval {
             'exclude' => $eval_print,
         }
     );
-
-    #Async_Editor->exec_eval('Après redirection : bonjour');
 }
 
 sub modify_pattern {
@@ -49,9 +72,10 @@ sub modify_pattern {
 
     #return;
     #print "Dans modify_pattern...$hash_ref->{'text'}\n";
-    Async_Editor->idle_eval_exec($eval_print);
+    Text::Editor::Easy::Async->idle_eval_exec($eval_print);
     return if ( anything_for_me() );
-    my $line    = $editor->first;
+    my $line = $editor->first;
+    return if ( !$line );
     my $program = $line->text;
     return if ( anything_for_me() );
     while ( $line = $line->next ) {
@@ -64,24 +88,24 @@ sub modify_pattern {
 # Avant de faire le ménage il faut :
 # ----------------------------------
 # 1 - être sûr que le thread 10 ne tourne plus et ne génère pas de nouveaux print pour eval_print
-    Editor->idle_eval_exec($eval_print);
+    Text::Editor::Easy->idle_eval_exec($eval_print);
     return if ( anything_for_me() );
 
 # 2 - être sûr qu'il ne reste plus aucun print asynchrones à afficher (on vide tout ceux qui sont en attente)
-    Editor->empty_queue($eval_print)
+    Text::Editor::Easy->empty_queue($eval_print)
       ;    # Attention, ne faire des empty_queue que sur des threads ne faisant
            # pas l'objet de requêtes synchrones (sinon threads bloqués)
     return if ( anything_for_me() );
 
    # 3 - être sur que eval_print n'est pas en train d'éditer à nouveau une ligne
-    Editor->idle_eval_print;
+    Text::Editor::Easy->idle_eval_print;
     return if ( anything_for_me() );
 
     $out->empty;
     return if ( anything_for_me() );
 
     $out->async->on_top;
-    Async_Editor->exec_eval($program);
+    Text::Editor::Easy::Async->exec_eval($program);
     return;
 }
 
@@ -109,8 +133,8 @@ sub search {
     my ( $ind, $exp ) = @_;
 
     print "IND $ind, EXP $exp\n";
-    my @search = Editor->list_in_zone('zone1');
-    my $search = bless \do { my $anonymous_scalar }, "Editor";
+    my @search = Text::Editor::Easy->list_in_zone('zone1');
+    my $search = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
     $search->reference( $search[$ind] );
 
     # Recherche dans l'écran
@@ -165,5 +189,29 @@ sub search {
         print "Trouvé : ", $found->text, "\n";
     }
 }
+
+=head1 FUNCTIONS
+
+=head2 init_eval
+
+=head2 insert_out
+
+=head2 modify_pattern
+
+=head2 print_b
+
+=head2 print_toto
+
+=head2 search
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

@@ -1,8 +1,8 @@
 #
 # Here is an example of
-# "one thread" Editor object creation
+# "one thread" Text::Editor::Easy object creation
 #
-# Once "Editor->manage_event" is
+# Once "Text::Editor::Easy->manage_event" is
 # called, the program is pending
 # on this instruction
 # until the user quit the window.
@@ -12,11 +12,12 @@
 # will be able to ... edit text.
 # Quite standard for an editor.
 
-use lib '.';
+use strict;
+use lib 'lib';
 
-use Editor;
+use Text::Editor::Easy;
 
-Editor->new(
+Text::Editor::Easy->new(
     {
         'x_offset' => 240,
         'y_offset' => 150,
@@ -26,7 +27,7 @@ Editor->new(
     }
 );
 
-Editor->manage_event;
+Text::Editor::Easy->manage_event;
 
 print "The user have closed the window\n";
 

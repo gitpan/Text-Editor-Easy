@@ -1,5 +1,19 @@
-package Key;
+package Text::Editor::Easy::Key;
+
+use warnings;
 use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Key - Key functions using object-oriented interface of "Text::Editor::Easy".
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 sub left {
     my ($self) = @_;
@@ -98,7 +112,7 @@ sub backspace {
     my ($self) = @_;
 
     return
-      if ( !defined Key::left($self) )
+      if ( !defined Text::Editor::Easy::Key::left($self) )
       ;    # left_key renvoie undef si on est au début du fichier
 
     # Améliorer l'interface de erase en autorisant les nombres négatifs ==>
@@ -355,7 +369,7 @@ sub list_display_positions {
 sub sel_first {
     my ($self) = @_;
 
-    my @list = Editor->list;
+    my @list = Text::Editor::Easy->list;
     print "Liste des éditeur ", @list, "\n";
     $self->focus( $list[0] );
 }
@@ -363,9 +377,81 @@ sub sel_first {
 sub sel_second {
     my ($self) = @_;
 
-    print "Liste des éditeur ", Editor->list, "\n";
-    my @list = Editor->list;
+    print "Liste des éditeur ", Text::Editor::Easy->list, "\n";
+    my @list = Text::Editor::Easy->list;
     $self->focus( $list[1] );
 }
+
+=head1 FUNCTIONS
+
+=head2 backspace
+
+=head2 copy_line
+
+=head2 cut_line
+
+=head2 display_cursor_display
+
+=head2 down
+
+=head2 end
+
+=head2 end_file
+
+=head2 home
+
+=head2 inser
+
+=head2 jump_down
+
+=head2 jump_left
+
+=head2 jump_right
+
+=head2 jump_up
+
+=head2 left
+
+=head2 list_display_positions
+
+=head2 move_down
+
+=head2 move_up
+
+=head2 new_a
+
+=head2 page_down
+
+=head2 page_up
+
+=head2 paste
+
+=head2 print_screen_number
+
+=head2 query_segments
+
+=head2 right
+
+=head2 save
+
+=head2 sel_first
+
+=head2 sel_second
+
+=head2 top_file
+
+=head2 up
+
+=head2 wrap
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

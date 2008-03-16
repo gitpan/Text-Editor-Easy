@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME                => 'Text::Editor::Easy',
-    AUTHOR              => 'Sébastien Grommier <sgrommier@free.fr>',
+    AUTHOR              => 'Sebastien Grommier <sgrommier@free.fr>',
     VERSION_FROM        => 'lib/Text/Editor/Easy.pm',
     ABSTRACT_FROM       => 'lib/Text/Editor/Easy.pm',
     PL_FILES            => {},

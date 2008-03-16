@@ -1,31 +1,55 @@
 #
 # Syntax highlighting :
-#    2) user input
+#    3) imagine an interactive application
 #
-# If putting color on a generated file
-# can help you read it better, on a file
-# that you are editing, this should give
-# you precise indications about what
-# is wrong.
+# Imagine you are editing your data,
+# with a "syntax highlight" checker.
+# While you are editing this data,
+# an automatic processing is made
+# to get ouput files from this data.
 #
-# So input highlighting should be more
-# complex than output highlighting
+# And imagine you've got the view of
+# this generated file in the same
+# window.
 #
+# This is a complete interactive application !
+#
+# How slow with perl ?
+# It can be fast... if the programmer
+# is not too silly.
+# To be very responsive to user input,
+# your program shouldn't be afraid
+# of giving up.
+#
+# On the opposite, you should be ashamed
+# of your program if it goes on making
+# uninteresting long processing. Think about
+# the potential user shouting after having
+# pressed the wrong endless button.
+#
+# Don't be afraid of giving up to serve better.
+# I didn't say that mono-thread programming
+# was silly, but perhaps it's not suitable for
+# impatient users like us (there is nothing
+# wrong with a mono-thread batch).
+#
+# Press guess what ? ... F5
 
-use lib '.';
-use Editor;
+use strict;
+use lib 'lib';
 
-Editor->new(
+use Text::Editor::Easy;
+
+use Text::Editor::Easy;
+my $zone1 = Text::Editor::Easy::Zone->new(
     {
-        'file'      => 'expenses.cpt',
-        'highlight' => { 'sub' => 'highlight', },
-        'x_offset'  => 40,
-        'y_offset'  => 40,
-        'width'     => 800,
-        'height'    => 500,
+        '-x'         => 0,
+        '-rely'      => 0,
+        '-relwidth'  => 0.5,
+        '-relheight' => 1,
+        'name'       => 'input_left',
     }
 );
-
 my %compte = (
     "ASV" => 1,
     "TAH" => 1,
@@ -63,9 +87,39 @@ my %compte = (
     "ASL" => 1
 );
 
-Editor->manage_event;
+Text::Editor::Easy->new(
+    {
+        'zone'      => $zone1,
+        'sub'       => 'main',
+        'file'      => 'expenses.cpt',
+        'highlight' => { 'sub' => 'input', },
+        'y_offset'  => 100,
+        'height'    => 500,
+    }
+);
 
-sub highlight {
+sub main {
+    my $zone2 = Text::Editor::Easy::Zone->new(
+        {
+            '-relx'      => 0.5,
+            '-rely'      => 0,
+            '-relwidth'  => 0.5,
+            '-relheight' => 1,
+            'name'       => 'output_right',
+        }
+    );
+    Text::Editor::Easy->new(
+        {
+            'zone'      => $zone2,
+            'file'      => 'account.hst',
+            'highlight' => { 'sub' => 'output', },
+        }
+    );
+}
+
+Text::Editor::Easy->manage_event();
+
+sub input {
     my ($text) = @_;
 
     #print "Texte reçu=$text=\n";
@@ -112,6 +166,7 @@ sub highlight {
         );
     }
     if ( !$compte{$debit} ) {
+        print "Debit $debit\n";
         return (
             [ substr( $text, 0, 8 ), "yellow" ],
             [ $debit, "error" ],
@@ -296,5 +351,30 @@ sub highlight {
         [ substr( $text, 32,   11 ), "dark red" ],
         [ substr( $text, 43 ), "comment" ],
     );
+}
 
+sub output {
+    my ($text) = @_;
+
+    if ( $text =~ /^(#|$)/ ) {
+        return [ $text, "comment" ];
+    }
+    if ( length($text) < 57 ) {
+        print "Incorrect : $text\n";
+        return [ $text, "black" ];
+    }
+
+    # The interface with module "Abstract.pm" will be completely modified
+    # This is only a demo
+    #
+    return (
+        [ substr( $text, 0,  3 ),  "dark purple" ],    # jour
+        [ substr( $text, 3,  3 ),  "dark green" ],     # mois
+        [ substr( $text, 6,  5 ),  "dark red" ],
+        [ substr( $text, 11, 11 ), "black" ],
+        [ substr( $text, 22, 11 ), "red" ],
+        [ substr( $text, 33, 12 ), "dark blue" ],
+        [ substr( $text, 45, 12 ), "dark green" ],     # jj mm ssaa
+        [ substr( $text, 57 ), "comment" ],
+    );
 }

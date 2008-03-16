@@ -1,7 +1,20 @@
-use strict;
-use warnings;
+package Text::Editor::Easy::Graphic;
 
-package Graphic;
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstract" and "Tk".
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
 use Tk;
 use Tk::Scrollbar;    # perl2exe
 use Tk::Canvas;       # perl2exe
@@ -128,6 +141,7 @@ sub initialize {
 sub launch_loop {
     my ( $self, $sub, $editor ) = @_;
 
+    #print "Lancement de la boucle d'exécution examine...\n";
     $repeat_id = $self->[TOP_LEVEL]->repeat( 15, [ $sub, $editor ] );
 
     #$self->[TOP_LEVEL]->repeat(600, [ $sub, $editor ] );
@@ -410,6 +424,11 @@ sub get_zone {
 sub get_graphic_focused_in_zone {
     my ( $self, $zone ) = @_;
 
+    if ( !defined $zone ) {
+        print STDERR
+"Zone must be defined when calling Text::Editor::Graphic::Tk_gue::get_graphic_focused_in_zone\nCan't return Text::Editor::Easy who has focus in an undefined zone\n";
+        return;
+    }
     return $zone{$zone};
 }
 
@@ -556,5 +575,15 @@ sub get_mw {
 
     return $self->[TOP_LEVEL];
 }
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

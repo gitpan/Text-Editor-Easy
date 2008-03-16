@@ -1,8 +1,19 @@
+package Text::Editor::Easy::Graphic;
+
+use warnings;
 use strict;
 
-#use warnings;
+=head1 NAME
 
-package Graphic;
+Text::Editor::Easy::Graphic::Console_glue - Link between "Text::Editor::Easy::Abstract" and a terminal. Does not actually work.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 #require Term::Screen;
 require Term::Screen::Win32;
@@ -402,5 +413,15 @@ sub line_height {
 sub margin {
     return 1;
 }
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

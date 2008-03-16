@@ -1,14 +1,24 @@
-package Easy::Program::Eval::Exec;
+package Text::Editor::Easy::Program::Eval::Exec;
+
+use warnings;
 use strict;
 
-#use Easy::Comm;
-use Comm;
+=head1 NAME
+
+Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions in the "Editor.pl" program.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+use Text::Editor::Easy::Comm;
 use threads;    # Pour debug
 
-use File::Basename;
-my $name      = fileparse($0);
-my $exec_eval = "tmp/${name}_Eval_Exec.trc";
-open( EXE, ">$exec_eval" ) or print "Impossible d'écrire dans $exec_eval :$!\n";
+Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 
 sub exec_eval {
     my ( $self, $program ) = @_;
@@ -16,7 +26,7 @@ sub exec_eval {
 # Ajout d'une instruction "return if anything_for_me;" entre chaque ligne pour réactivité maximum
 
     $program =~ s/;(\n+)/;\nreturn if ( anything_for_me() );$1/g;
-    print EXE "Dans exec_eval(", threads->tid, ") : \n$program\n\n";
+    print DBG "Dans exec_eval(", threads->tid, ") : \n$program\n\n";
 
     #print substr ( $program, 0, 150 ), "\n\n";
     eval $program;
@@ -27,6 +37,24 @@ sub idle_eval_exec {
     my ( $self, $eval_print ) = @_;
 
     if ( defined $eval_print ) {
-        Editor->empty_queue($eval_print);
+        Text::Editor::Easy->empty_queue($eval_print);
     }
 }
+
+=head1 FUNCTIONS
+
+=head2 exec_eval
+
+=head2 idle_eval_exec
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
+
+1;

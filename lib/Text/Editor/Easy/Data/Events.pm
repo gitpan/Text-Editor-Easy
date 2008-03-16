@@ -1,11 +1,22 @@
 return (
 
     # Evènements d'éditeurs
-    'cursor_set_last' => 'Editor',
-    'motion_last'     => 'Editor',
-    'on_top_last'     => 'Editor',
-    'insert_last'     => 'Editor',
+    'cursor_set_last' => 'Text::Editor::Easy',
+    'motion_last'     => 'Text::Editor::Easy',
+    'on_top_last'     => 'Text::Editor::Easy',
+    'insert_last'     => 'Text::Editor::Easy',
 
     # Evènements de zones
-    'on_top_editor_change' => 'Zone',
+    'on_top_editor_change' => 'Text::Editor::Easy::Zone',
 );
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
+

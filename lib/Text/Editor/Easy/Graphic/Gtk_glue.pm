@@ -1,7 +1,20 @@
-use strict;
-use warnings;
+package Text::Editor::Easy::Graphic;
 
-package Graphic;
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Graphic::Gtk_glue - Link between "Text::Editor::Easy::Abstract" and "Gtk". Does not actually work.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
 use Gtk2 -init;
 
 #use Gnome2::Canvas;
@@ -414,5 +427,15 @@ sub redraw_cursor {
     }
     return 1;
 }
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

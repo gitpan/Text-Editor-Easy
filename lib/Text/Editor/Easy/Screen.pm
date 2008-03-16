@@ -1,17 +1,28 @@
-package Screen;
-use Easy::Line;
+package Text::Editor::Easy::Screen;
 
-# Ce package n'est qu'une interface orientée objet à des fonctions de Abstract.pm rendues inaccessibles (ne se trouvent
-# pas dans les hachages gérés par AUTOLOAD de Editor) car susceptibles de changer
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Cursor - Object oriented interface to screen data (managed by "Text::Editor::Easy::Abstract").
+
+This module shoud disappear. Screen will be separated into "Window" and "Zone".
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "screen_" puis reprennent
 # le nom de la méthode
-
-use strict;
+use Text::Editor::Easy::Line;
 use Scalar::Util qw(refaddr);
 
-#use Easy::Comm;
-use Comm;
+use Text::Editor::Easy::Comm;
 
 use threads;
 use threads::shared;
@@ -34,7 +45,7 @@ sub first {
 
     my $ref = refaddr $self;
     my $id  = $ref_Editor{$ref}->screen_first;
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
@@ -46,7 +57,7 @@ sub last {
 
     my $ref = refaddr $self;
     my $id  = $ref_Editor{$ref}->screen_last;
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
@@ -59,7 +70,7 @@ sub number {
     my $ref = refaddr $self;
     my $id  = $ref_Editor{$ref}->screen_number($number);
     return $id if ( $id !~ /_/ );
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
@@ -69,22 +80,22 @@ sub number {
 my %method = (
 
     # Les 2 méthodes suivantes doivent être virées (liées à un objet texte)
-    'font_height' => \&Abstract::screen_font_height,
-    'line_height' => \&Abstract::screen_line_height,
+    'font_height' => \&Text::Editor::Easy::Abstract::screen_font_height,
+    'line_height' => \&Text::Editor::Easy::Abstract::screen_line_height,
 
-    'height'       => \&Abstract::screen_height,
-    'y_offset'     => \&Abstract::screen_y_offset,
-    'x_offset'     => \&Abstract::screen_x_offset,
-    'margin'       => \&Abstract::screen_margin,
-    'width'        => \&Abstract::screen_width,
-    'set_width'    => \&Abstract::screen_set_width,
-    'set_height'   => \&Abstract::screen_set_height,
-    'set_x_corner' => \&Abstract::screen_set_x_corner,
-    'set_y_corner' => \&Abstract::screen_set_y_corner,
-    'move'         => \&Abstract::screen_move,
-    'wrap'         => \&Abstract::screen_wrap,
-    'set_wrap'     => \&Abstract::screen_set_wrap,
-    'unset_wrap'   => \&Abstract::screen_unset_wrap,
+    'height'       => \&Text::Editor::Easy::Abstract::screen_height,
+    'y_offset'     => \&Text::Editor::Easy::Abstract::screen_y_offset,
+    'x_offset'     => \&Text::Editor::Easy::Abstract::screen_x_offset,
+    'margin'       => \&Text::Editor::Easy::Abstract::screen_margin,
+    'width'        => \&Text::Editor::Easy::Abstract::screen_width,
+    'set_width'    => \&Text::Editor::Easy::Abstract::screen_set_width,
+    'set_height'   => \&Text::Editor::Easy::Abstract::screen_set_height,
+    'set_x_corner' => \&Text::Editor::Easy::Abstract::screen_set_x_corner,
+    'set_y_corner' => \&Text::Editor::Easy::Abstract::screen_set_y_corner,
+    'move'         => \&Text::Editor::Easy::Abstract::screen_move,
+    'wrap'         => \&Text::Editor::Easy::Abstract::screen_wrap,
+    'set_wrap'     => \&Text::Editor::Easy::Abstract::screen_set_wrap,
+    'unset_wrap'   => \&Text::Editor::Easy::Abstract::screen_unset_wrap,
 
     # Autres méthodes à développer
     # set_geometry        avec hachage de correspondance
@@ -99,15 +110,38 @@ sub AUTOLOAD {
     my ( $self, @param ) = @_;
 
     my $what = $AUTOLOAD;
-    $what =~ s/^(\w+):://;
+    $what =~ s/^Text::Editor::Easy::Screen:://;
 
     if ( !$method{$what} ) {
-        print "La méthode $what n'est pas connue de l'objet Screen\n";
+        print
+"La méthode $what n'est pas connue de l'objet Text::Editor::Easy::Screen\n";
         return;
     }
 
     return $ref_Editor{ refaddr $self }->ask2( 'screen_' . $what, @param );
 }
+
+=head1 FUNCTIONS
+
+=head2 first
+
+=head2 last
+
+=head2 new
+
+=head2 number
+
+=cut
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;
 

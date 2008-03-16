@@ -1,16 +1,30 @@
-package Display;
+package Text::Editor::Easy::Display;
+
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Cursor - Object oriented interface to displays (managed by "Text::Editor::Easy::Abstract"). A display is a screen line. With
+wrap mode, you can have several displays for a single line on a file.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 # Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
-# pas dans les hachages gérés par AUTOLOAD de Editor) car susceptibles de changer
+# pas dans les hachages gérés par AUTOLOAD de Text::Editor::Easy) car susceptibles de changer
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
 
-use strict;
 use Scalar::Util qw(refaddr weaken);
 
-#use Easy::Comm;
-use Comm;
+use Text::Editor::Easy::Comm;
 
 # 2 attributs pour un objet "Line"
 my %ref_Editor;    # Une ligne appartient à un éditeur unique
@@ -46,7 +60,7 @@ sub next {
     my $ref        = refaddr $self;
     my $ref_editor = $ref_Editor{$ref};
     my $next_id    = $ref_editor->display_next( $ref_id{$ref} );
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $next_id,
@@ -59,7 +73,7 @@ sub previous {
     my $ref         = refaddr $self;
     my $ref_editor  = $ref_Editor{$ref};
     my $previous_id = $ref_editor->display_previous( $ref_id{$ref} );
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $previous_id,
@@ -73,7 +87,7 @@ sub next_in_file {
     my ( $id, $num ) = split( /_/, $ref_id{$ref} );
     my $ref_editor = $ref_Editor{$ref};
     my ($next_id) = $ref_editor->next_line($id);
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $ref_editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $next_id,
@@ -88,7 +102,7 @@ sub previous_in_file {
     my $ref_editor = $ref_Editor{$ref};
     my ($previous_id) = $ref_editor->previous_line($id);
 
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $ref_editor
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $previous_id,
@@ -102,7 +116,7 @@ sub line {
     my ( $id, $num ) = split( /_/, $ref_id{$ref} );
     my $ref_editor = $ref_Editor{$ref};
 
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
@@ -137,14 +151,16 @@ sub DESTROY {
 }
 
 my %sub = (
-    'text'             => [ 'graphic', \&Abstract::display_text ],
-    'next_is_same'     => [ 'graphic', \&Abstract::display_next_is_same ],
-    'previous_is_same' => [ 'graphic', \&Abstract::display_previous_is_same ],
-    'ord'              => [ 'graphic', \&Abstract::display_ord ],
-    'height'           => [ 'graphic', \&Abstract::display_height ],
-    'number'           => [ 'graphic', \&Abstract::display_number ],
-    'abs'              => [ 'graphic', \&Abstract::display_abs ],
-    'select'           => [ 'graphic', \&Abstract::display_select ],
+    'text' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_text ],
+    'next_is_same' =>
+      [ 'graphic', \&Text::Editor::Easy::Abstract::display_next_is_same ],
+    'previous_is_same' =>
+      [ 'graphic', \&Text::Editor::Easy::Abstract::display_previous_is_same ],
+    'ord'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_ord ],
+    'height' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_height ],
+    'number' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_number ],
+    'abs'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_abs ],
+    'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_select ],
 );
 
 sub AUTOLOAD {
@@ -153,10 +169,11 @@ sub AUTOLOAD {
     my ( $self, @param ) = @_;
 
     my $what = $AUTOLOAD;
-    $what =~ s/^(\w+):://;
+    $what =~ s/^Text::Editor::Easy::Display:://;
 
     if ( !$sub{$what} ) {
-        print "La méthode $what n'est pas connue de l'objet Display\n";
+        print
+"La méthode $what n'est pas connue de l'objet Text::Editor::Easy::Display\n";
         return;
     }
 
@@ -175,5 +192,33 @@ sub count {
     }
     return $total;
 }
+
+=head1 FUNCTIONS
+
+=head2 count
+
+=head2 line
+
+=head2 new
+
+=head2 next
+
+=head2 next_in_file
+
+=head2 previous
+
+=head2 previous_in_file
+
+=head2 ref
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

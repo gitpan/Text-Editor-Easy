@@ -1,7 +1,21 @@
-package Editor::Tee;
-use IO::File;
+package Text::Editor::Easy::Program::Flush;
+
+use warnings;
 use strict;
 
+=head1 NAME
+
+Text::Editor::Easy::Program::Flush - STDOUT and SDTERR redirection when launching a new application from "Editor.pl" program.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+use IO::File;
 use File::Basename;
 my $name = fileparse($0);
 my $info = "tmp/${name}_Flush.info";
@@ -50,7 +64,17 @@ package main;
 
 my $own_STDOUT = "tmp/${name}_trace.trc";
 unlink($own_STDOUT);
-tie *STDOUT, "Editor::Tee", ( $own_STDOUT, 'STDOUT' );
-tie *STDERR, "Editor::Tee", ( $own_STDOUT, 'STDERR' );
+tie *STDOUT, "Text::Editor::Easy::Program::Flush", ( $own_STDOUT, 'STDOUT' );
+tie *STDERR, "Text::Editor::Easy::Program::Flush", ( $own_STDOUT, 'STDERR' );
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

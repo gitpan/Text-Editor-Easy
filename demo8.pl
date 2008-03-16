@@ -13,7 +13,7 @@
 #       in the $self object received by the
 #       following anonymous sub (or any
 #       other change if you are not afraid of
-#       the interface of the Editor module)
+#       the interface of the Text::Editor::Easy module)
 #
 #  2 - then add characters to the macro
 #       panel at the bottom to force a new
@@ -27,7 +27,7 @@
 sub {
     my ( $self, @param ) = @_;
 
-    print "\nIn method 'demo8' of Editor object $self\n";
+    print "\nIn method 'demo8' of Text::Editor::Easy object $self\n";
     print " received param : @param\n\n";
 
     $self->deselect;
@@ -46,7 +46,7 @@ sub {
   # And what ?
   # You don't see the point ?
   # This file is in fact the "dynamic"
-  # method "demo8" of the Editor object.
+  # method "demo8" of the Text::Editor::Easy object.
   #
   # Here you are designing your own
   # application from whithin your application :

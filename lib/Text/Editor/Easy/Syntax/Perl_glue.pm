@@ -1,6 +1,20 @@
-package Sup;
+package Text::Editor::Easy::Syntax::Perl_glue;
 
+use warnings;
 use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Syntax::Perl_glue - Perl highlighting (will always be limited, perl is too dynamic...). Contexts are still not yet managed.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
 use Syntax::Highlight::Perl ':FULL';
 my $formatter = new Syntax::Highlight::Perl;
 
@@ -122,5 +136,19 @@ sub syntax {
     }
     return @format;
 }
+
+=head1 FUNCTIONS
+
+=head2 syntax
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

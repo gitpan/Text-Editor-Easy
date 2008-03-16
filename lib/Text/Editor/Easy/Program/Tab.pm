@@ -1,11 +1,25 @@
-package Easy::Program::Tab;
+package Text::Editor::Easy::Program::Tab;
 
-#use Easy::Comm;
-use Comm;
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Program::Tab - Tab simulation with just a Text::Editor::Easy object.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+use Text::Editor::Easy::Comm;
 
 #sub anything_for_me {};
 use File::Basename;
-use strict;
+
 use Data::Dump qw(dump);
 
 my %tab_object;
@@ -24,16 +38,18 @@ sub on_top_editor_change {
     my $tab_editor = $tab_object{$tab_ref};
     if ( !$tab_editor ) {
         print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
-        $tab_editor = bless \do { my $anonymous_scalar }, "Editor";
+        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
         $tab_editor->reference($tab_ref);
         $tab_object{$tab_ref} = $tab_editor;
     }
     my $info_ref      = $tab_editor->load_info;
     my $file_list_ref = $info_ref->{'file_list'};
 
+    print "Dans on_top_editor_change avant appel file_name\n";
+
     # Attention, file_name peut être indéfini, il faut également tester name...
     my $file_name = $new_on_top_editor->file_name;
-
+    print "Dans on_top_editor_change après appel file_name $file_name\n";
     my $indice = 0;
     my $start  = 0;
     my $end;
@@ -53,8 +69,9 @@ sub on_top_editor_change {
         $start += length( $file_conf_ref->{'name'} ) + 1;
         $end   += 1;
     }
+    print "Dans on_top_editor_change après appel file_name\n";
     if ( !$found_ref ) {
-        print "PAs trouvé le nom de $file_name";
+        print "PAs trouvé le nom de $file_name\n";
         my @highlight = ();
         my @file      = ();
         my $name;
@@ -88,8 +105,10 @@ sub on_top_editor_change {
         $tab_editor->save_info($info_ref);
     }
 
-    #print "Forçage de la ligne 1 de tab_editor à $tab_line\n";
+    print "Forçage de la ligne 1 de tab_editor à $tab_line\n";
     my $first = $tab_editor->first;
+    print "On top editor change, première ligne de l'onglet : |", $first->text,
+      "|\n";
     if ( !$first ) {
         ($first) = $tab_editor->insert($tab_line);
         if ( !$first ) {
@@ -106,6 +125,8 @@ sub on_top_editor_change {
             $tab_editor->insert($tab_line);
         }
     }
+    print "On top editor change 2 (", $tab_editor->get_unique_ref,
+      ") première ligne de l'onglet : |", $tab_editor->first->text, "|\n";
     $tab_editor->deselect;
 
     #print "First $first\n";
@@ -116,10 +137,13 @@ sub on_top_editor_change {
 sub motion_over_tab {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
 
-    # Vérification que l'on est bien sur la première ligne
+ #print "Dans motion_over_tab $unique_ref|$editor|", $hash_ref->{'line'}, "|\n";
+ #print "Reference du tab $editor : ", $editor->get_unique_ref, "\n";
+ # Vérification que l'on est bien sur la première ligne
     return if ( anything_for_me() );
 
-    my $first_line   = $editor->first;
+    my $first_line = $editor->first;
+    print "First line $first_line\n";
     my $pointed_line = $hash_ref->{'line'};
     return if ( $first_line != $pointed_line );
 
@@ -156,23 +180,47 @@ sub motion_over_tab {
     }
 
     #print "FILE _ref |$name|$file_ref->{'file'}\n";
-    my $new_on_top = Editor->whose_name($name);
+    my $new_on_top = Text::Editor::Easy->whose_name($name);
     if ( !$new_on_top ) {
 
    # L'éditeur n'existe pas on le crée à la volée
    #print "Création d'un éditeur par motion sur tab : ", dump ($file_ref), "\n";
         return if ( !$file_ref->{'zone'} );
         $file_ref->{'focus'} = 'yes';
-        $new_on_top = Editor->new($file_ref);
 
+        #$new_on_top = Text::Editor::Easy->new($file_ref);
+
+# Appel asynchrone obligatoire : la création d'un éditeur peut obliger le thread 0 à appeler le thread motion
+# de façon synchrone si des évènements sont "à référencer de façon asynchrone"
+# ==> et en cas d'appel synchrone ici, on aurait un deadlock : 3 en attente de 0, lui-même en attente de 3
+        Text::Editor::Easy::Async->new($file_ref);
     }
     else {
 
 #print "Avant demande de changement de focus |", $new_on_top->ref, $new_on_top->file_name, "|", $new_on_top->name,"|\n";
-        $new_on_top->focus;
+#$new_on_top->focus;
+        $new_on_top->async->focus;
     }
 
 #print "Fichier du nouveau new_on_top : |", $new_on_top->file_name, "|$new_on_top|", $new_on_top->ref, "|\n";
 }
+
+=head1 FUNCTIONS
+
+=head2 motion_over_tab
+
+=head2 on_main_editor_change
+
+=head2 on_top_editor_change
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

@@ -1,11 +1,54 @@
+package Text::Editor::Easy::File_manager;
+
+use warnings;
 use strict;
 
-package File_manager;
+=head1 NAME
 
-#use Easy::Comm;
-use Comm;
+Text::Editor::Easy::File_manager - Management of the data that is edited.
 
-#sub get_task_to_do {};
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+=head1 SYNOPSIS
+
+By complexity order, this module, I think, is the third.
+
+If you create a "Text::Editor::Easy" object, this module will be called very often (but you don't even have to know 
+that this module exists, thanks to "Text::Editor::Easy::Comm").
+
+It manages "file" or "memory" data in a very lazy way. Too lazy for now. I'm going to ask more to this module
+soon.
+
+You can read data from the start of the file, from the bottom, from the midde, ... from where you want in fact.
+I just use the "seek" instruction for that. You can read a line, its next or its previous.
+
+This module is lazy because it doesn't read the file even once. I will change this to compute the line number and
+put some references in order to access faster to a given line number (with an interuptible long task at start).
+
+If you modify a line that is on a file, well it has to work (reluctantly !). It puts the line in memory and will never
+fetch this line any more from the file.
+
+When you save a modified file, it reads data from the initial file (for non-modified lines) or from memory 
+(when modified), create a new file and when finished, move the new file to the initial.
+
+There is a little drawback : you need more disk space than an Editor which would load everything into memory.
+The big advantage is that this module don't waste time reading uninteresting data : it reads only on the file the
+part you can see on the screen. Said like that, this seems obvious not to ask more to your computer. But most
+Editors think it's useful to read everything (well, it's surely because most programmers don't want to manage the
+complexity !). And when the file is huge, your entire system blocks. This seems stupid, because who is able
+to watch several Go of text data in a single day ? Well, I should say in a single year : but, nowadays, with 
+cheap hard drive, most people don't know any more what can contain 1 single Go of text data.
+
+=cut
+
+#use Text::Editor::Easy::Comm; Interruptible task not yet done, so Comm is still useless
+
 use Scalar::Util qw(refaddr);
 use Data::Dump qw(dump);
 use Devel::Size qw(size total_size);
@@ -54,21 +97,17 @@ use constant {
     NUMBER       => 1,
 };
 
-sub manage_requests {
-    my ( $editor, $file_name, $growing_file, $save_info ) = @_;
+sub init_file_manager {
 
-    my %need_who = (
-        'init_read'                         => 1,
-        'read_next'                         => 1,
-        'save_line_number'                  => 1,
-        'create_ref_current'                => 1,
-        'get_line_number_from_ref_internal' => 1,
-        'read_until2'                       => 1,
-        'ref_of_read_next'                  => 1,
-    );
+    #my ( $editor, $file_name, $growing_file, $save_info ) = @_;
+    my ( $file_manager_ref, $reference, $file_name, $growing_file, $save_info )
+      = @_;
+
+#print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$file_name\n";
 
     my $file_desc;
-    my $file_manager_ref;
+
+    #my $file_manager_ref;
 
     my $segment_ref;    # Segment père de tous les segments
 
@@ -108,75 +147,7 @@ sub manage_requests {
         $file_manager_ref->[GROWING] = 0;
     }
 
-    my %ref_sub
-      ; # Stockage des méthodes appelées pour éviter l'évaluation dès le 2ème appel
-
-  TASK: while ( my ( $what, @param ) = get_task_to_do() ) {
-        last if ( !defined $what );
-        if ( $file_manager_ref->[GROWING] ) {
-            if ( $file_manager_ref->[SEEK_END] != ( stat $file_name )[7] ) {
-
-#print "avant réouv. DE $file_name ", (stat $file_name )[7], "|", $file_manager_ref->[SEEK_END], "|\n";
-                close($file_desc);
-                open( $file_desc, $file_name )
-                  or die "Impossible d'ouvrir $file_name : $!\n";
-
-#print "REOUVERTURE DE $file_name ", (stat $file_desc)[7], "|", $file_manager_ref->[SEEK_END], "|\n";
-                my $new_size = ( stat $file_desc )[7];
-                $file_manager_ref->[SEEK_END]        = $new_size;
-                $file_manager_ref->[ROOT][FILE_DESC] = $file_desc;
-                $file_manager_ref->[FILE_DESC]       = $file_desc;
-                $file_manager_ref->[ROOT][SEEK_END]  = $new_size;
-            }
-        }
-        if ( !$ref_sub{$what} ) {
-            my $ref_sub = eval "\\&$what";
-
-            #print "Premier appel à $what\n";
-            my $response;
-            if ( $need_who{$what} ) {
-                eval {
-                    $response =
-                      just_call_with_who( $file_manager_ref, $ref_sub, @param );
-                };
-            }
-            else {
-                eval {
-                    $response =
-                      simple_context_call( $file_manager_ref, $ref_sub,
-                        @param );
-                };
-            }
-            if ($@) {
-                print STDERR
-"La fonction $what n'est pas correctement implémentée dans le package ",
-                  __PACKAGE__, "\n";
-                respond( @param, undef );
-            }
-            else {
-                respond( @param, $response );
-                $ref_sub{$what} = $ref_sub;
-            }
-        }
-        else {
-            if ( $need_who{$what} ) {
-                call_with_who( $file_manager_ref, $ref_sub{$what}, @param );
-            }
-            else {
-                simple_call( $file_manager_ref, $ref_sub{$what}, @param );
-            }
-        }
-
-        #Ménage en tâche de fond
-        #if ( defined $file_manager_ref->[TO_DELETE] ) {
-        #    while ( ! anything_for_me ) {
-        #clean ($file_manager_ref);
-        #        clean ($file_manager_ref->[TO_DELETE]);
-        #    }
-        #}
-    }
-
-    #actions_to_do_before_dying ( $self );
+    return $file_manager_ref;
 }
 
 sub display {
@@ -430,6 +401,12 @@ sub query_segments {
     }
 }
 
+sub close {
+    my ($self) = @_;
+
+    close $self->[ROOT][FILE_DESC];
+}
+
 sub save_internal {
 
 # Cette fonction est bloquante : à réécrire : sauvegarde rapide la structure, puis création d'un thread de sauvegarde avec doublage
@@ -498,9 +475,9 @@ sub save_internal {
     $new_root_ref->[SEEK_END] = tell $new_file_desc;
 
     if ( $self->[ROOT][FILE_DESC] ) {
-        close $self->[ROOT][FILE_DESC];
+        CORE::close $self->[ROOT][FILE_DESC];
     }
-    close $new_file_desc;    # Vérification avec diff
+    CORE::close $new_file_desc;    # Vérification avec diff
     use File::Copy;
     move( $temp_file_name, $file_name );
 
@@ -530,7 +507,7 @@ sub revert_internal {
 
     undef $self->[ROOT][FIRST];
     undef $self->[ROOT][LAST];
-    close $self->[ROOT][FILE_DESC];
+    CORE::close $self->[ROOT][FILE_DESC];
     open( $self->[ROOT][FILE_DESC], $self->[ROOT][FILE_NAME] )
       or die "Impossible dans revert d'ouvrir $self->[ROOT][FILE_NAME] : $!\n";
     $self->[ROOT][SEEK_START] = 0;
@@ -573,7 +550,7 @@ sub empty_internal {
 #print "Après undef : self->[TO_DELETE][FIRST] = ", dump $self->[TO_DELETE][FIRST], "\n";
 #print "Après undef : self->[TO_DELETE][LAST]  = ", dump $self->[TO_DELETE][LAST], "\n";
     if ( $self->[ROOT][FILE_DESC] ) {
-        close $self->[ROOT][FILE_DESC];
+        CORE::close $self->[ROOT][FILE_DESC];
         undef $self->[ROOT][FILE_DESC];
         $self->[ROOT][SEEK_START] = 0;
         $self->[ROOT][SEEK_END]   = 0;
@@ -696,12 +673,19 @@ sub next_line {
     my ( $self, $ref ) = @_;
 
     if ( !$ref ) {
+
+        #print "next_line : pas de ref demandée\n";
         my $line_ref = first_( $self->[ROOT] );
         if ($line_ref) {
             my $ref = save_line( $self, $line_ref );
+            print
+              "Dans next_line Une référence a été trouvée : $line_ref|$ref|",
+              $line_ref->[TEXT], "\n";
             return ( $ref, $line_ref->[TEXT] );
         }
         else {    # Aucune ligne à renvoyer
+            print "Dans next line : Pas de référence trouvée, Threads tid : ",
+              threads->tid, "\n";
             return;
         }
     }
@@ -1133,5 +1117,95 @@ sub load_info {
 
     return $self->[SAVED_INFO];
 }
+
+=head1 FUNCTIONS
+
+=head2 clean
+
+=head2 close
+
+=head2 create_ref_current
+
+=head2 delete_and_return_first
+
+=head2 delete_line
+
+=head2 display
+
+=head2 empty_internal
+
+=head2 first_
+
+=head2 get_line_number_from_ref_internal
+
+=head2 get_next_ref
+
+=head2 get_ref_and_text_from_line_ref
+
+=head2 get_ref_for_empty_structure
+
+=head2 get_text_from_ref
+
+=head2 init_file_manager
+
+=head2 init_read
+
+=head2 last_
+
+=head2 line_seek_start
+
+=head2 load_info
+
+=head2 manage_requests
+
+=head2 modify_line
+
+=head2 new_line
+
+=head2 next_
+
+=head2 next_line
+
+=head2 prev_line
+
+=head2 previous_
+
+=head2 previous_line
+
+=head2 query_segments
+
+=head2 read_
+
+=head2 read_line_ref
+
+=head2 read_next
+
+=head2 read_previous_
+
+=head2 read_until
+
+=head2 read_until2
+
+=head2 ref_of_read_next
+
+=head2 revert_internal
+
+=head2 save_info
+
+=head2 save_internal
+
+=head2 save_line
+
+=head2 save_line_number
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

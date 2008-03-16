@@ -1,14 +1,14 @@
 #
 # Here is an example of
-# Editor object creation with
+# Text::Editor::Easy object creation with
 # a way to make actions on it
 # (a new "client thread" have been
 # created to execute your sub).
 #
 # The first argument of the sub is
-# the newly created Editor object.
+# the newly created Text::Editor::Easy object.
 #
-# "Editor->manage_event" is called
+# "Text::Editor::Easy->manage_event" is called
 # internally (by the initial thread).
 #
 # To execute it, still press F5 and
@@ -16,11 +16,12 @@
 # to be performed...
 #
 
-use lib '.';
+use strict;
+use lib 'lib';
 
-use Editor;
+use Text::Editor::Easy;
 
-Editor->new(
+my $editor_thread_0 = Text::Editor::Easy->new(
     {
         'sub'      => 'main',    # Sub for action
         'x_offset' => 60,
@@ -31,11 +32,18 @@ Editor->new(
 );
 
 print "The user have closed the window\n";
+if ( -f "Uninteresting_data.txt" ) {
+    print "File \"Uninteresting_data.txt\" will be removed\n";
+    $editor_thread_0->close;
+    if ( !unlink("Uninteresting_data.txt") ) {
+        print "Can't remove file \"Uninteresting_data.txt\" : $!\n";
+    }
+}
 
 sub main {
     my ($editor) = @_;
 
-    # You can now act on the Editor object with your program and
+    # You can now act on the Text::Editor::Easy object with your program and
     # the user can edit things too !
     # Dangerous, isn't it ?
 

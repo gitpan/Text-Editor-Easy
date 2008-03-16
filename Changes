@@ -1,5 +1,41 @@
 Revision history for Text-Editor-Easy
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
+-----------------------+
+0.01 : 20 January 2008 !
+-----------------------+
+        First version, 9 demos in Editor.pl program.
 
+-----------------------+
+0.1 : 16 March 2008    !
+-----------------------+
+        Standardization of thread mecanism. Using clean packages in "Text::Editor::Easy" namespace. Adding about 250 tests.
+
+a) Standardization of thread mecanism : see "Text::Editor::Easy::Comm" for a discussion of different types of threads
+---------------------------------------
+With the version 0.01, there were different implementations for each type of threads. And I also mixed "package" and "module" perl notions
+during thread creation process. I couldn't go on with this mess (this mess was an improvement of another mess, still, there is a time
+where you need to simplify, think another time, and reinvent something more powerful that fulfils all the new needs you have created :
+but it was, of course, impossible to imagine the actual solution before writing anything and seeing the needs).
+
+The version 0.1 is just that : the new thread mecanism. First this thread mecanism was completely separated from the other 
+thread mecanisms that were running. I created sample tests for this newly defined mecanism. Then, one by one, I migrated all the ancient
+thread to the new thread system. And, believe it or not, I had problems almost for each thread migration. This migration was difficult,
+because work has to be made but without any visible change (no visual functionnality added).
+
+b) Using clean packages in "Text::Editor::Easy" namespace
+---------------------------------------------------------
+The new thread system allowed me to use clean packages easily thanks to 'use' and 'package' options of the "create_new_server' sub.
+All my packages are now 'behind' "Text::Editor::Easy".
+
+c)  Adding about 250 tests
+--------------------------
+All tests should be written before writing any code, as soon as the interface have been defined. Only, it's not obvious to choose a right
+interface on the paper without using it and seeing the real problems.
+Often, I have to write bad code before I can think really about the interface (and I still write bad code after too !).
+I'm very careful about debugging because multi-thread is complex to debug. Sometimes all your threads work well, taken individually.
+But the communications between them is not synchronized : either some little things don't work or everything is blocked... The best
+way to avoid nightmares when I have to debug is to have the more tests I can and lots of displays to watch. With an Editor, you can
+have even better : a complete dynamic explanations of all displays (history of thread calls, from which module/line and so on...).
+I'll try to have this complete debugging tool working before version 1.0. For the moment, history is done in only one thread and
+that's too limited to understand a multi-threaded program. I think that to debug complex mecanism you need powerful tool.
+Otherwise, you lose more and more time maintaining your complexity and your complexity brings you nothing but new problems.

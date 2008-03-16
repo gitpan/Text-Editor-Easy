@@ -1,21 +1,59 @@
-package Abstract;
+package Text::Editor::Easy::Abstract;
 
 use warnings;
 use strict;
 
-# Affichage
-#use Gtk_glue;
-use Easy::Graphic::Tk_glue;
+=head1 NAME
 
-# Maybe with version 1.0, here lies the explanation of my ugly re-use of the Editor module (no specific Tk tab...)
-#use Graphic::Console_glue;
+Text::Editor::Easy::Abstract - The module that manages everything that is displayed.
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
+
+=head1 SYNOPSIS
+
+There are 2 (or 3 if we include the "Text::Editor::Easy::File_manager" module) complex modules in the "Text::Editor::Easy" tree.
+This module and the "Text::Editor::Easy::Comm" which handles communication between threads.
+
+If you create a "Text::Editor::Easy" object, this module will be called very often. Lots of methods are
+redirected here (but you don't even have to know that this module exists, thanks to "Text::Editor::Easy::Comm").
+
+At the beginning (in 2006), there was only this "module-program". Little by little, this module has grown and
+has soon become an ugly mess (well, it still is !).
+When I decided to access the "text data" to be displayed in an another module, it became much simpler. At this
+very moment, I began to use more than one thread, and the number of different modules grew rapidly. This was
+the very good thing threads has brougth me : simplification by partition.
+
+This module has only limited knowledge of what is in the file. It knows only what it has to display according
+to the police size and to the screen size.
+
+When there is space to fill up, it asks "File_manager" for data. "File_manager" can provide data before or after
+a referenced line. When the user modify something, this module informs "File_manager".
+
+As soon a line is no more on the screen, this module forgets it (destroy it for speed reason) : it relies
+entirely on "File_manager" to memorize what should be.
+
+This trick has a big advantage. In fact, with my module, you can Edit text file of unlimited size with the same
+speed as little file. Not much Editors can do that. For huge file, my perl Editor is still usable whereas most C
+Editors are not. Of course, you could develop a C Editor with the same principle, ... good luck. With
+perl, it's just funny. In C, it's pure work.
+
+=cut
+
+# Affichage
+use Text::Editor::Easy::Graphic::Tk_glue;
 
 # Syntaxe
-use Easy::Syntax::perl_assist;
+use Text::Editor::Easy::Syntax::perl_assist;
 
 # Communication
-#use Easy::Comm;
-use Comm;
+use Text::Editor::Easy::Comm
+  qw(anything_for_me get_task_to_do execute_this_task reference_event_conditions);
 
 use Scalar::Util qw(refaddr);
 use Devel::Size qw(size total_size);
@@ -102,62 +140,62 @@ use constant {
     CURSOR    => 7,
     FILE      => 8,
     RETURN    => 10,    # Test de redirection
-    UNIQUE    => 11,    # Editor unique identifier
+    UNIQUE    => 11,    # Text::Editor::Easy unique identifier
     INIT_TAB  => 12,
     PARENT    => 13,
     REDIRECT  => 14,
     ASSIST    => 15,
 };
 
-use Easy::Key;
+use Text::Editor::Easy::Key;
 my %key = (
-    'Insert' => \&Key::inser,
-    'Prior'  => \&Key::page_up,
-    'Next'   => \&Key::page_down,
+    'Insert' => \&Text::Editor::Easy::Key::inser,
+    'Prior'  => \&Text::Editor::Easy::Key::page_up,
+    'Next'   => \&Text::Editor::Easy::Key::page_down,
 
-    'Down'  => \&Key::down,
-    'Up'    => \&Key::up,
-    'Home'  => \&Key::home,
-    'End'   => \&Key::end,
-    'Left'  => \&Key::left,
-    'Right' => \&Key::right,
+    'Down'  => \&Text::Editor::Easy::Key::down,
+    'Up'    => \&Text::Editor::Easy::Key::up,
+    'Home'  => \&Text::Editor::Easy::Key::home,
+    'End'   => \&Text::Editor::Easy::Key::end,
+    'Left'  => \&Text::Editor::Easy::Key::left,
+    'Right' => \&Text::Editor::Easy::Key::right,
 
-# Fonctions déroutées vers Editor pour récupérer l'objet Abstract en entrée des procédures
-# (utilisation du mécanisme d'AUTOLOAD du package Editor)
-    'Return'   => [ \&Editor::enter, { 'indent' => 'auto' } ],
-    'KP_Enter' => [ \&Editor::enter, { 'indent' => 'auto' } ],
-    'Delete'   => [ \&Editor::erase, 1 ],
+# Fonctions déroutées vers Text::Editor::Easy pour récupérer l'objet Abstract en entrée des procédures
+# (utilisation du mécanisme d'AUTOLOAD du package Text::Editor::Easy)
+    'Return'   => [ \&Text::Editor::Easy::enter, { 'indent' => 'auto' } ],
+    'KP_Enter' => [ \&Text::Editor::Easy::enter, { 'indent' => 'auto' } ],
+    'Delete'   => [ \&Text::Editor::Easy::erase, 1 ],
 
-    'BackSpace'  => \&Key::backspace,
-    'ctrl_End'   => \&Key::end_file,
-    'ctrl_Home'  => \&Key::top_file,
-    'ctrl_Right' => \&Key::jump_right,
-    'ctrl_Left'  => \&Key::jump_left,
-    'ctrl_q'     => \&Key::query_segments,
-    'ctrl_Q'     => \&Key::query_segments,
-    'ctrl_s'     => \&Key::save,
-    'ctrl_S'     => \&Key::save,
+    'BackSpace'  => \&Text::Editor::Easy::Key::backspace,
+    'ctrl_End'   => \&Text::Editor::Easy::Key::end_file,
+    'ctrl_Home'  => \&Text::Editor::Easy::Key::top_file,
+    'ctrl_Right' => \&Text::Editor::Easy::Key::jump_right,
+    'ctrl_Left'  => \&Text::Editor::Easy::Key::jump_left,
+    'ctrl_q'     => \&Text::Editor::Easy::Key::query_segments,
+    'ctrl_Q'     => \&Text::Editor::Easy::Key::query_segments,
+    'ctrl_s'     => \&Text::Editor::Easy::Key::save,
+    'ctrl_S'     => \&Text::Editor::Easy::Key::save,
 
-    'F3' => \&Editor::next_search,
+    'F3' => \&Text::Editor::Easy::next_search,
 
-    'ctrl_c' => \&Key::copy_line,
-    'ctrl_C' => \&Key::copy_line,
+    'ctrl_c' => \&Text::Editor::Easy::Key::copy_line,
+    'ctrl_C' => \&Text::Editor::Easy::Key::copy_line,
 
     'ctrl_r' => \&revert,
     'ctrl_R' => \&revert,
 
-    'ctrl_v' => \&Key::paste,
-    'ctrl_V' => \&Key::paste,
+    'ctrl_v' => \&Text::Editor::Easy::Key::paste,
+    'ctrl_V' => \&Text::Editor::Easy::Key::paste,
 
-    'ctrl_w' => \&Key::wrap,
-    'ctrl_W' => \&Key::wrap,
+    'ctrl_w' => \&Text::Editor::Easy::Key::wrap,
+    'ctrl_W' => \&Text::Editor::Easy::Key::wrap,
 
-    'ctrl_x'    => \&Key::cut_line,
-    'ctrl_X'    => \&Key::cut_line,
-    'ctrl_Up'   => \&Key::jump_up,
-    'ctrl_Down' => \&Key::jump_down,
-    'alt_Up'    => \&Key::move_up,
-    'alt_Down'  => \&Key::move_down,
+    'ctrl_x'    => \&Text::Editor::Easy::Key::cut_line,
+    'ctrl_X'    => \&Text::Editor::Easy::Key::cut_line,
+    'ctrl_Up'   => \&Text::Editor::Easy::Key::jump_up,
+    'ctrl_Down' => \&Text::Editor::Easy::Key::jump_down,
+    'alt_Up'    => \&Text::Editor::Easy::Key::move_up,
+    'alt_Down'  => \&Text::Editor::Easy::Key::move_down,
 
     'ctrl_p'    => \&increase_line_space,
     'ctrl_P'    => \&increase_line_space,
@@ -165,15 +203,15 @@ my %key = (
     'ctrl_M'    => \&decrease_line_space,
     'ctrl_plus' => \&increase_font,
 
-    'ctrl_shift_n' => \&Key::print_screen_number,
-    'ctrl_shift_N' => \&Key::print_screen_number,
-    'ctrl_shift_l' => \&Key::display_cursor_display,
-    'ctrl_shift_L' => \&Key::display_cursor_display,
-    'ctrl_shift_p' => \&Key::list_display_positions,
-    'ctrl_shift_P' => \&Key::list_display_positions,
+    'ctrl_shift_n' => \&Text::Editor::Easy::Key::print_screen_number,
+    'ctrl_shift_N' => \&Text::Editor::Easy::Key::print_screen_number,
+    'ctrl_shift_l' => \&Text::Editor::Easy::Key::display_cursor_display,
+    'ctrl_shift_L' => \&Text::Editor::Easy::Key::display_cursor_display,
+    'ctrl_shift_p' => \&Text::Editor::Easy::Key::list_display_positions,
+    'ctrl_shift_P' => \&Text::Editor::Easy::Key::list_display_positions,
 
-    'alt_ampersand' => \&Key::sel_first,
-    'alt_eacute'    => \&Key::sel_second,
+    'alt_ampersand' => \&Text::Editor::Easy::Key::sel_first,
+    'alt_eacute'    => \&Text::Editor::Easy::Key::sel_second,
 );
 
 my %font;
@@ -182,9 +220,9 @@ my %abstract
   ;   # A une référence d'éditeur unique, on fait correspondre un objet Abstract
 
 # Redirection
-my %redirect = do "Easy/Data/Events.pm";
-my %event_zone;
+my %redirect = do "Text/Editor/Easy/Data/Events.pm";
 
+my %event_zone;
 my %use;
 
 sub new {
@@ -218,7 +256,8 @@ sub new {
                 my $use = $redirect_ref->{'use'};
                 if ( defined $use and !$use{$use} ) {
                     eval "use $use";
-                    print "EVAL use $use en erreur\n$@\n" if ($@);
+
+                    #print "EVAL use $use en erreur\n$@\n" if ($@);
                     $use{$use} = 1;
                 }
                 my $package = $redirect_ref->{'package'};
@@ -261,8 +300,9 @@ sub new {
     if ( my $tab_ref = $hash_ref->{'highlight'} ) {
         if ( my $use = $tab_ref->{'use'} ) {
             eval "use $use";
-            print "EVAL use $use en erreur\n$@\n" if ($@);
-            if ( $use eq 'Syntax::Perl_glue' ) {
+
+            #print "EVAL use $use en erreur\n$@\n" if ($@);
+            if ( $use eq 'Text::Editor::Easy::Syntax::Perl_glue' ) {
                 $edit_ref->[ASSIST] = 1;
             }
         }
@@ -286,7 +326,7 @@ sub new {
     if ( defined $hash_ref->{'y_offset'} ) {
         $y_offset = $hash_ref->{'y_offset'};
     }
-    $edit_ref->[GRAPHIC] = Graphic->new(
+    $edit_ref->[GRAPHIC] = Text::Editor::Easy::Graphic->new(
         {
             'title'                       => $edit_ref->[FILE],
             'width'                       => $width,
@@ -437,35 +477,16 @@ sub new {
 my %ref_sub;
 
 sub examine_external_request {
-    my ($edit_ref) = @_
-      ; # L'éditeur va être envoyé lors de chaque requête (sous la forme de l'identifiant unique)
 
     #while ( anything_for_me ) { # Ne marche pas bien sous Linux (?)
     if ( anything_for_me() ) {
-        my ( $what, @param ) = get_task_to_do();
-
-        if ( !$ref_sub{$what} ) {
-
-    #warn "La fonction $what ne peut pas être gérée par ce thread (Abstract)\n";
-    #print "On essaie quand même (appel ask2 possible...)\n";
-            my $ref_sub = eval "\\&$what";
-            $ref_sub{$what} = $ref_sub;
-            $origin         = $param[0];
-            $sub_origin     = $what;
-            simple_call( undef, $ref_sub{$what}, @param );
-        }
-        else {
-            $origin     = $param[0];
-            $sub_origin = $what;
-            simple_call( undef, $ref_sub{$what}, @param );
-        }
-        $origin     = 'graphic';
-        $sub_origin = undef;
+        my ( $what, $call_id, @param ) = get_task_to_do();
+        $origin     = $call_id;
+        $sub_origin = $what;
+        execute_this_task( $what, $call_id, @param );
     }
-}
-
-sub new_editor {
-    Comm::new_editor(@_);
+    $origin     = "graphic";
+    $sub_origin = undef;
 }
 
 sub test {
@@ -493,11 +514,18 @@ sub test {
     }
 }
 
-# On donne la main au gestionnaire d'évènement : le thread principal n'exéctera plus que examine_external_request périodiquement
+# On donne la main au gestionnaire d'évènement : le thread principal n'exécutera plus que examine_external_request périodiquement
 sub manage_event {
-    my ($edit_ref) = @_;
-    $edit_ref->[GRAPHIC]->manage_event();
-
+    my $compteur = 0;
+    for ( keys %abstract ) {
+        $compteur += 1;
+        $abstract{$_}->[GRAPHIC]->manage_event();
+        last;
+    }
+    if ( !$compteur ) {
+        print STDERR
+"Can't call manage_event loop when no Text::Editor::Easy is created\n";
+    }
 }
 
 #-------------------------------------------------
@@ -1088,7 +1116,7 @@ sub get_position_from_line_and_abs {
     my $position = 0;
     my $text_ref = $line_ref->[FIRST];
     while (
-        $text_ref->[NEXT
+        $text_ref->[ NEXT
         ]   # Ne pas creer de tableau par autovivification si pas d'element NEXT
         and $text_ref->[NEXT][ABS] - $edit_ref->[SCREEN][VERTICAL_OFFSET] < $x
       )
@@ -1180,6 +1208,10 @@ sub resize {
 
 # On lance le "serveur" de thread mais uniquement lorsque l'éditeur est affiché entièrement (revoir dans le cas multi-fichier
 # ==> désactivation puis réactivation ?)
+#print "Dans Abstract resize, lancement de examine_external_request\n";
+
+# Cette boucle, "multi-instances", ne doit être lancée qu'une seule fois (==> dans verify_graphic ?)
+# Donc pas dans le premier resize de chaque éditeur
         $edit_ref->[GRAPHIC]
           ->launch_loop( \&examine_external_request, $edit_ref );
     }
@@ -3344,11 +3376,12 @@ sub on_top {
     my ( $self, $hash_ref ) = @_;    # hash_ref est défini qu'en création
     my $zone = $self->[GRAPHIC]->get_zone;
 
-    print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
-      $self->[PARENT]->ref, "|\n";
+    #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
+    #  $self->[PARENT]->ref, "|\n";
 
-    my $graphic = Graphic->get_graphic_focused_in_zone($zone);
-    if ( defined $graphic and ref $graphic eq 'Graphic' ) {
+    my $graphic =
+      Text::Editor::Easy::Graphic->get_graphic_focused_in_zone($zone);
+    if ( defined $graphic and ref $graphic eq 'Text::Editor::Easy::Graphic' ) {
         return if ( $graphic == $self->[GRAPHIC] );
 
         #print "Réel changement de on_top...\n";
@@ -3368,6 +3401,7 @@ sub on_top {
 #				);
 #		}
 #}
+    return if ( !defined $zone );
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref
         and my $data_ref = $event_ref->{'on_top_editor_change'} )
@@ -3456,14 +3490,14 @@ sub decrease_line_space {
 
 sub resize_all {
 
-    #my @zones = Zone->list;
-    #ZONE: for my $zone ( @zones ) {
-    #print "Zone $zone\n";
-    #my $graphic = Graphic->get_graphic_focused_in_zone ( $zone );
+#my @zones = Text::Editor::Easy::Zone->list;
+#ZONE: for my $zone ( @zones ) {
+#print "Zone $zone\n";
+#my $graphic = Text::Editor::Easy::Graphic->get_graphic_focused_in_zone ( $zone );
     for my $abstract_ref ( values %abstract ) {
 
         #if ( $graphic == $abstract_ref->[GRAPHIC] ) {
-        print "Editor $abstract_ref->[UNIQUE]\n";
+        print "Text::Editor::Easy $abstract_ref->[UNIQUE]\n";
         $abstract_ref->deselect;
         resize(
             $abstract_ref,
@@ -3496,5 +3530,306 @@ sub reference_zone_event {
         $event_zone{$name}{$event}{tab_ref} = $hash_ref->{sub}[1];
     }
 }
+
+sub abstract_join {
+    my ( $self, $tid ) = @_;
+
+    print "Dans abstract_join tid = $tid\n";
+    threads->object($tid)->join;
+    return $tid;
+}
+
+sub exit {
+    my ($rc) = @_;
+
+    Text::Editor::Easy::Comm::untie_print();
+    print "Dans exit |$rc|\n";
+    exit 0 if ( !$rc or $rc =~ /\D/ );
+    exit $rc;
+}
+
+=head1 FUNCTIONS
+
+=head2 abstract_eval
+
+=head2 abstract_join
+
+=head2 abstract_size
+
+=head2 add_tag
+
+=head2 add_tag_complete
+
+=head2 assist_on_inserted_text
+
+=head2 bind_key
+
+=head2 calc_line_position_from_display_position
+
+=head2 change_reference
+
+=head2 change_title
+
+=head2 check_cursor
+
+=head2 clean
+
+=head2 clear_screen
+
+=head2 clic_text
+
+=head2 concat
+
+=head2 create_line_ref_from_ref
+
+=head2 create_text_in_line
+
+=head2 cursor_abs
+
+=head2 cursor_display
+
+=head2 cursor_get
+
+=head2 cursor_line
+
+=head2 cursor_make_visible
+
+=head2 cursor_position_in_display
+
+=head2 cursor_position_in_text
+
+=head2 cursor_set
+
+=head2 cursor_virtual_abs
+
+=head2 decrease_line_space
+
+=head2 delete_return
+
+=head2 delete_text_in_line
+
+=head2 deselect
+
+=head2 display
+
+=head2 display_abs
+
+=head2 display_bottom_of_the_screen
+
+=head2 display_height
+
+=head2 display_line_from_bottom
+
+=head2 display_line_from_top
+
+=head2 display_next
+
+=head2 display_next_is_same
+
+=head2 display_number
+
+=head2 display_ord
+
+=head2 display_previous
+
+=head2 display_previous_is_same
+
+=head2 display_reference
+
+=head2 display_reference_line
+
+=head2 display_select
+
+=head2 display_text
+
+=head2 display_text_from_memory
+
+=head2 display_top_of_the_screen
+
+=head2 display_with_tag
+
+=head2 divide_line
+
+=head2 editor_insert_mode
+
+=head2 editor_set_insert
+
+=head2 editor_set_replace
+
+=head2 else
+
+=head2 empty
+
+=head2 enter
+
+=head2 erase
+
+=head2 examine_external_request
+
+=head2 exit
+
+=head2 focus
+
+=head2 for
+
+=head2 get_display_ref_from
+
+=head2 get_display_ref_from_ord
+
+=head2 get_displayed_editor
+
+=head2 get_first_complete_line
+
+=head2 get_line_number
+
+=head2 get_line_number_from_ord
+
+=head2 get_line_ords
+
+=head2 get_line_ref_from_display_ref
+
+=head2 get_line_ref_from_ord
+
+=head2 get_line_ref_from_ref
+
+=head2 get_position_from_line_and_abs
+
+=head2 get_screen_size
+
+=head2 if
+
+=head2 increase_font
+
+=head2 increase_line_space
+
+=head2 indent_on_return
+
+=head2 init
+
+=head2 inser
+
+=head2 insert
+
+=head2 key_press
+
+=head2 line_displayed
+
+=head2 line_ref_abs
+
+=head2 line_select
+
+=head2 load_search
+
+=head2 manage_event
+
+=head2 mouse_wheel_event
+
+=head2 move_bottom
+
+=head2 move_text
+
+=head2 new
+
+=head2 on_top
+
+=head2 parent
+
+=head2 position_cursor_in_display
+
+=head2 position_cursor_in_line
+
+=head2 read_next_line
+
+=head2 read_previous_line
+
+=head2 reference_zone_event
+
+=head2 resize
+
+=head2 resize_all
+
+=head2 return_complete_line
+
+=head2 revert
+
+=head2 save_search
+
+=head2 screen_first
+
+=head2 screen_font_height
+
+=head2 screen_height
+
+=head2 screen_last
+
+=head2 screen_line_height
+
+=head2 screen_margin
+
+=head2 screen_move
+
+=head2 screen_number
+
+=head2 screen_set_height
+
+=head2 screen_set_width
+
+=head2 screen_set_wrap
+
+=head2 screen_set_x_corner
+
+=head2 screen_set_y_corner
+
+=head2 screen_unset_wrap
+
+=head2 screen_width
+
+=head2 screen_wrap
+
+=head2 screen_x_offset
+
+=head2 screen_y_offset
+
+=head2 scrollbar_move
+
+=head2 search_line_ref_and_type
+
+=head2 select_text_element
+
+=head2 start_line
+
+=head2 suppress_bottom_invisible_lines
+
+=head2 suppress_from_screen_complete_line
+
+=head2 suppress_from_screen_line
+
+=head2 suppress_text
+
+=head2 suppress_top_invisible_lines
+
+=head2 test
+
+=head2 test_suppress_indent
+
+=head2 trunc
+
+=head2 update_vertical_scrollbar
+
+=head2 verify_if_cursor_is_visible_horizontally
+
+=head2 verify_if_cursor_is_visible_vertically
+
+=head2 wrap
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;

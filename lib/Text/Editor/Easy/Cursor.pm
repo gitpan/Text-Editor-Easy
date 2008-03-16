@@ -1,17 +1,27 @@
-package Cursor;
+package Text::Editor::Easy::Cursor;
 
-# Ce package n'est qu'une interface orientée objet à des fonctions de Abstract.pm rendues inaccessibles
-# car susceptibles de changer
+use warnings;
+use strict;
+
+=head1 NAME
+
+Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed by "Text::Editor::Easy::Abstract")
+
+=head1 VERSION
+
+Version 0.1
+
+=cut
+
+our $VERSION = '0.1';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode
 
-use strict;
 use Scalar::Util qw(refaddr);
 
-#use Easy::Comm;
-use Comm;
-use Easy::Line;
+use Text::Editor::Easy::Comm;
+use Text::Editor::Easy::Line;
 
 my %ref_Editor;    # Récupération des queue de comm (par ref + type)
 
@@ -32,11 +42,16 @@ sub set {
     #print "Dans cursor set : $position, $line1, $line2\n";
     my $line;
     if ( defined $line1 ) {
-        if ( ref $line1 eq 'Line' or ref $line1 eq 'Display' ) {
+        if (   ref $line1 eq 'Text::Editor::Easy::Line'
+            or ref $line1 eq 'Text::Editor::Easy::Display' )
+        {
             $line = $line1->ref;
         }
-        elsif ( defined $line2
-            and ( ref $line2 eq 'Line' or ref $line2 eq 'Display' ) )
+        elsif (
+            defined $line2
+            and (  ref $line2 eq 'Text::Editor::Easy::Line'
+                or ref $line2 eq 'Text::Editor::Easy::Display' )
+          )
         {
             $line = $line2->ref;
         }
@@ -56,13 +71,15 @@ sub set {
 }
 
 my %method = (
-    'position_in_display' => \&Abstract::cursor_position_in_display,
-    'position_in_text'    => \&Abstract::cursor_position_in_text,
-    'abs'                 => \&Abstract::cursor_abs,
-    'virtual_abs'         => \&Abstract::cursor_virtual_abs,
-    'line'                => \&Abstract::cursor_line,
-    'get'                 => \&Abstract::cursor_get,
-    'make_visible'        => \&Abstract::cursor_make_visible,
+    'position_in_display' =>
+      \&Text::Editor::Easy::Abstract::cursor_position_in_display,
+    'position_in_text' =>
+      \&Text::Editor::Easy::Abstract::cursor_position_in_text,
+    'abs'          => \&Text::Editor::Easy::Abstract::cursor_abs,
+    'virtual_abs'  => \&Text::Editor::Easy::Abstract::cursor_virtual_abs,
+    'line'         => \&Text::Editor::Easy::Abstract::cursor_line,
+    'get'          => \&Text::Editor::Easy::Abstract::cursor_get,
+    'make_visible' => \&Text::Editor::Easy::Abstract::cursor_make_visible,
 );
 
 sub AUTOLOAD {
@@ -71,10 +88,11 @@ sub AUTOLOAD {
     my ( $self, @param ) = @_;
 
     my $what = $AUTOLOAD;
-    $what =~ s/^(\w+):://;
+    $what =~ s/^Text::Editor::Easy::Cursor:://;
 
     if ( !$method{$what} ) {
-        warn "La méthode '$what' n'est pas connue de l'objet Cursor $self\n";
+        warn
+"La méthode '$what' n'est pas connue de l'objet Text::Editor::Easy::Cursor $self\n";
         return;
     }
 
@@ -87,7 +105,7 @@ sub line {
 
     my $ref = refaddr $self;
     my $id  = $ref_Editor{$ref}->cursor_line();
-    return Line->new(
+    return Text::Editor::Easy::Line->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
@@ -100,12 +118,32 @@ sub display {
     my $ref = refaddr $self;
     my $id  = $ref_Editor{$ref}->cursor_display();
 
-    return Display->new(
+    return Text::Editor::Easy::Display->new(
         $ref_Editor{$ref}
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $id,
     );
 }
+
+=head1 FUNCTIONS
+
+=head2 display
+
+=head2 line
+
+=head2 new
+
+=head2 set
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
 
 1;
 
