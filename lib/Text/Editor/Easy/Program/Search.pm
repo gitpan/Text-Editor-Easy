@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Text::Editor::Easy::Comm;
 
@@ -26,7 +26,7 @@ sub init_eval {
     my ( $self, $reference, $other_ref, $unique_ref ) = @_;
     print "============>INIT de Search .. $self, $unique_ref\n";
     $out = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    $out->reference($unique_ref);
+    Text::Editor::Easy::Comm::set_ref( $out, $unique_ref);
 
     #$out->insert('Bonjour');
     #$self, $package, $tab_methods_ref, $self_server
@@ -105,7 +105,7 @@ sub modify_pattern {
     return if ( anything_for_me() );
 
     $out->async->on_top;
-    Text::Editor::Easy::Async->exec_eval($program);
+    Text::Editor::Easy::Async->exec_eval($program, $hash_ref);
     return;
 }
 
@@ -135,7 +135,7 @@ sub search {
     print "IND $ind, EXP $exp\n";
     my @search = Text::Editor::Easy->list_in_zone('zone1');
     my $search = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    $search->reference( $search[$ind] );
+    Text::Editor::Easy::Comm::set_ref( $search, $search[$ind] );
 
     # Recherche dans l'écran
     return if ( anything_for_me() );

@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Flush - STDOUT and SDTERR redirection when launchin
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use IO::File;
 use File::Basename;

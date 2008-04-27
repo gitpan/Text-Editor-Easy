@@ -1,5 +1,6 @@
 use threads;
 use threads::shared;
+use Thread::Queue;
 
 =head1 NAME
 
@@ -7,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 =head1 SYNOPSIS
 
@@ -46,8 +47,11 @@ or any other combination). Second, I'm able to define dynamic methods and have a
 modifications. The demo8 of version 0.01 gave me ideas about what I needed to increase my productivity in developping my Editor.
 
 The "create_new_server" method can be called either with an instance, or with a class :
+
   my $tid = $editor->create_new_server ( {...} );
+  
 or
+
   my $tid = Text::Editor::Easy->create_new_server ( {...} );
 
 For an OWNED or MULTIPLEXED type, use the instance call. For the CLASS type use the class call. "create_new_server" uses a
@@ -89,7 +93,7 @@ Here are the parameters of the given hash to the "create_new_server" method :
 		# optionnal, gives a sub that will initialize the object.
 		# The sub does not need to return the object because the reference is given.
 		# Be careful, the first parameter received by 'package::sub_name' is the reference
-		# of the object that will be used to call the newly defined method (this is
+		# of the object that will be used when calling the newly defined methods (this is
 		# what should be initialized)
 		# AND THE SECOND PARAMETER is the "pseudo-reference" with which the "create_new_server"
 		# has been called (either "a unique reference" for an instance call which is an integer that
@@ -137,6 +141,7 @@ and  'use' option or by the "add_thread_method" and the 'use' option).
 
 The 'add_thread_method' allows you to define a new method for the thread and not necessarily for the same reference that was initially used
 for the thread creation. This "reference change" can modify slightly the "personnality" of your thread. The possible options for the hash are :
+
   'use' (evaluation of a new module for this method)
   'package'
   'method'
@@ -144,14 +149,15 @@ for the thread creation. This "reference change" can modify slightly the "person
   'memory' (for dynamic designing : the code of the method to be executed is given and not on a file)
 
 The 'add_thread_object' method allows you to add new objects in a MULTIPLEXED thread. The possible options for the hash are :
+
   'object' (see "create_new_server")
   'new' (see "create_new_server")
+  
 You don't add a new thread, but you ask an existing thread to handle a new instance with the same default methods that have been defined
 by "create_new_server" (and possibly added by "add_thread_method" if the reference was the same as the first initially used with "create_new_server").
 
 You may have a look at the tests included with "Text::Editor::Easy" if you want to understand by practise these explanations (for instance,
-"multiplexed_without_thread_creation.t" is a good example for asynchronous calls and a client that acts as a server). You can also look
-at all the "Text::Editor::Easy" modules of the tree directory.
+"multiplexed_without_thread_creation.t" is a good example for asynchronous calls and a client that acts as a server).
 
 =head1 EXPORT
 
@@ -164,8 +170,10 @@ a "lazy behaviour" : that is to say, which implements interruptible tasks.
 As communication between threads uses the "Thread::Queue" mecanism, you can know if there is something waiting for you in the "Queue".
 I encapsulate the "pending call" to the queue object in the "anything_for_me" function which does not accept any parameter.
 "anything_for_me" returns true if there is another task for you, false otherwise.
-If you look at my code, you'll see, in lots of my lazy graphical methods, the 
+If you look at my code, you'll see, in lots of my lazy graphical methods, the
+
 		return if anything_for_me;
+		
 This little line is magical. Before beginning a new heavy instruction, you check if something could invalidate your processing. Then, you may
 see another reason to create thread : if you can separate the functions that lead to give up other ones, you can put these functions in a
 single thread and write them in "lazy mode". No matter the memory used ! It's now cheap. But take into consideration the time of your
@@ -178,9 +186,11 @@ For me, what I have in mind is "counting the lines of a file that may be huge", 
 that to go further in the development of my Editor. "have_task_done" does not accept any parameter. For the moment, it returns "true" only
 if the thread should be stopped ("stop_thread" method already called).
 So, to create an interruptible long task, you could write, from time to time, during your long process :
+
   while ( anything_for_me ) {
     return if ( have_task_done );
   }
+  
 The difference between "return if anything_for_me" is that your thread still is in your long interruptible task after having done a few more
 urgent tasks. More over, you don't lose any of the values of your variables before the call. Except the "main shared object" that
 some of your methods normally shares (it could have been modified by the urgent calls), nothing should have been changed.
@@ -196,10 +206,6 @@ improved (more events have to be added and tested...).
 
 =cut
 
-my $trace_queue;
-share $trace_queue;
-
-my $synchronous_trace : shared = 1;
 my $data_thread : shared;
 
 package Text::Editor::Easy::Comm::Trace;
@@ -224,7 +230,8 @@ sub PRINT {
 
     my $who = threads->tid;
 
-    # Traçage de l'appel dans Data mais de façon asynchrone
+    # Traçage de l'appel dans Data et de façon synchrone ==> Data doit connaître le statut de tous les threads impliqués
+	# par ce print pour pouvoir faire des redirections très précises (voir reference_print_redirection et trace_full)
     my @calls;
     my $indice = 0;
     while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
@@ -237,27 +244,7 @@ sub PRINT {
         'calls' => $array_dump,
         'time'  => scalar(gettimeofday)
     );
-    if ( $synchronous_trace and defined $data_thread ) {
-        my $string = '';
-        for (@_) {
-            if ( defined $_ ) {
-                $string .= $_;
-            }
-        }
-        Text::Editor::Easy->trace_print( $hash_dump, @_ );
-    }
-    else {
-        my $string = '';
-        for (@_) {
-            if ( defined $_ ) {
-                $string .= $_;
-            }
-        }
-        my $trace =
-          Text::Editor::Easy::Comm::encode( 'trace', $who, 'Text::Editor::Easy',
-            'X', 'print', $hash_dump, @_ );
-        $trace_queue->enqueue($trace);
-    }
+    Text::Editor::Easy->trace_print( $hash_dump, @_ );
 }
 
 package Text::Editor::Easy::Comm::Null;
@@ -285,7 +272,7 @@ our @ISA = ("Exporter");
 
 #  qw ( execute_this_task anything_for_me get_task_to_do ask2 verify_model_thread respond simple_context_call verify_graphic verify_motion_thread reference_event_conditions have_task_done);
 our @EXPORT =
-  qw ( execute_this_task anything_for_me ask2 get_task_to_do reference_event_conditions have_task_done);
+  qw ( execute_this_task anything_for_me anything_for ask2 get_task_to_do reference_event_conditions have_task_done);
 
 our @EXPORT_OK =
   qw(get_anything_for_me get_task_to_do execute_this_task reference_event_conditions)
@@ -298,23 +285,20 @@ use threads;
 use Thread::Queue;
 use threads::shared;
 
-my %free;
-share(%free);
-
-my %queue_by_tid
-  ;    # Queue de réponse (queue cliente : un serveur la possède aussi)
+ # Queue de réponse (queue cliente : un serveur la possède aussi)
+my %queue_by_tid;   
 share(%queue_by_tid);
 
-my %server_queue_by_tid
-  ; # Queue server, d'attente de tâche : un client l'a aussi car il est d'abord serveur en attente au départ
-    # lors de la création de la grappe de thread
+# Queue server, d'attente de tâche : un client l'a aussi car il est d'abord serveur en attente au départ
+# lors de la création de la grappe de thread
+my %server_queue_by_tid;
 share(%server_queue_by_tid);
 
 my %stop_dequeue_server_queue;
 share(%server_queue_by_tid);
 
-my %synchronize
-  ; # indéfini tant que l'objet n'est pas correctement fini, 1 sinon (entrée, unique_ref)
+# indéfini tant que l'objet n'est pas correctement fini, 1 sinon (entrée, unique_ref)
+my %synchronize; 
 share(%synchronize);
 
 my %stop_server;
@@ -348,15 +332,23 @@ sub add_thread_method {
     my ( $self_server, $reference, $options_ref ) = @_;
 
     my $initial_instance_ref = $thread_knowledge{'instance'};
-    print "Dans add thread method : ", scalar( threads->list ), "\n";
+    #print "Dans add thread method : ", scalar( threads->list ), "\n";
 
     my $method = $options_ref->{'method'};
     return if ( !defined $method );
+	if ( ref $method ) { # ARRAY
+		# Appel récursif : à optimiser par la suite...
+		for my $new_method ( @$method ) {
+		    $options_ref->{'method'} = $new_method;
+		    add_thread_method ( $self_server, $reference, $options_ref );
+		}
+		return;
+    }
     my $method_ref;
     if ( my $program = $options_ref->{'memory'} ) {
 
         #Le code doit renvoyer une référence de sub
-        $method_ref->[REF] = eval "$program";
+        $method_ref->[REF] = eval $program;
         if ($@) {
             $method_ref->[COMPIL] = $@;
             print STDERR "Wrong code for method $method :\n$@\n";
@@ -368,6 +360,9 @@ sub add_thread_method {
         if ( defined $use ) {
             if ( !$use{$use} ) {
                 eval "use $use";
+				if ($@) {
+					print STDERR "Wrong code for module $use :\n$@\n";
+				}
                 $use{$use}{'messages'} = $@;
             }
         }
@@ -380,7 +375,7 @@ sub add_thread_method {
         $method_ref->[REF] = eval "\\&${package}::$sub";
     }
     if ( !$initial_instance_ref->{$reference} ) {
-        print "Ajout pour la nouvelle classe/méthode $reference de $method\n";
+        #print "Ajout pour la nouvelle classe/méthode $reference de $method\n";
         $ref_method{$method}[OTHER]{$reference} = $method_ref;
     }
     else {
@@ -408,111 +403,56 @@ sub add_thread_method {
             %hash = %{$hash_ref};
         }
         $hash{$reference} = threads->tid;
-        print "Ajout de la méthode $method pour la classe $reference\n";
+        #print "Ajout de la méthode $method pour la classe $reference\n";
         $get_tid_from_class_method{$method} = \%hash;
     }
-    print "Fin de add thread method : ", scalar( threads->list ), "\n";
+    #print "Fin de add thread method : ", scalar( threads->list ), "\n";
 }
 
 sub decode_message {
     my ($message) = @_;
 
-    return if ( !defined $message );
+    return if ( ! defined $message );
     return eval $message;
 }
-
-sub encode {
-    my @param = @_;
-
-    #if ( $param[0] ne 'print_encode' ) {
-    #		Text::Editor::Easy->print_encode( $param[0], $param[1] );
-    #}
-    return dump @param;
-}
-
-my $indice = 0;
 
 my %com_unique;
 
 sub simple_call {
-    my ( $self, $sub, $call_id, $context, @param ) = @_;
+    my ( $self, $sub_name, $sub_ref, $call_id, $context, @param ) = @_;
 
     my ( $who, $id ) = split( /_/, $call_id );
 
-    if ( !defined $self ) {
-        print STDERR "Call to simple_call with no self object defined\n";
-    }
-    my $response =
-      simple_context_call( $self, $sub, $call_id, $context, @param );
+    my $response = simple_context_call( $self, $sub_name, $sub_ref, $call_id, $context, @param );
 
-    if ( !defined $queue_by_tid{$who} ) {
-        print DBG "!!!!!!!!!!!!Pas de définition pour who = |$who|\n";
-        print DBG "=========>  Dans simple_call : $sub $who $context\n";
-        return;
-    }
-    my $synchronous = 0;
-    $synchronous = 1 if ( length $context == 1 );
-    print DBG "Longueur de context |$context|\n";
-    if ($synchronous) {
-        return respond( $call_id, $context, @param, $response );
+    #print DBG "Longueur de context  call_id $call_id|$context|\n";
+    if (length $context == 1) { # Synchronous call
+        if ( threads->tid == $who ) {    # Même thread
+            my ( $return_call_id, $return_message ) = split( /;/, $response, 2 );
+            return decode_message($return_message);
+        }
+        else { 
+            if ( !defined $queue_by_tid{$who} ) {
+                print STDERR "Can't answer to client $who as no queue to receive result has been found\n";
+                return;
+            }
+            $queue_by_tid{$who}->enqueue($response);
+        }
     }
     else {    # Appel asynchrone
-        my $from = threads->tid;
-
-# LEs traces sont synchrones donc pas de deep recursion si on revient d'une méthode asynchrone du thread data
-#if ( $from ne $data_thread or $method !~ /^trace/ ) {	        # En cas d'appel asynchrone, il faut quand même répondre, mais à Data
-        if ( $synchronous_trace and defined $data_thread ) {
-            Text::Editor::Easy->trace_response( $from, $call_id, undef,
-                gettimeofday(), $response );
-        }
-        else {
-            my $trace = encode(
-                'trace',              $who,
-                'Text::Editor::Easy', 'X',
-                'response',           $from,
-                $call_id,             undef,
-                gettimeofday(),       $response
-            );
-            $trace_queue->enqueue($trace);
-        }
-
-        #}
-    }
-}
-
-sub respond {
-    my ( $call_id, $context, @param ) = @_;
-
-    my ( $who, $id ) = split( /_/, $call_id );
-
-    my $response = pop @param;
-    print DBG "RESPOND : $call_id\n";
-    if ( threads->tid == $who and length($context) != 2 )
-    {    # Même thread + appel synchrone
-        my ( $return_call_id, $return_message ) = split( /;/, $response, 2 );
-        return decode_message($return_message);
-    }
-    elsif ( $context ne 'X' ) { # Appel asynchrone de mode trace, pas de réponse
-            #print DBG "CALL_ID $call_id, $context, @param\n";
-        $queue_by_tid{$who}->enqueue($response);
-    }
-    else {
-
-        #print "Appel asynchrone détecté...\n";
+		return if ( $sub_name =~ /^trace/ );
+		#print DBG "Appel asynchrone pour $sub_name, call_id $call_id, tid ", threads->tid, "\n";
+		
+		# Thread Data will memorize the answer (if "call_id" has been fetched by the client when calling the method)
+        Text::Editor::Easy->trace_response( threads->tid, $call_id, undef, gettimeofday(), $response );
     }
 }
 
 sub simple_context_call {
-    my ( $self, $sub_ref, $call_id, $context, @param ) = @_;
-
-    my ( $who, $id ) = split( /_/, $call_id );
+    my ( $self, $sub_name, $sub_ref, $call_id, $context, @param ) = @_;
 
     my $response;
-    my $sub_name = '';
-    if ( CORE::ref $sub_ref eq 'ARRAY' ) {
-        ( $sub_name, $sub_ref ) = @$sub_ref;
-    }
-    print DBG "SIMPLE_CONTEXT_CALL : $call_id|$sub_name|\n";
+    #print DBG "SIMPLE_CONTEXT_CALL : $call_id|$sub_name|\n";
     if ( $context eq 'A' or $context eq 'AA' ) {
         my @return = $sub_ref->( $self, @param );
         $response = dump @return;
@@ -521,25 +461,11 @@ sub simple_context_call {
         my $return = $sub_ref->( $self, @param );
         $response = dump $return;
     }
-    else {    # $context = 'V' (void) ou 'X' (asynchrone)
+    else {    # $context = 'V' (void)
         $sub_ref->( $self, @param );
         $response = dump;
     }
     return "$call_id;$response";
-}
-
-sub create_queue {
-    my ($tid) = @_;
-
-    if ( !$queue_by_tid{$tid} ) {
-        $queue_by_tid{$tid} = Thread::Queue->new;
-    }
-}
-
-sub get_response_from {
-    my ($tid) = @_;
-
-    return $queue_by_tid{$tid}->dequeue;
 }
 
 sub anything_for_me {
@@ -548,33 +474,19 @@ sub anything_for_me {
     return $server_queue_by_tid{$who}->pending;
 }
 
+sub anything_for {
+    my ( $who ) = @_;
+	
+    return if ( defined $stop_dequeue_server_queue{$who} );
+    return $server_queue_by_tid{$who}->pending;
+}
+
+
 sub get_message_for {
     my ( $who, $from, $method, $call_id, $context, $data ) = @_;
 
-    #if ( length($context) == 2 ) {
-
-    # Appel asynchrone, le simple call devra répondre à Data
-    #  return $call_id;
-    #}
-
-    #print DBG "File d'attente pour WHO = $who\n";
-    #my $data = $queue_by_tid{$who}->dequeue;
-
-    # Traçage de l'appel dans Data mais de façon asynchrone
-    #if ( $from ne $data_thread or $method !~ /^trace/ ) {
     if ( $method !~ /^trace/ ) {
-        if ( $synchronous_trace and defined $data_thread ) {
-            Text::Editor::Easy->trace_response( $from, $call_id, $method,
-                gettimeofday(), $data );
-        }
-        else {
-            my $trace = encode(
-                'trace',        $who,  'Text::Editor::Easy', 'X',
-                'response',     $from, $call_id,             $method,
-                gettimeofday(), $data
-            );
-            $trace_queue->enqueue($trace);
-        }
+        Text::Editor::Easy->trace_response( $from, $call_id, $method, gettimeofday(), $data );
     }
     my ( $return_call_id, $return_message ) = split( /;/, $data, 2 );
     if ( $return_call_id ne $call_id and $method ne 'trace_print' ) {
@@ -605,21 +517,10 @@ sub get_task_to_do {
     if ( $what =~ /^trace/ ) {
         return ( $what, @param );
     }
-    elsif ( $synchronous_trace and defined $data_thread ) {
-        print DBG
-          "Avant appel trace_start de $what (call_id $param[0], tid $who)\n";
-        Text::Editor::Easy->trace_start( $who, $param[0], $what,
-            gettimeofday() );
-        print DBG
-          "Retour de l'appel trace_start de $what (call_id $param[0])\n";
-    }
     else {
-        my $trace = encode(
-            'trace', $who, 'Text::Editor::Easy', 'X',
-            'start', $who, $param[0],            $what,
-            gettimeofday()
-        );    # $param[0] = $call_id
-        $trace_queue->enqueue($trace);
+        #print DBG
+        #  "Avant appel trace_start de $what (call_id $param[0], tid $who)\n";
+        Text::Editor::Easy->trace_start( $who, $param[0], $what, gettimeofday() );
     }
     return ( $what, @param );
 }
@@ -627,9 +528,7 @@ sub get_task_to_do {
 my %method;   # Permet de trouver le serveur qui gère une méthode éditeur donnée
 share(%method);
 
-my %standard_call;    # Méthode centrale d'appel inter-thread (non shared)
-
-sub ref {
+sub get_ref {
     my ($self) = @_;
 
     return $com_unique{ refaddr $self };
@@ -645,42 +544,35 @@ sub set_ref {
 my $call_order = 0;
 
 sub ask2 {
-    my ( $self, $method_server_tid, @data ) = @_;
+    my ( $self, $method, @data ) = @_;
 
-    my ( $method, $server_tid ) = split( / /, $method_server_tid );
-
-    if ( defined $server_tid ) {
-        print DBG "method_server_tid defined : $method|$server_tid\n";
-        print DBG "DATA = @data\n";
+    if ( $method eq 'clipboard_set' ) {
+		print "ASK2 : Appel clipboard_set, @data\n";
     }
 
-#print ("Dans ask 2  |", $self->file_name, "|$self|", $self->ref, "|\n") if ( $method eq 'focus' );
+    my $server_tid;
 
     my $unique_ref;
-    if ( !CORE::ref($self) ) {    # Appel d'une méthode de classe
+    if ( ! ref($self) ) {    # Appel d'une méthode de classe
         $unique_ref = '';
     }
     else {
+       $unique_ref = $com_unique{ refaddr $self };
 
-        #print DBG "unblessed ? $self|", CORE::ref $self, "\n";
-        $unique_ref = $com_unique{ refaddr $self };
-
-        # A virer par la suite
         if ( !defined $unique_ref ) {
-            $unique_ref = $self->get_unique_ref();
-            $com_unique{ refaddr $self } = $unique_ref;
+		    print STDERR "No reference found for object $self, can't manage this instance of ", ref($self), "\n";
+			return;
         }
     }
     my $client_tid = threads->tid;
 
     my $tid;
-    my $package;
     if ($unique_ref) {
         my $hash_ref = $get_tid_from_instance_method{$method};
         $tid = $hash_ref->{$unique_ref};
 
         if ( !defined $tid ) {
-            $tid = $hash_ref->{ CORE::ref($self) };
+            $tid = $hash_ref->{ ref($self) };
             if ( defined $tid and $tid =~ /\D/ ) {
                 print DBG "Trouvé un appel nommé : méthode $method, nom $tid\n";
                 my $hash_ref = $get_tid_from_thread_name{$tid};
@@ -688,7 +580,6 @@ sub ask2 {
                 print DBG "TID de l'appel nommé : $tid\n";
             }
             else {
-
                 # Tester l'héritage ici (long) : fait ici de façon simplifiée
                 $tid = $hash_ref->{'Text::Editor::Easy'};
                 if ( defined $tid and $tid =~ /\D/ ) {
@@ -700,92 +591,75 @@ sub ask2 {
     }
     else {
         my $hash_ref = $get_tid_from_class_method{$method};
-        $tid = $hash_ref->{$self};
+        if ( defined $hash_ref ) {
+		    $tid = $hash_ref->{$self};
 
-#print DBG "Récupération de get_tid_from_class_method de $method : $hash_ref pour $self\n";
+            print DBG "Récupération de get_tid_from_class_method de $method : $hash_ref pour $self\n";
+	    }
 # Tester l'héritage ici
         if ( !defined $tid ) {
             $tid = $hash_ref->{'Text::Editor::Easy'};
 
-    #print DBG "Récupération de tid par l'ancêtre de base Text::Editor::Easy\n";
+            print DBG "Récupération de tid par l'ancêtre de base Text::Editor::Easy\n";
         }
     }
+    print DBG "Recherche pour méthode $method...\n";
+
     if ( defined $tid ) {
+		 print DBG "TID défini pour méthode $method...\n";
         $server_tid = $tid;
-
-        # pour appel de méthode dans le même thread
-        if ( defined $ref_method{$method} ) {
-            $package = $ref_method{$method}[PACKAGE];
-        }
-
-        #print "Dans ask2, méthode $method|$tid|$package\n";
-
-        return new_ask( $self, $method, $unique_ref, $client_tid, $server_tid,
-            $package, @data );
+        return new_ask( $self, $method, $unique_ref, $client_tid, $server_tid, @data );
     }
+	# La méthode s'exécute dans le contexte du thread client appelant
+	print DBG "La méthode $method n'est pas gérée par un thread serveur\n";
 
-    ($package) = $method{ $unique_ref . ' ' . $method };
-    if ( !defined $package ) {
+    my $sub = $method{ $unique_ref . ' ' . $method };
+    if ( !defined $sub ) {
 
-#print "La méthode $method n'est pas définie spécifiquement pour l'éditeur $unique_ref\n";
-        ($package) = $method{$method};
+        print DBG "Recherche de la méthode 'shared' $method...\n";
+        $sub = $method{$method};
 
-        #if ( ! defined $package and ! defined $server_tid ) {
-        if ( !defined $package )
-        {    # Le package doit être défini même si l'on précise le thread
-             # ==> A un thread, correspond un et un seul package mais un package peut être associé à de multiples threads
-            if ( !defined $server_tid or !$server_queue_by_tid{$server_tid} ) {
-                print STDERR "Method $method unknown for object $self\n";
-                return;
-            }
+        if ( !defined $sub ) {
+		     print DBG "Impossible de trouver la sub pour la méthode $method...\n";
+		     print STDERR "Can't handle method $method for object $self ($unique_ref)\n";
+		     return;
         }
     }
-
-    #my $server_tid;
-    print DBG
-      "APPEL STANDARD : $package, method $method, unique_ref $unique_ref\n";
-    print DBG "MEthode |$method| : PAckage appelé : $package\n";
-
-    #print DBG "method_server_tid : $method_server_tid|package $package\n";
-    if ( !defined $server_tid ) {
-        if ( $package =~ /^shared_method:(.*)$/ ) {
-
-            #print "La méthode $method est commune à tous les éditeurs\n";
-            my $sub_ref = eval "\\&$1";
-            return $sub_ref->( $self, @data );
-        }
+	else {
+		print DBG "La méthode $method est spécifique à la référence $unique_ref\n";
     }
-    print STDERR "Can't handle method $method for object $self\n";
-    return;
+    my $sub_ref = eval "\\&$sub";
+    return $sub_ref->( $self, @data );
 }
 
 sub new_ask {
-    my ( $self, $method, $unique_ref, $client_tid, $server_tid, $package,
-        @data ) = @_;
+    my ( $self, $method, $unique_ref, $client_tid, $server_tid, @data ) = @_;
 
     my $context = '';
 
-    if ( CORE::ref($self) eq 'Text::Editor::Easy::Async'
+    if ( ref($self) eq 'Text::Editor::Easy::Async'
         or $self eq 'Text::Editor::Easy::Async' )
     {
         print DBG "Appel asynchrone détecté pour la méthode $method\n";
         $context = 'A';
     }
+	if (wantarray) {
+		$context .= 'A';
+	}
+	elsif ( defined(wantarray) ) {
+		$context .= 'S';
+	}
+	else {
+		$context .= 'V';
+	}
 
-    if ( $client_tid == $server_tid and $context ne 'A' ) {
-
-        $call_order += 1;
+    if ( $client_tid == $server_tid and length($context) ne 2 ) {
+		
+		#Le call_id ne sert ici à rien (pas d'échange avec le thread Data)
+		# mais nécessaire à execute_task
         my $call_id     = $client_tid . '_' . $call_order;
         my $self_server = $thread_knowledge{'self_server'};
-        if (wantarray) {
-            $context .= 'A';
-        }
-        elsif ( defined(wantarray) ) {
-            $context .= 'S';
-        }
-        else {
-            $context .= 'V';
-        }
+
         print DBG
 "Contexte avant appel execute_task |$context| pour appel méthode $method\n";
         return execute_task( 'sync', $self_server, $method, $call_id,
@@ -796,19 +670,8 @@ sub new_ask {
     #print DBG "SERVER _TID = $server_tid pour $method\n";
     my $queue = $server_queue_by_tid{$server_tid};
 
-    if (wantarray) {
-        $context .= 'A';
-    }
-    elsif ( defined(wantarray) ) {
-        $context .= 'S';
-    }
-    else {
-        $context .= 'V';
-    }
-
-    $call_order += 1;
+    $call_order += 1  if ( $method !~ /^trace/ );
     my $call_id = $client_tid . '_' . $call_order;
-    ;  # Avoir toujours le client même si pas de trace (encode après if et push)
 
 #if ( $server_tid ne $data_thread or $method !~ /^trace/ ) { # 2 serveurs pour les traces : ne plus tester le tid :
     if ( $method !~ /^trace/ )
@@ -825,36 +688,17 @@ sub new_ask {
             $call_id, $server_tid,    $method, $unique_ref,
             $context, gettimeofday(), @calls
         );
-        if ( $synchronous_trace and defined $data_thread ) {
-
-            # Trace synchrone
-            Text::Editor::Easy->trace_call(@call_params);
-        }
-        else {
-            my $trace =
-              encode( 'trace', $call_id, 'Text::Editor::Easy', 'X', 'call',
-                @call_params );
-            $trace_queue->enqueue($trace);
-        }
+        Text::Editor::Easy->trace_call(@call_params);
     }
 
-#if ( ! CORE::ref $self ) {
-#	print "Appel de classe new_ask $self|",  $unique_ref || $self, "|$server_tid|\n";
-#}
-
-#print "Dans new_ask, avant appel par queue |$method| : ", scalar (threads->list), "\n";
-    my $message =
-      encode( $method, $call_id, $unique_ref || $self, $context, @data );
+    my $message = dump ( $method, $call_id, $unique_ref || $self, $context, @data );
 
     my $reference_sent = $unique_ref || $self;
-    print DBG
-"APPEL $call_id|$method| reference sent $reference_sent, queue_by_tid de $client_tid\n";
+
     while ( $queue_by_tid{$client_tid}->pending ) {
         print DBG "   PROBLEME appel avec file perso déjà renseignée...\n";
         my $data = $queue_by_tid{$client_tid}->dequeue;
-        print DBG "   Elle contenait\n\t$data\n";
     }
-    print DBG "Après test pending\n";
     $queue->enqueue($message);
 
 # Pour l'instant on ne traite pas les demandes synchrones ou asynchrones (pas de modification de who)
@@ -869,46 +713,34 @@ sub new_ask {
 
         #print "On va attendre la fin de la requête $call_id\n";
         # Récupération du message initial
-        my $message =
-          get_message_for( $client_tid, $server_tid, $method, $call_id,
-            $context );
+        my $message = get_message_for( $client_tid, $server_tid, $method, $call_id, $context );
         my $status = Text::Editor::Easy->async_status($call_id);
         while ( $status ne 'ended' ) {
             print DBG "Statut reçu : $status\n";
             $status = Text::Editor::Easy->async_status($call_id);
         }
-        my $response =
-          Text::Editor::Easy->async_response($call_id)
-          ;    # Obligatoire pour nettoyage (propre)
+		
+		# Nettoyage
+        my $response = Text::Editor::Easy->async_response($call_id);
         delete $server_queue_by_tid{$server_tid};
         delete $queue_by_tid{$server_tid};
-        print DBG
-          "Le statut est a ended, on renvoie la main au thread appelant\n";
+		
+        print DBG "Le statut est a ended, on renvoie la main au thread appelant\n";
         return 1;
     }
 
     if ( length($context) == 2 ) {
-
         # Appel asynchrone, le simple call devra répondre à Data
         return $call_id;
     }
-    $free{ threads->tid } = "$call_id|$server_tid";
-    print_free( "Thread "
-          . threads->tid
-          . " bloqué par l'appel $call_id à $server_tid\n" );
-
     #print DBG "File d'attente pour WHO = $who\n";
     my $data = $queue_by_tid{$client_tid}->dequeue;
-    $free{ threads->tid } = 0;
     return get_message_for( $client_tid, $server_tid, $method, $call_id,
         $context, $data );
 }
 
 sub ask_thread {
     my ( $self, $method, $server_tid, @data ) = @_;
-
-    print DBG "Dans ask_thread : $method, $server_tid|",
-      scalar( threads->list ), "\n";
 
     # En commun avec ask2 : à simplifier !!!
     my $unique_ref;
@@ -917,32 +749,19 @@ sub ask_thread {
         $unique_ref = '';
     }
     else {
-
-        #print DBG "unblessed ? $self|", CORE::ref $self, "\n";
         $unique_ref = $com_unique{ refaddr $self };
 
-        # A virer par la suite
         if ( !defined $unique_ref ) {
-            $unique_ref = $self->get_unique_ref();
-            $com_unique{ refaddr $self } = $unique_ref;
+		    print STDERR "ask_thread : no reference found for object $self\n";
+			return;
         }
     }
-
-# Package uniquement utilisé pour appel dans le même thread... (valeur sans importance dans
-# un appel entre 2 threads différents)
-    my $package;
-    if ( $ref_method{$method} ) {
-        $package = $ref_method{$method}[PACKAGE];
-    }
-    my $client_tid = threads->tid;
-
+	
 # Attention, la première donnée de la fonction est $unique_ref || $self ==> cad la référence avec laquelle la méthode de thread
 # a été appelée
-
-    print DBG "Dans ask_thread, avant appel new_ask, $method : ",
-      scalar( threads->list ), "\n";
-    return new_ask( $self, $method, $unique_ref, $client_tid, $server_tid,
-        $package, $unique_ref || $self, @data );
+    return new_ask( 
+	    $self, $method, $unique_ref, threads->tid, $server_tid, $unique_ref || $self, @data
+	);
 }
 
 sub create_thread {
@@ -960,6 +779,7 @@ sub create_thread {
         "Dans create thread, création de $tid ("
       . scalar( threads->list )
       . " threads actifs)\n";
+    my $indice = 0;
     while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
         $string .= "P|F|L|$pack|$file|$line|\n";
     }
@@ -979,20 +799,10 @@ use File::Basename;
 my $name = fileparse($0);
 
 sub verify_model_thread {
-    if ( !defined $trace_queue ) {
-        $trace_queue = Thread::Queue->new;
-    }
-    else {
-
-        # Appels éventuellement multi-thread...
-        while ( !$model_thread ) {
-        }
-
-        # Tracer ici l'appel à "Text::Editor::Easy::new"
-        return;
-    }
-
 #print "Dans Comm ", threads->tid, " |", $Text::Editor::Easy::Trace{'all'}, "|\n";
+    if ( defined $data_thread ) {
+		return trace_new();
+    }
     $name =~ m/^([a-zA-Z0-9\._]+)$/
       ; # To suppress "taint error" => "Insecure dependency in open while running with -T switch at ..."
 
@@ -1024,10 +834,6 @@ sub verify_model_thread {
     }
     my $array_dump = dump @calls;
 
-    #my $trace      =
-    #  encode( 'trace', threads->tid, 'X', 'new', threads->tid, $array_dump );
-    #$trace_queue->enqueue($trace);
-
     return
       if ( defined $model_thread )
       ;    # La création de thread est déjà opérationnelle
@@ -1053,7 +859,7 @@ sub verify_model_thread {
     if ( $model_thread != $tid ) {
 
     # Le model_thread a été créé par un autre éditeur, il faut éliminer le notre
-        my $message = encode(undef);
+        my $message = dump (undef);
         $queue->enqueue($message);
 
         $thread->join();
@@ -1061,26 +867,37 @@ sub verify_model_thread {
         # Suppression des queue (ou recyclage ?) à faire
     }
     else {
-        $method{'explain_method'}   = ('shared_method:explain_method');
-        $method{'display_instance'} = ('shared_method:display_instance');
-        $method{'display_class'}    = ('shared_method:display_class');
+        $method{'explain_method'}   = ('explain_method');
+        $method{'display_instance'} = ('display_instance');
+        $method{'display_class'}    = ('display_class');
 
-        $method{'empty_queue'}          = ('shared_method:empty_queue');
-        $method{'create_new_server'}    = ('shared_method:create_new_server');
+        $method{'empty_queue'}          = ('empty_queue');
+        $method{'create_new_server'}    = ('create_new_server');
         $method{'create_client_thread'} =
-          ('shared_method:create_client_thread');
-        $method{'ref'}              = ('shared_method:ref');
-        $method{'set_synchronize'}  = ('shared_method:set_synchronize');
-        $method{'get_synchronized'} = ('shared_method:get_synchronized');
-        $method{'redirect'}         = ('shared_method:redirect');
-        $method{'transform_hash'}   = ('shared_method:transform_hash');
-        $method{'set_ref'}          = ('shared_method:set_ref');
+          ('create_client_thread');
+        $method{'get_ref'}              = ('get_ref');
+        $method{'set_synchronize'}  = ('set_synchronize');
+        $method{'get_synchronized'} = ('get_synchronized');
+        $method{'redirect'}         = ('redirect');
+        $method{'transform_hash'}   = ('transform_hash');
+        $method{'set_ref'}          = ('set_ref');
 
         $method{'create_thread'} = ('shared_thread:Text::Editor::Easy::Comm');
-        $method{'add_method'}    = ('shared_method:add_method');
-        $method{'ask_thread'}    = ('shared_method:ask_thread');
+        $method{'add_method'}    = ('add_method');
+        $method{'ask_thread'}    = ('ask_thread');
         create_data_thread();
     }
+	# Now that everything has been created, we can trace the 'new' call
+	return trace_new();
+}
+
+sub trace_new {
+		my $string = "Dans trace_new...\n";
+		my $indice = 0;
+        while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
+            $string .= "P|F|L|$pack|$file|$line|\n";
+        }
+		print DBG $string;
 }
 
 sub manage_debug_file {
@@ -1177,6 +994,7 @@ sub create_data_thread {
                 'name_of_zone_order',
                 'data_file_name',
                 'data_name',
+				'trace',
                 'trace_print',
                 'trace_call',
                 'trace_start',
@@ -1193,6 +1011,10 @@ sub create_data_thread {
                 'reference_zone',
                 'zone_named',
                 'zone_list',
+				'save_current',
+				'data_last_current',
+				'data_get_search_options',
+				'data_set_search_options',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data'],
@@ -1203,15 +1025,6 @@ sub create_data_thread {
     while ( !$queue ) {
         $queue = $server_queue_by_tid{$tid};
     }
-
-# On met la vraie queue pour trace_queue
-# On suppose que l'on est seul à travailler : première demande de création d'un objet éditeur
-# ======>  donc pas possible de faire dès maintenant un appel de méthode (à vérifier)
-    while ( $trace_queue->pending ) {
-        my $data = $trace_queue->dequeue;
-        $queue->enqueue($data);
-    }
-    $trace_queue = $queue;
 
     $data_thread = $tid;
 }
@@ -1268,6 +1081,7 @@ sub verify_graphic {
                     'editor_insert_mode',
                     'editor_set_insert',
                     'editor_set_replace',
+					'editor_visual_search',
 
                     'screen_first',
                     'screen_last',
@@ -1287,6 +1101,7 @@ sub verify_graphic {
                     'screen_wrap',
                     'screen_set_wrap',
                     'screen_unset_wrap',
+                    'screen_check_borders',
 
                     'display_text',
                     'display_next',
@@ -1296,11 +1111,14 @@ sub verify_graphic {
                     'display_number',
                     'display_ord',
                     'display_height',
+				    'display_middle_ord',
                     'display_abs',
                     'display_select',
 
                     'line_displayed',
                     'line_select',
+					'line_deselect',
+					'line_set',
 
                     'cursor_position_in_display',
                     'cursor_position_in_text',
@@ -1309,6 +1127,7 @@ sub verify_graphic {
                     'cursor_line',
                     'cursor_display',
                     'cursor_set',
+					'cursor_set_shape',
                     'cursor_get',
                     'cursor_make_visible',
 
@@ -1321,7 +1140,14 @@ sub verify_graphic {
             0,
             {
                 'package' => 'Text::Editor::Easy::Abstract',
-                'method'  => 'reference_zone_event',
+                'method'  => [ 
+						'reference_zone_event',
+						'exit', 
+						'abstract_join', 
+						'manage_event', 
+						'clipboard_set', 
+						'clipboard_get', 
+				    ]
             }
         );
         Text::Editor::Easy->ask_thread(
@@ -1329,23 +1155,8 @@ sub verify_graphic {
             0,
             {
                 'package' => 'Text::Editor::Easy::Abstract',
-                'method'  => 'exit',
-            }
-        );
-        Text::Editor::Easy->ask_thread(
-            'add_thread_method',
-            0,
-            {
-                'package' => 'Text::Editor::Easy::Abstract',
-                'method'  => 'abstract_join',
-            }
-        );
-        Text::Editor::Easy->ask_thread(
-            'add_thread_method',
-            0,
-            {
-                'package' => 'Text::Editor::Easy::Abstract',
-                'method'  => 'manage_event',
+                'method'  => 'bind_key',
+				'sub'      => 'bind_key_global',
             }
         );
     }
@@ -1370,13 +1181,10 @@ sub new_editor {
     my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
     $com_unique{ refaddr $editor } = $ref;
 
-    #print "#### REFERENCEMENT avec $ref\n";
-    $editor->reference($ref);
     print DBG "Dans new_editor, avant appel Abstract new\n";
     my $object = Text::Editor::Easy::Abstract->new( $hash_ref, $editor, $ref );
     print DBG "Fin de new_editor\n";
 
-    #return ( $object, $server_queue_by_tid{0} );
     return $object;
 }
 
@@ -1388,12 +1196,8 @@ sub create_client_thread {
     my $ref        = refaddr $self;
     my $unique_ref = $com_unique{$ref};
     if ( !$unique_ref ) {
-
-# Lorsque tous les threads seront créés par Comm, déclarer get_unique_ref ici et modifier ces 2 lignes
-        $unique_ref = $self->get_unique_ref;
-
-        # Mise à jour de la référence unique
-        $com_unique{$ref} = $unique_ref;
+	    print STDERR "create_client_thread : no reference found for object $self\n";
+		return;
     }
 
 #print "... méthode de création d'un thread client : $unique_ref\n";
@@ -1405,7 +1209,7 @@ sub create_client_thread {
     my $queue = $server_queue_by_tid{$tid};
 
     my $message =
-      encode( "${package}::$sub_name", threads->tid, "S", $unique_ref,
+      dump ( "${package}::$sub_name", threads->tid, "S", $unique_ref,
         $package );
     $queue->enqueue($message);
 
@@ -1431,7 +1235,7 @@ sub thread_generator {
 
   # La seule chose que sait faire le thread_generator, c'est générer des threads
   #print "Dans thread générator : $what|@param\n";
-        simple_call( 'not_undef_but_useless', \&create_thread, @param );
+        simple_call( undef, 'create_thread', \&create_thread, @param );
     }
 }
 
@@ -1449,10 +1253,12 @@ sub verify_server_queue_and_wait {
 
     # Il ne faut pas se mettre en attente sur une file non encore créée
     while ( !$queue ) {
-        $queue =
-          $server_queue_by_tid{ $tid
-          }; # La création est faite en parallèle par le thread qui a créé celui-ci
+		# La création est faite en parallèle par le thread qui a créé celui-ci
+        $queue = $server_queue_by_tid{ $tid }; 
     }
+	
+	# Initalisation du $call_order, utile si le thread devient un serveur
+	$call_order = 0;
 
     #print "Mise en attente du thread $tid\n";
     my $data = $queue->dequeue;
@@ -1476,10 +1282,7 @@ sub verify_server_queue_and_wait {
                 $editor = bless \do { my $anonymous_scalar },
                   "Text::Editor::Easy";
 
-                #print "UNIQUE REF : $unique_ref\n";
-
                 $com_unique{ refaddr $editor } = $unique_ref;
-                $editor->reference($unique_ref);
             }
 
             #print "PARAM @param|", scalar(@param), "\n";
@@ -1572,7 +1375,7 @@ sub verify_motion_thread {
         if ( $motion_thread != $tid ) {
 
     # Le model_thread a été créé par un autre éditeur, il faut éliminer le notre
-            my $message = encode(undef);
+            my $message = dump (undef);
             $queue->enqueue($message);
 
             threads->object($tid)->join();
@@ -1624,7 +1427,7 @@ sub redirect {
     my ( $self, $method, $abstract_ref, $hash_ref ) = @_;
 
     my $ref = $com_unique{ refaddr $self};
-    if ( CORE::ref($method) ne 'CODE' ) {
+    if ( ref($method) ne 'CODE' ) {
 
         print DBG "Appel asynchrone avec la méthode $method, $ref...\n";
         if ( my $condition = $redirect_condition{$method}{$ref} ) {
@@ -1636,7 +1439,6 @@ sub redirect {
 
                 print DBG "\tCondition positive : $@\n";
 
-                #async_call ($motion_thread, $method, $self->ref, $hash_ref );
                 print( "dans REDIRECT de cOMM : zone = ",
                     $hash_ref->{'zone'}, "\n" )
                   if ( defined $hash_ref->{'zone'} );
@@ -1652,7 +1454,6 @@ sub redirect {
             }
         }
         else {             # Pas de condition, on exécute tout le temps
-                #async_call ($motion_thread, $method, $self->ref, $hash_ref );
             return if ( !defined $motion_thread );
 
             #Text::Editor::Easy::Async->ask2( 'manage_events ' . $motion_thread,
@@ -1700,6 +1501,7 @@ sub init_server_thread {
 #Bug à voir : comment est-ce que l'on peut déjà avoir une clé renseignée dans $thread_knowledge ?
     $thread_knowledge{'instance'} = {};
 
+    my $indice = 0;
     while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
         print DBG "P|F|L|$pack|$file|$line|\n";
     }
@@ -1740,20 +1542,20 @@ sub init_server_thread {
 
     $thread_knowledge{'package'} = $package;
     my $initial_reference;
-    if ( CORE::ref $self_caller )
+    if ( ref $self_caller )
     {    # Actuellement, c'est toujours une référence d'objet Text::Editor::Easy
             # car verify_server_queue ... crée un objet Text::Editor::Easy
             # sans se soucier de ce qu'il était éventuellement au départ
             # Owned thread
         print DBG "OWNED THREAD : SELF caller $self_caller|",
-          CORE::ref $self_caller, "|\n";
+          ref $self_caller, "|\n";
         $initial_reference = $com_unique{ refaddr $self_caller };
     }
     else {
 
         # Shared thread
         print DBG "SHARED THREAD : SELF caller $self_caller|",
-          CORE::ref $self_caller, "|$self_server\n";
+          ref $self_caller, "|$self_server\n";
         $self_caller = 'Text::Editor::Easy'
           if ( $self_caller eq 'Text::Editor::Easy::Async' );
         $initial_reference = $self_caller;
@@ -1772,8 +1574,8 @@ sub manage_requests2 {
     my $self_server = init_server_thread( $self_caller, $options_ref );
 
     while ( my ( $method, $call_id, $reference, @param ) = get_task_to_do ) {
-        print DBG "Dans manage2, avant appel execute $method|", scalar(@param),
-          "|reference : $reference\n\t|";
+        #print DBG "Dans manage2, avant appel execute $method|", scalar(@param),
+        #  "|reference : $reference\n\t|";
         for my $indice ( 0 .. scalar(@param) - 1 ) {
             my $element = $param[ $indice - 1 ];
             if ( defined $element ) {
@@ -1806,18 +1608,18 @@ sub manage_requests2 {
 sub execute_task {
     my ( $call, $self_server, $method, $call_id, $reference, @param ) = @_;
 
-    print DBG "Appel request2: ", threads->tid,
-      "|$method|$call_id|$reference|context $param[0]|", threads->tid, "\n";
+    #print DBG "Appel request2: ", threads->tid,
+    #  "|$method|$call_id|$reference|context $param[0]|", threads->tid, "\n";
     my $initial_reference_ref = $thread_knowledge{'instance'};
 
-    my $string =
-        "CLES de \$thread_knowledge{'instance'} : "
-      . threads->tid
-      . " ($method) dans execute_task\n";
-    for my $key ( keys %$initial_reference_ref ) {
-        $string .= "\t$key|" . $initial_reference_ref->{$key} . "|\n";
-    }
-    print DBG $string;
+    #my $string =
+    #    "CLES de \$thread_knowledge{'instance'} : "
+    #  . threads->tid
+    #  . " ($method) dans execute_task\n";
+    #for my $key ( keys %$initial_reference_ref ) {
+    #    $string .= "\t$key|" . $initial_reference_ref->{$key} . "|\n";
+    #}
+    #print DBG $string;
 
     $reference = 'Text::Editor::Easy'
       if ( $reference eq 'Text::Editor::Easy::Async' );
@@ -1828,30 +1630,30 @@ sub execute_task {
 
     my $object = $initial_reference_ref->{$reference};
 
-    print DBG "On a récupéré ( tid ", threads->tid,
-      ", méthode : $method) dans thread_knowledge de instance de $reference |";
-    print DBG "\$object défini => |$object" if ( defined $object );
-    print DBG "|\n";
+    #print DBG "On a récupéré ( tid ", threads->tid,
+    #  ", méthode : $method) dans thread_knowledge de instance de $reference |";
+    #print DBG "\$object défini => |$object" if ( defined $object );
+    #print DBG "|\n";
     if ( defined $object ) {
-        print DBG "Avant définition de \$method_ref\n";
+        #print DBG "Avant définition de \$method_ref\n";
         $self_server = $object;
         $method_ref  = $ref_method{$method};
-        my $string = "Appel avec une référence initale |$method|";
-        if ( defined $method_ref ) {
-            $string .=
-              "\$method_ref défini => |$method_ref|" . $method_ref->[REF];
-        }
-        $string .= "|\n";
-        print DBG $string;
+        #my $string = "Appel avec une référence initale |$method|";
+        #if ( defined $method_ref ) {
+        #    $string .=
+        #      "\$method_ref défini => |$method_ref|" . $method_ref->[REF];
+        #}
+        #$string .= "|\n";
+        #print DBG $string;
     }
     else {
-        print DBG "Appel avec autre ref : |$reference|$method\n";
+        #print DBG "Appel avec autre ref : |$reference|$method\n";
 
 # Problème sous Linux ($method_ref devient défini de façon magique ?  bug perl ?)
         $method_ref = undef;
 
         if ( my $ref = $ref_method{$method} ) {
-            print DBG "REF = $ref\n";
+            #print DBG "REF = $ref\n";
             if ( my $other_ref = $ref->[OTHER] ) {
                 $method_ref = $ref_method{$method}[OTHER]{$reference};
             }
@@ -1859,18 +1661,18 @@ sub execute_task {
         if ( !defined $method_ref and $reference =~ /\D/ )
         {    # Méthode de classe non définie
                 # On force (héritage) Text::Editor::Easy pour la classe
-            print DBG
-"Dans manage_...2 : on force la méthode de classe Text::Editor::Easy pour $method\n";
+            #print DBG
+#"Dans manage_...2 : on force la méthode de classe Text::Editor::Easy pour $method\n";
             if ( $initial_reference_ref->{'Text::Editor::Easy'} )
             {    # Shared thread
                 $method_ref = $ref_method{$method};
-                print DBG
-"méthode de classe Text::Editor::Easy trouvée en standard...$method_ref\n";
+#                print DBG
+#"méthode de classe Text::Editor::Easy trouvée en standard...$method_ref\n";
             }
             elsif ( my $ref = $ref_method{$method} ) {    # Owned thread
-                print DBG "OWNED THREAD...\n";
+                #print DBG "OWNED THREAD...\n";
                 if ( my $other_ref = $ref->[OTHER] ) {
-                    print DBG "Trouvé other_ref : $other_ref pout $method\n";
+                    #print DBG "Trouvé other_ref : $other_ref pout $method\n";
                     $method_ref = $other_ref->{'Text::Editor::Easy'};
                 }
             }
@@ -1882,47 +1684,46 @@ sub execute_task {
     {    # Methode de thread : eval, add_method, overload_method ...
          # Tester l'appartenance à un sous-ensemble de méthodes autorisées => il ne faut pas lancer n'importe quoi
          # en cas d'erreur réelle
-        print DBG "Appel d'une fonction non définie par défaut : $method\n";
+        #print DBG "Appel d'une fonction non définie par défaut : $method\n";
         my $ref_sub = eval "\\&$method";
         eval {
 
             #simple_call( $self_server, $ref_sub, $call_id, @param );
-            simple_call( $self_server, [ $method, $ref_sub ], $call_id, @param )
+            simple_call( $self_server, $method, $ref_sub, $call_id, @param )
               ;    # Modifier ask_thread et le fichier test "...add_method.t"
              # La procédure d'init passe aussi par ici et elle doit récupérer l'objet standard qui sera utilisé
              # pour tous les appels suivants (init = initialisation de cet objet => voir file_manager)
         };
-        if ( $@ and $method !~ /^trace/ )
-        {    # A supprimer... même les traces de départ doivent être traitées
-            print STDERR "Wrong execution of pseudo-method $method :\n$@\n";
+		if ( $@ ) {
+            print STDERR "Wrong execution of pseudo-method $method for tid ", threads->tid, " :\n$@\n";
         }
 
         #print "Fin de l'appel spécial de $method\n";
     }
     elsif ( my $sub_ref = $method_ref->[REF] ) {
-        print DBG "Appel standard simple_call pour $method\n";
+        #print DBG "Appel standard simple_call pour $method\n";
         if ( $call eq 'sync' ) {
-            return simple_call( $self_server, [ $method, $sub_ref ],
+            return simple_call( $self_server, $method, $sub_ref,
                 $call_id, @param );
         }
         else {
-            simple_call( $self_server, [ $method, $sub_ref ], $call_id,
+            simple_call( $self_server, $method, $sub_ref, $call_id,
                 @param );
         }
     }
     else
     {    # Ne devrait jamais servir : évaluer toujours lors de l'initialisation
-        print DBG "Appel à vérifier : $method (", threads->tid, ")\n";
+        #print DBG "Appel à vérifier : $method (", threads->tid, ")\n";
 
         # Si utilisé, alors traiter [MEMORY] avant
         my $package = $method_ref->[PACKAGE];
         my $sub     = $method_ref->[SUB];
         if ( defined $sub and defined $package ) {
             my $sub_ref = eval "\\&${package}::$sub";
-            simple_call( $self_server, [ $sub, $sub_ref ], $call_id, @param );
+            simple_call( $self_server, $sub, $sub_ref, $call_id, @param );
         }
         else {
-            print DBG "SUB et PACKAGE indéfinis...|", $method_ref->[REF], "|\n";
+            #print DBG "SUB et PACKAGE indéfinis...|", $method_ref->[REF], "|\n";
         }
     }
     return $thread_knowledge{'stop_wanted'};
@@ -1976,11 +1777,11 @@ sub add_method {
 
     #my $name = $method;
     #$name = $options_ref->{'sub'} if ( defined $options_ref->{'sub'} );
-    if ( CORE::ref $self ) {
+    if ( ref $self ) {
 
         # instance method (adding it for only one Text::Editor::Easy object)
         print "Adding method $method to object $self\n";
-        $key = $self->ref . ' ' . $method;
+        $key = get_ref($self) . ' ' . $method;
     }
     else {
 
@@ -1988,7 +1789,7 @@ sub add_method {
         print "Adding method $method to all Text::Editor::Easy objects\n";
         $key = $method;
     }
-    $method{$key} = "shared_method:${package}::$name";
+    $method{$key} = "${package}::$name";
 }
 
 sub create_new_server {
@@ -2001,16 +1802,13 @@ sub create_new_server {
     #print DBG "Dans create_new_server $package $self_server\n";
 
     my $unique_ref;
-    if ( defined $self and CORE::ref($self) ) {
+    if ( defined $self and ref($self) ) {
         my $ref = refaddr $self;
         $unique_ref = $com_unique{$ref};
-        if ( !$unique_ref ) {
 
-# Lorsque tous les threads seront créés par Comm, déclarer get_unique_ref ici et modifier ces 2 lignes
-            $unique_ref = $self->get_unique_ref;
-
-            # Mise à jour de la référence unique
-            $com_unique{$ref} = $unique_ref;
+        if ( !defined $unique_ref ) {
+		    print STDERR "create_new_server : no reference found for object $self\n";
+			return;
         }
     }
     my $self_caller;
@@ -2028,7 +1826,7 @@ sub create_new_server {
         my $key;
         if ($unique_ref) {       # Appel d'instance ($self est un objet)
 
-            my $class    = CORE::ref $self;
+            my $class    = ref $self;
             my $name     = $options_ref->{'name'};
             my $name_tid = $name || $tid;
             $name_tid = $tid if ( $options_ref->{'put_tid'} );
@@ -2080,7 +1878,7 @@ sub create_new_server {
     if ( !$options_ref->{'do_not_create'} ) {
         my $queue = $server_queue_by_tid{$tid};
 
-        my $message = encode(
+        my $message = dump (
             "Text::Editor::Easy::Comm::manage_requests2",
             threads->tid,
             "S",
@@ -2170,6 +1968,10 @@ sub have_task_done {
 # task will recover CPU only when the 2nd launched task is over
     my $self_server = $thread_knowledge{'self_server'};
     my ( $method, $call_id, $reference, @param ) = get_task_to_do;
+
+    if ( $method eq 'clipboard_set' ) {
+		print "HAVE_TASK_DONE : Appel clipboard_set, @param\n";
+    }
     execute_task( 'async', $self_server, $method, $call_id, $reference,
         @param );
 }
@@ -2181,15 +1983,6 @@ sub execute_this_task {
         @param );
 }
 
-sub print_free {
-    my ($string) = @_;
-    for ( sort keys %free ) {
-        if ( $free{$_} ) {
-            $string .= "\t$_\t$free{$_}\n";
-        }
-    }
-    print DBG $string;
-}
 
 =head1 FUNCTIONS
 
@@ -2198,6 +1991,11 @@ sub print_free {
 =head2 add_thread_method
 
 =head2 add_thread_object
+
+=head2 anything_for
+
+"anything_for_me" can tell one thread if there is something more to do for itself. With "anything_for" and the tid of the thread given, any thread can know about the queue of any other thread.
+This is used to propagate lazyness between threads : a running task can be stopped if the change in another thread invalidates it.
 
 =head2 ask2
 
@@ -2213,15 +2011,11 @@ sub print_free {
 
 =head2 create_new_server
 
-=head2 create_queue
-
 =head2 create_thread
 
 =head2 decode_message
 
 =head2 empty_queue
-
-=head2 encode
 
 =head2 execute_task
 
@@ -2229,7 +2023,9 @@ sub print_free {
 
 =head2 get_message_for
 
-=head2 get_response_from
+=head2 get_ref
+
+Return the reference (unique) of a Text::Editor::Easy instance.
 
 =head2 get_synchronized
 
@@ -2244,8 +2040,6 @@ sub print_free {
 This sub is called only in the graphic thread context (with the thread that has tid 0).
 It initializes new graphical data for the new "Text::Editor::Easy" object as well as reference this object for
 thread communication.
-
-=head2 print_free
 
 =head2 manage_debug_file
 
@@ -2271,6 +2065,10 @@ all the "print DBG" everywhere.
 =head2 stop_thread
 
 =head2 thread_generator
+
+=head2 trace_new
+
+Every AUTOLOAD calls are traced. Still some important methods (instance creation, thread creation, ...) are not yet traced. To be done.
 
 =head2 transform_hash
 

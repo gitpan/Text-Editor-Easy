@@ -9,11 +9,11 @@ Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed b
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode
@@ -68,6 +68,40 @@ sub set {
     }
     my $ref = refaddr $self;
     $ref_Editor{$ref}->cursor_set( $position, $line );
+	if ( ! wantarray ) {
+        return $ref_Editor{$ref}->cursor_set( $position, $line );
+    }
+    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position ) =
+		    $ref_Editor{$ref}->cursor_get( $position, $line );
+	$line = Text::Editor::Easy::Line->new(
+            $ref_Editor{$ref},
+            $ref_line,
+	    );
+	my $display = Text::Editor::Easy::Display->new(
+            $ref_Editor{$ref},
+            $ref_display,
+	    );
+	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position );
+}
+
+sub get {
+    my ( $self ) = @_;
+
+    my $ref = refaddr $self;
+	if ( ! wantarray ) {
+        return $ref_Editor{$ref}->cursor_get();
+    }
+    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position ) =
+		    $ref_Editor{$ref}->cursor_get();
+	my $line = Text::Editor::Easy::Line->new(
+            $ref_Editor{$ref},
+            $ref_line,
+	    );
+	my $display = Text::Editor::Easy::Display->new(
+            $ref_Editor{$ref},
+            $ref_display,
+	    );
+	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position );
 }
 
 my %method = (
@@ -95,6 +129,7 @@ sub AUTOLOAD {
 "La méthode '$what' n'est pas connue de l'objet Text::Editor::Easy::Cursor $self\n";
         return;
     }
+
 
     my $ref = refaddr $self;
     return $ref_Editor{$ref}->ask2( 'cursor_' . $what, @param );
@@ -128,6 +163,10 @@ sub display {
 =head1 FUNCTIONS
 
 =head2 display
+
+=head2 get
+
+Gives the line object and position in this line of the current cursor position.
 
 =head2 line
 

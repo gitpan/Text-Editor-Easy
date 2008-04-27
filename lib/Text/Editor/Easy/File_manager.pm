@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 =head1 SYNOPSIS
 
@@ -278,13 +278,16 @@ sub read_until2 {
             $line_ref = read_line_ref( $self, $who );
         }
     }
-    if ( !$line_ref ) {    # On est à la fin du fichier
-        $line_ref =
-          read_line_ref( $self, $who )
-          ; # Nouvelle lecture et recréation de $self->[DESC]{$who} par read_line_ref
+	else {
+		$line_ref = read_line_ref( $self, $who );
     }
-    return if ( !$line_ref );    # Rien dans le fichier...
-    my $stop_ref = $options_ref->{'line_stop'};
+    if ( !$line_ref ) {    # On est à la fin du fichier
+        $line_ref = read_line_ref( $self, $who );
+    }
+    if ( !$line_ref ) {
+			return; #A la fin du fichier
+	}
+	my $stop_ref = $options_ref->{'line_stop'};
     if ( $line_ref->[REF] and $stop_ref and $line_ref->[REF] == $stop_ref ) {
 
         # "Démémorisation"
@@ -404,7 +407,7 @@ sub query_segments {
 sub close {
     my ($self) = @_;
 
-    close $self->[ROOT][FILE_DESC];
+    CORE::close $self->[ROOT][FILE_DESC];
 }
 
 sub save_internal {
@@ -1107,15 +1110,152 @@ sub delete_and_return_first {
 }
 
 sub save_info {
-    my ( $self, $info ) = @_;
+    my ( $self, $info, $key ) = @_;
 
-    $self->[SAVED_INFO] = $info;
+    if ( defined $key ) {
+		$self->[SAVED_INFO]{$key} = $info;
+    }
+	else {
+        $self->[SAVED_INFO] = $info;
+    }
 }
 
 sub load_info {
-    my ($self) = @_;
+    my ( $self, $key ) = @_;
 
+    if ( defined $key ) {
+		if ( ref ($self->[SAVED_INFO] ) eq 'HASH' ) {
+		    return $self->[SAVED_INFO]{$key};
+	    }
+		else {
+		    print STDERR "Saved_info in File_manager is not a hash\n";
+			return;
+	    }
+    }
     return $self->[SAVED_INFO];
+}
+
+sub editor_number {
+    my ( $self, $number, $options_ref ) = @_;
+	
+	print "Dans editor_number, reçu : NUMBER $number\n";
+
+    my $check_every = 20;
+	my $lazy;
+	if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+        $check_every = $options_ref->{'check_every'} || 20;
+	    $lazy = $options_ref->{'lazy'};
+    }
+
+	my $indice = 0;
+	# 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
+    my $who = 'I' . $indice;
+    while  ( defined $self->[DESC]{$who} ) {
+		$indice += 1;
+		$who = 'I' . $indice;
+    }
+    $self->[DESC]{$who} = ();
+	
+    my $text = read_next($self, $who);
+
+    $indice = 0;
+    my $current;
+    while ( defined($text) ) {
+        $current += 1;
+		$indice += 1;
+        if ( $current == $number ) {
+            my $new_ref = create_ref_current($self, $who);
+			print "Texte de la ligne : |$text|\n";
+            save_line_number( $self, $who, $new_ref, $number );
+			# Désinit
+			$self->[DESC]{$who} = undef;
+            return $new_ref;
+        }
+		if ( $indice == $check_every ) {
+		    $indice = 0;
+			if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
+				return;
+		    }
+            if ( Text::Editor::Easy::Comm::anything_for_me() ) {
+				#return if ( Text::Editor::Easy::Comm::have_task_done() );
+				Text::Editor::Easy::Comm::have_task_done()
+		    }
+	    }
+        $text = read_next($self, $who);
+    }
+}
+
+
+sub editor_search {
+    my ( $self, $regexp, $options_ref ) = @_;
+	
+    my $check_every = 20;
+	my ( $lazy, $who, $start_line, $start_pos, $stop_line, $stop_pos );
+	if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+        $check_every = $options_ref->{'check_every'} || 20;
+	    $lazy = $options_ref->{'lazy'};
+		$who = $options_ref->{'thread'};
+		$start_line = $options_ref->{'start_line'};
+		$start_pos = $options_ref->{'start_pos'};
+		$stop_line = $options_ref->{'stop_line'};
+		$stop_pos = $options_ref->{'stop_pos'};
+    }
+	if ( ! defined $stop_line ) {
+		$stop_line = $start_line;
+    }
+
+     if ( ! defined $who ) {
+	    my $indice = 0;
+	    # 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
+        $who = 'I' . $indice;
+        while  ( defined $self->[DESC]{$who} ) {
+		    $indice += 1;
+		    $who = 'I' . $indice;
+        }
+    }
+    $self->[DESC]{$who} = ();
+	
+    #my $text = read_next($self, $who, $start_line);
+	my $line_ref = $self->[HASH_REF]{$start_line};
+	return if ( ! defined $line_ref ); # Mauvaise référence
+	$self->[DESC]{$who}[REF] = $line_ref;
+	my $text = $line_ref->[TEXT];
+	if ( ! defined $stop_pos ) {
+		$stop_pos = length ( $text );
+    }
+
+    my $indice = 0;
+    while ( defined($text) ) {
+		$indice += 1;
+		#print "Ligne lue : |$text|\n";
+        while ( $text =~ m/($regexp)/g ) {
+            my $length    = length($1);
+            my $end_pos   = pos($text);
+            my $start_pos = $end_pos - $length;
+            my $new_ref = create_ref_current($self, $who);
+			#print "Texte de la ligne : |$text|\n";
+			if ( $new_ref != $start_line ) {
+                save_line_number( $self, $who, $new_ref );
+		    }
+			if ( $new_ref != $start_line or $start_pos  > $options_ref->{'start_pos'} ) {
+				$self->[DESC]{$who} = undef;
+                return ( $new_ref, $start_pos, $end_pos);
+		    }
+        }
+		if ( $indice == $check_every ) {
+		    $indice = 0;
+			if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
+				return;
+		    }
+            if ( Text::Editor::Easy::Comm::anything_for_me() ) {
+				#return if ( Text::Editor::Easy::Comm::have_task_done() );
+				Text::Editor::Easy::Comm::have_task_done()
+		    }
+	    }
+        #$text = read_next($self, $who);
+		$text = read_until2( $self, $who, { 'line_stop' => $stop_line } );
+    }
+	return;
 }
 
 =head1 FUNCTIONS
@@ -1131,6 +1271,17 @@ sub load_info {
 =head2 delete_line
 
 =head2 display
+
+=head2 editor_number
+
+Return the line of a Text::Editor::Easy instance given its number. This task may be long for the moment (with huge file), so lazy mode is possible. At the beginning, this task was done outside this module,
+because sub "anything_for" was not written. Lazy processing can now be transmitted between threads : this means that one thread can stop its processing if another thread receives a new task.
+
+=head2 editor_search
+
+Return the line of a Text::Editor::Easy instance and the position (start and end) in this line that match the regexp given. This task may be long (with huge file), so lazy mode is possible.
+
+=head2 empty_internal
 
 =head2 empty_internal
 

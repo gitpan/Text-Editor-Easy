@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 =head1 SYNOPSIS
 
@@ -33,7 +33,7 @@ The demos (9 demos to be tested from the "Editor.pl" program) will show you exam
 
 =head1 EXPORT
 
-This module is object-oriented. Once created, numerous methods are accessible. New methods can be added
+This module is object-oriented. Once a instance is created, numerous methods are accessible. New methods can be added
 on the fly with, why not, new threads associated with these new methods.
 
 Sometimes, you need to consume CPU to achieve your goal. But this shouldn't block the user who interactively
@@ -57,7 +57,7 @@ communicating object (a "Text::Editor::Easy::Graphic") between the Abstract modu
 This interface may change a little in order to allow other "Glue module" to be written, but, of course, all graphic glue modules would
 have to use the same interface.
 You can see the "Text::Editor::Easy" as a super graphical layer above other layers. I imagine a generator where you design an
-application in your preferred graphical mode but the generated application could run (maybe in a limited way) in "Console mode".
+application in your preferred graphical user interface but the generated application could run (maybe in a limited way) in "Console mode".
 Constant re-use is the key to hyper-productivity.
 
 =head1 FUNCTIONS
@@ -65,162 +65,141 @@ Constant re-use is the key to hyper-productivity.
 =cut
 
 use Scalar::Util qw(refaddr);
+use Data::Dump qw(dump);
 use threads;
 
 use Text::Editor::Easy::Comm;
-use Text::Editor::Easy::File_manager;
 
 our %Trace; # Hash to tell modules if they have to make displays or to be silent
-
-my %ref_undo;
-my %unique_ref;
 
 use Text::Editor::Easy::Cursor;
 use Text::Editor::Easy::Screen;
 
-{
+my $main_loop_launched;
 
-    sub new {
-        my ( $classe, $hash_ref ) = @_;
+sub new {
+    my ( $classe, $hash_ref ) = @_;
 
-        # Création du "thread modèle", générateur de tous les autres
-        if ( my $trace_ref = $hash_ref->{'trace'} ) {
+    # Création du "thread modèle", générateur de tous les autres
+    if ( my $trace_ref = $hash_ref->{'trace'} ) {
 
 # Hash "%Trace" must be seen by all future created threads but needn't be  a shared hash
 # ===> will be duplicated by perl thread creation mecanism
-            %Trace = %{$trace_ref};
+        %Trace = %{$trace_ref};
+    }
+    Text::Editor::Easy::Comm::verify_model_thread();
+
+    my $editor = bless \do { my $anonymous_scalar }, $classe;
+
+    my $ref = refaddr $editor;
+	Text::Editor::Easy::Comm::set_ref($editor, $ref);
+
+    my $zone = $hash_ref->{'zone'};
+    if ( defined $zone and ! ref $zone ) {
+        $hash_ref->{'zone'} = Text::Editor::Easy::Zone->named($zone);
+    }
+
+    Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
+
+    Text::Editor::Easy::Comm::verify_motion_thread( $ref, $hash_ref );
+
+    if ( defined $hash_ref->{'growing_file'} ) {
+        print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
+    }
+    print "Avant appel pour création d'un nouveau thread file_manager\n";
+
+    my $file_tid = $editor->create_new_server(
+        {
+            'use'     => 'Text::Editor::Easy::File_manager',
+             'package' => 'Text::Editor::Easy::File_manager',
+             'methods' => [
+                'delete_line',
+                'get_line',
+                'get_text_from_ref',
+                'modify_line',
+                'new_line',
+                'next_line',
+                'previous_line',
+                'save_internal',
+                'query_segments',
+                'revert_internal',
+                'read_next',
+                'read_until',
+                'read_until2',
+                'create_ref_current',
+                'init_read',
+                'ref_of_read_next',
+                'save_action',
+                'save_line_number',
+                'get_line_number_from_ref_internal',
+                'get_ref_for_empty_structure',
+                'line_seek_start',
+                'empty_internal',
+                'save_info',
+                'load_info',
+                'close',
+				'editor_number',
+				'editor_search',
+            ],
+            'object' => [],
+            'init'   => [
+                'Text::Editor::Easy::File_manager::init_file_manager',
+                $hash_ref->{'file'},
+                $hash_ref->{'growing_file'},
+                $hash_ref->{'save_info'},
+            ],
+            'name' => 'File_manager',
         }
-        Text::Editor::Easy::Comm::verify_model_thread();
+    );
 
-        my $editor = bless \do { my $anonymous_scalar }, $classe;
+    # Référencement de l'éditeur
+    Text::Editor::Easy->reference_editor( $ref, $hash_ref->{'zone'},
+        $hash_ref->{'file'}, $hash_ref->{'name'} );
 
-        my $ref = refaddr $editor;
-        $unique_ref{$ref} = $ref;
+    my $new_editor;
 
-        my $zone = $hash_ref->{'zone'};
-        if ( defined $zone and !CORE::ref $zone ) {
-            $hash_ref->{'zone'} = Text::Editor::Easy::Zone->named($zone);
-        }
-
-        Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
-
-        Text::Editor::Easy::Comm::verify_motion_thread( $ref, $hash_ref );
-
-       #return
-       #  if ( !defined $ref_Abstract{$ref} );  # On n'est pas dans le process 0
-
-        #$file_name{ $ref } = $hash_ref->{file};
-
-        if ( defined $hash_ref->{'growing_file'} ) {
-            print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
-        }
-        print "Avant appel pour création d'un nouveau thread file_manager\n";
-
-        my ( $init_file, $init_grow, $init_save ) = (
-            $hash_ref->{'file'},
-            $hash_ref->{'growing_file'},
-            $hash_ref->{'save_info'}
-        );
-        my $file_tid = $editor->create_new_server(
-            {
-                'use'     => 'Text::Editor::Easy::File_manager',
-                'package' => 'Text::Editor::Easy::File_manager',
-                'methods' => [
-                    'delete_line',
-                    'get_line',
-                    'get_text_from_ref',
-                    'modify_line',
-                    'new_line',
-                    'next_line',
-                    'previous_line',
-                    'save_internal',
-                    'query_segments',
-                    'revert_internal',
-                    'read_next',
-                    'read_until',
-                    'read_until2',
-                    'create_ref_current',
-                    'init_read',
-                    'ref_of_read_next',
-                    'save_action',
-                    'save_line_number',
-                    'get_line_number_from_ref_internal',
-                    'get_ref_for_empty_structure',
-                    'line_seek_start',
-                    'empty_internal',
-                    'save_info',
-                    'load_info',
-                    'close',
-                ],
-                'object' => [],
-                'init'   => [
-                    'Text::Editor::Easy::File_manager::init_file_manager',
-                    $init_file,
-                    $init_grow,
-                    $init_save,
-
-                    #$hash_ref->{'file'},
-                    #$hash_ref->{'growing_file'},
-                    #$hash_ref->{'save_info'},
-                ],
-                'name' => 'File_manager',
-            }
-        );
-
-        # Référencement de l'éditeur
-        Text::Editor::Easy->reference_editor( $ref, $hash_ref->{'zone'},
-            $hash_ref->{'file'}, $hash_ref->{'name'} );
-
-        my $new_editor;
-
-        if ( $hash_ref->{sub} ) {
+    if ( $hash_ref->{sub} ) {
 
             # On demande la création d'un thread supplémentaire
-            my $thread = $editor->create_client_thread( $hash_ref->{sub} );
-            $editor->set_synchronize();
-            if ( threads->tid == 0 ) {
-                print "Appel de la main loop (méthode new)\n";
-                Text::Editor::Easy->manage_event;
-                print "Fin de la main loop (méthode new)\n";
+        my $thread = $editor->create_client_thread( $hash_ref->{sub} );
+        $editor->set_synchronize();
+        if ( threads->tid == 0 and ! $main_loop_launched) {
+		    $main_loop_launched = 1;
+            print "Appel de la main loop (méthode new)\n";
+            Text::Editor::Easy->manage_event;
+            print "Fin de la main loop (méthode new)\n";
 
-                #Text::Editor::Easy::Comm::stop_all_threads;
-                Text::Editor::Easy::Comm::untie_print;
-                return $editor;
-            }
+            Text::Editor::Easy::Comm::untie_print;
+            return $editor;
         }
-        else {
-            $editor->set_synchronize();
-        }
-
-        #print "Appel de editor on_top pour zone = ",
-        #  $hash_ref->{'zone'}{'name'}, " tid : ", threads->tid, "\n";
-        my $focus = $hash_ref->{'focus'};
-        if ( !defined $focus ) {
-            $editor->on_top($hash_ref);
-        }
-        elsif ( $focus eq 'yes' ) {
-            $editor->focus($hash_ref);
-        }
-        print "Après appel de editor_on_top\n";
-        return $editor;
+    }
+    else {
+        $editor->set_synchronize();
     }
 
-    sub file_name {
-        my ($self) = @_;
-
-        my $ref    = $self->ref;
-        my $retour = Text::Editor::Easy->data_file_name($ref);
-
-        #print "RETOUR de file_name : $retour\n";
-        return $retour;
+    my $focus = $hash_ref->{'focus'};
+    if ( !defined $focus ) {
+        $editor->on_top($hash_ref);
     }
-
-    sub name {
-        my ($self) = @_;
-
-        my $ref = $self->ref;
-        return $self->data_name($ref);
+    elsif ( $focus eq 'yes' ) {
+        $editor->focus($hash_ref);
     }
+    print "Après appel de editor_on_top\n";
+    return $editor;
+ }
+
+ sub file_name {
+    my ($self) = @_;
+    my $ref    = $self->get_ref;
+    my $retour = Text::Editor::Easy->data_file_name($ref);
+
+    return $retour;
+}
+
+sub name {
+    my ($self) = @_;
+
+    return Text::Editor::Easy->data_name($self->get_ref);
 }
 
 sub revert {
@@ -246,19 +225,6 @@ sub insert_text {
 # Cette fonction devrait rester interne et ne devrait pas être dans l'interface ... sauf
 # qu'elle se trouve dans le package Text::Editor::Easy, donc accessible ... à voir
 
-    if ( $ref_undo{ refaddr $self} ) {    # Gestion de l'annulation, à revoir
-        my $line_number = $self->get_line_number_from_ref_internal($ref);
-
-        my $replace = "";
-        if ( length($line_text) > $pos ) {
-            $replace =
-              substr( $line_text, $pos, 1 ); # Longueur supérieur à 1 maintenant
-        }
-
-        $ref_undo{ refaddr $self}
-          ->save_action( $line_number, $pos, $insert, $text, $replace );
-    }
-
     my $start = substr( $line_text, 0, $pos );
     my $end = substr( $line_text, $pos );
     if ($insert) {
@@ -279,12 +245,6 @@ sub insert_text {
 
 sub insert_return {
     my ( $self, $text, $pos, $ref ) = @_;
-
-    if ( $ref_undo{ refaddr $self} ) {    # Gestion de l'annulation, à revoir
-        my $line_number = $self->get_line_number_from_ref_internal($ref);
-
-#        $ref_undo{refaddr $self}->save_action( $line_number, $pos, $insert, $key, $replace );
-    }
 
     my ( $new_text, $new_ref );
     $new_text =
@@ -385,7 +345,8 @@ sub regexp {
 
     #print "Position de départ de la recherche |$pos|\n";
 
-    my $regexp = qr/$exp/i;
+    #my $regexp = qr/$exp/i;
+	my $regexp = $exp;
     print "REGEXP $regexp\n";
 
     my $end_ref;
@@ -453,19 +414,68 @@ sub regexp {
 sub search {
     my ( $self, $exp, $options_ref ) = @_;
 
-    $exp =~ s/\\/\\\\/g;
-    $exp =~ s/\//\\\//g;
-    $exp =~ s/\(/\\\(/g;
-    $exp =~ s/\[/\\\[/g;
-    $exp =~ s/\{/\\\{/g;
-    $exp =~ s/\)/\\\)/g;
-    $exp =~ s/\]/\\\]/g;
-    $exp =~ s/\}/\\\}/g;
-    $exp =~ s/\./\\\./g;
-    $exp =~ s/\^/\\\^/g;
-    $exp =~ s/\$/\\\$/g;
+   if ( ! ref $exp ) {
+     return if ( $exp eq q{} );
+     $exp =~ s/\\/\\\\/g;
+     $exp =~ s/\//\\\//g;
+     $exp =~ s/\(/\\\(/g;
+     $exp =~ s/\[/\\\[/g;
+     $exp =~ s/\{/\\\{/g;
+     $exp =~ s/\)/\\\)/g;
+     $exp =~ s/\]/\\\]/g;
+     $exp =~ s/\}/\\\}/g;
+     $exp =~ s/\./\\\./g;
+     $exp =~ s/\^/\\\^/g;
+     $exp =~ s/\$/\\\$/g;
+     $exp =~ s/\*/\\\*/g;
+     $exp =~ s/\+/\\\+/g;
+	 $exp = qr/$exp/;
+	}
+	else {
+		return if ( $exp == qr// );
+   }
+   my ( $start_line, $stop_line );
+    if ( ! defined $options_ref or ref $options_ref ne 'HASH' ) {
 
-    return $self->regexp( $exp, $options_ref );
+		if ( ! defined $options_ref ) {
+		    $options_ref = {};
+		}
+		$start_line = $options_ref->{'start_line'};
+		$stop_line = $options_ref->{'stop_line'};
+    }
+	else {
+		$start_line = $options_ref->{'start_line'};
+		$stop_line = $options_ref->{'stop_line'};
+		if ( defined $start_line and ref $start_line eq 'Text::Editor::Easy::Line' ) {
+		    $start_line = $start_line->ref;
+			$options_ref->{'start_line'} = $start_line;
+	    }
+		if ( defined $stop_line and ref $stop_line eq 'Text::Editor::Easy::Line' ) {
+		    $stop_line = $stop_line->ref;
+			$options_ref->{'stop_line'} = $stop_line;
+	    }
+	}
+	
+	my $pos = 0;
+	if ( ! defined $start_line ) {
+		# On utilise AUTOLOAD pour récupérer une référence à une ligne directement
+        ( $options_ref->{'start_line'}, $pos ) = cursor_get( $self );
+    }
+	if ( ! defined $options_ref->{'start_pos'} ) {
+		$options_ref->{'start_pos'} = $pos;
+	}
+
+    print "Avant appel editor_search : $exp\n", dump($options_ref), "\n";;
+	my ( $ref, $start_pos, $end_pos ) = $self->editor_search( $exp, $options_ref );
+	my $line = Text::Editor::Easy::Line->new( $self, $ref, );
+	return ( $line, $start_pos, $end_pos, $exp );
+}
+
+sub visual_search {
+		my ( $self, $exp, $line, $start ) = @_;
+
+        
+		return $self->editor_visual_search($exp, $line->ref, $start );
 }
 
 sub next_search {
@@ -477,10 +487,10 @@ sub next_search {
     return if ( !defined $hash_ref );
     my $ref_start = $hash_ref->{'line_start'};
     $hash_ref->{'line_start'} =
-      Text::Editor::Easy::Line->new( $unique_ref{$ref_editor}, $ref_start, );
+      Text::Editor::Easy::Line->new( $self, $ref_start, );
     my $ref_stop = $hash_ref->{'line_stop'};
     $hash_ref->{'line_stop'} =
-      Text::Editor::Easy::Line->new( $unique_ref{$ref_editor}, $ref_stop, );
+      Text::Editor::Easy::Line->new( $self, $ref_stop, );
 
     my ( $line, $start, $end ) = $self->regexp( $hash_ref->{'exp'}, $hash_ref );
     if ($line) {
@@ -490,13 +500,17 @@ sub next_search {
 }
 
 sub number {
+# First step, integration in File_manager (only one traced call)
+# But not yet optimized in File_manager : the file is not yet read once at start
 
-# Horrible sub not yet optimized : very, very long ! So lazy mode (return if anything_for_me) for server thread
-# Still longer as all method calls are traced and one method call is made for each single line of the file read
-# Will be integrated in File_manager.pm (only one call) and optimized
-    my ( $self, $line ) = @_;
+    my ( $self, $line, $options_ref ) = @_;
 
+    my $ref_line = $self->editor_number( $line, $options_ref );
+    return if ( ! defined $ref_line );
+    return Text::Editor::Easy::Line->new( $self, $ref_line, );
+	
     my $desc = threads->tid;
+	
     $self->init_read($desc);
     my $text = $self->read_next($desc);
 
@@ -557,8 +571,8 @@ sub AUTOLOAD {
     my $what = $AUTOLOAD;
     $what =~ s/^Text::Editor::Easy:://;
     $what =~ s/^Async:://;
-    print( "Dans AUTOLOAD  |", $self->file_name, "|$self|", $self->ref, "|\n" )
-      if ( $what eq 'focus' );
+    print( "Dans AUTOLOAD  appel clipboard_set|$self|\n" )
+      if ( $what eq 'manage_event' );
 
     return Text::Editor::Easy::Comm::ask2( $self, $what, @param );
 }
@@ -604,6 +618,8 @@ sub erase_text {                      # On supprime un ou plusieurs caractères
 }
 
 my %cursor;                           # Référence au "sous-objet" cursor
+# Danger : il n'y a qu'un seul curseur par objet "Text::Editor::Easy"
+# ==> enlever cette limite
 
 sub cursor {
     my ($self) = @_;
@@ -619,6 +635,7 @@ sub cursor {
 }
 
 my %screen;    # Référence au "sous-objet" cursor
+# Objet screen à migrer vers zone et window
 
 sub screen {
     my ($self) = @_;
@@ -642,7 +659,7 @@ sub insert {
     if ( !wantarray ) {
         return $self->ask2( 'insert', @param );
     }
-    elsif ( CORE::ref($self) eq 'Text::Editor::Easy::Async' )
+    elsif ( ref($self) eq 'Text::Editor::Easy::Async' )
     {    # Appel asynchrone, insert ne renvoie pas une référence de ligne
         return $self->ask2( 'insert', @param );
     }
@@ -653,8 +670,6 @@ sub insert {
 
 # Création d'un objet ligne pour chaque référence (dans le thread de l'appelant)
             push @lines, Text::Editor::Easy::Line->new(
-
-#$unique_ref{ $ref },         # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
                 $self,
                 $_,
             );
@@ -665,10 +680,6 @@ sub insert {
 
 sub display {
     my ( $self, $line, $options_ref ) = @_;
-
-    my $ref = refaddr $self;
-
-    #print $line->ref, "\n";
 
     $self->ask2( 'display', $line->ref, $options_ref );
 }
@@ -686,29 +697,11 @@ sub first {
 
     my ( $id, $text ) = $self->next_line;
 
-    print "Dans first : $self|", $self->get_unique_ref, "|$id|$text|\n";
+    #print "Dans first : $self|", $self->get_ref, "|$id|$text|\n";
     return Text::Editor::Easy::Line->new(
-        $self
-        , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
+        $self,
         $id,
     );
-}
-
-sub get_unique_ref {
-    my ($self) = @_;
-
-    return $unique_ref{ refaddr $self };
-}
-
-sub reference {
-    my ( $self, $unique_ref ) = @_;
-
-    return if ( !defined $unique_ref );    # Impossible de référencer undef
-
-# %unique_ref de Text::Editor::Easy.pm doit disparaître au profit de %com_unique de Text::Editor::Easy::Comm
-# ==> Migration à finaliser
-    $unique_ref{ refaddr $self } = $unique_ref;
-    $self->set_ref($unique_ref);
 }
 
 # Ecrasement de la méthode async du package thread mais pas moyen de la
@@ -720,7 +713,8 @@ sub async {
     my ($self) = @_;
 
     my $async = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy::Async';
-    $unique_ref{ refaddr $async} = $unique_ref{ refaddr $self};
+	my $unique_ref = Text::Editor::Easy::Comm::get_ref($self);
+    Text::Editor::Easy::Comm::set_ref($async, $unique_ref);
     return $async;
 }
 use warnings;
@@ -728,9 +722,9 @@ use warnings;
 sub slurp {
     my ($self) = @_;
 
-    # This function is not safe in a multi-thread environnement
+    # This function is not safe in a multi-thread environnement :
+	# you may have in return something that has never existed
     # But if you know what you are doing...
-    #print "Dans slurp de $self\n";
     my $file;
 
     my $number = 0;
@@ -741,16 +735,9 @@ sub slurp {
         $line = $line->next;
     }
 
-    #print "Total lignes lues : $number\n";
     return $file;
 
 }
-
-#sub print_self {
-#        my ( $self ) = @_;
-#
-#        print "SELF $self, ref self = ", CORE::ref($self), "\n";
-#}
 
 sub get_in_zone {
     my ( $self, $zone, $number ) = @_;
@@ -760,7 +747,7 @@ sub get_in_zone {
         return;
     }
     my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    $editor->reference( $ref[$number] );
+    Text::Editor::Easy::Comm::set_ref( $editor, $ref[$number] );
     return $editor;
 }
 
@@ -772,7 +759,7 @@ sub whose_name {
 
         #print "Référence récupérée de data |$ref|\n";
         my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        $editor->reference($ref);
+        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
         return $editor;
     }
     return;
@@ -784,7 +771,19 @@ sub whose_file_name {
     my $ref = Text::Editor::Easy->data_get_editor_from_file_name($file_name);
     if ($ref) {
         my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        $editor->reference($ref);
+        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
+        return $editor;
+    }
+    return;
+}
+
+sub last_current {
+    my ( $self ) = @_;
+
+    my $ref = Text::Editor::Easy->data_last_current();
+    if ($ref) {
+        my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
+        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
         return $editor;
     }
     return;
@@ -813,7 +812,17 @@ use Scalar::Util qw(refaddr);
 # A modifier en un référence de scalaire...
 sub new {
     my ( $classe, $hash_ref ) = @_;
+	
+		if ( my $trace_ref = $hash_ref->{'trace'} ) {
 
+# Hash "%Trace" must be seen by all future created threads but needn't be  a shared hash
+# ===> will be duplicated by perl thread creation mecanism
+            %Text::Editor::Easy::Trace = %{$trace_ref};
+			delete $hash_ref->{'trace'};
+        }
+    #Text::Editor::Easy::trace_test();
+
+    Text::Editor::Easy::Comm::verify_model_thread();
     my $zone = bless $hash_ref, $classe;
     my $name = $hash_ref->{'name'};
     if ( defined $name ) {
@@ -871,8 +880,6 @@ our @ISA = 'Text::Editor::Easy';
 
 =head2 get_line_number_from_ref
 
-=head2 get_unique_ref
-
 =head2 insert
 
 =head2 insert_mode
@@ -883,6 +890,10 @@ our @ISA = 'Text::Editor::Easy';
 
 =head2 last
 
+=head2 last_current
+
+Class method : returns the editor instance who had the focus when ctrl-f was pressed.
+
 =head2 manage_event
 
 =head2 name
@@ -892,8 +903,6 @@ our @ISA = 'Text::Editor::Easy';
 =head2 next_search
 
 =head2 number
-
-=head2 reference
 
 =head2 regexp
 
@@ -914,6 +923,10 @@ our @ISA = 'Text::Editor::Easy';
 =head2 slurp
 
 =head2 substitute_eval_with_file
+
+=head2 visual_search
+
+Call to editor_visual_search : replacement of line object (scalar reference, memory adress specific to one thread) by the reference of the line (common for all threads).
 
 =head2 whose_file_name
 

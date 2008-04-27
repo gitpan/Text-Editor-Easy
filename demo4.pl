@@ -3,7 +3,7 @@
 #    1) generated output
 #
 # Here, the example is very simple
-# and fulfill its need.
+# and fulfils its need.
 # Let's imagine that the file "account.hst"
 # is a generated one (by calculation on
 # other files) :

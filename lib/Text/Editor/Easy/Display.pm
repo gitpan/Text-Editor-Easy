@@ -5,16 +5,16 @@ use strict;
 
 =head1 NAME
 
-Text::Editor::Easy::Cursor - Object oriented interface to displays (managed by "Text::Editor::Easy::Abstract"). A display is a screen line. With
+Text::Editor::Easy::Display - Object oriented interface to displays (managed by "Text::Editor::Easy::Abstract"). A display is a screen line. With
 wrap mode, you can have several displays for a single line on a file.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 # Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
 # pas dans les hachages gérés par AUTOLOAD de Text::Editor::Easy) car susceptibles de changer
@@ -42,7 +42,7 @@ sub new {
     if ($line) {
         return $line;
     }
-    my $unique_ref = $ref_Editor->ref;
+    my $unique_ref = $ref_Editor->get_ref;
     $line = bless \do { my $anonymous_scalar }, $classe;
 
     my $ref = refaddr $line;
@@ -158,6 +158,7 @@ my %sub = (
       [ 'graphic', \&Text::Editor::Easy::Abstract::display_previous_is_same ],
     'ord'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_ord ],
     'height' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_height ],
+    'middle_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_middle_ord ],
     'number' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_number ],
     'abs'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_abs ],
     'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_select ],

@@ -5,15 +5,16 @@ use strict;
 
 =head1 NAME
 
-Text::Editor::Easy::Trace::Print - Print management.
+Text::Editor::Easy::Trace::Print - Print management (every print is traced : which thread writes it, what was the thread called for, stack call is also saved).
+The consequence is that a print should be considered as a long operation. The benefit is that every print is a little more than a print.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :

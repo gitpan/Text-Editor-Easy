@@ -15,11 +15,11 @@ use strict;
 
 =head1 NAME
 
-Automatic indentation, addition of characters,...
+- Automatic indentation, addition of characters,...
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
@@ -73,7 +73,7 @@ sub if {
 
     # Attention, ici on suppose une indentation à 4 : à paramétrer
     my ($ref) = $self->insert("(  ) {\n$indent    \n$indent}");
-    print "REF TEXT = ", $ref->text, "\n";
+    print "REF TEXT = |", $ref->text, "|\n";
     $self->cursor->set( $pos + 2, $ref );
 }
 

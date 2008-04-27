@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with just a Text::Editor::Easy
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Text::Editor::Easy::Comm;
 
@@ -39,7 +39,7 @@ sub on_top_editor_change {
     if ( !$tab_editor ) {
         print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
         $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        $tab_editor->reference($tab_ref);
+        Text::Editor::Easy::Comm::set_ref( $tab_editor, $tab_ref);
         $tab_object{$tab_ref} = $tab_editor;
     }
     my $info_ref      = $tab_editor->load_info;
@@ -125,7 +125,7 @@ sub on_top_editor_change {
             $tab_editor->insert($tab_line);
         }
     }
-    print "On top editor change 2 (", $tab_editor->get_unique_ref,
+    print "On top editor change 2 (", $tab_editor->get_ref,
       ") première ligne de l'onglet : |", $tab_editor->first->text, "|\n";
     $tab_editor->deselect;
 
@@ -138,8 +138,7 @@ sub motion_over_tab {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
 
  #print "Dans motion_over_tab $unique_ref|$editor|", $hash_ref->{'line'}, "|\n";
- #print "Reference du tab $editor : ", $editor->get_unique_ref, "\n";
- # Vérification que l'on est bien sur la première ligne
+  # Vérification que l'on est bien sur la première ligne
     return if ( anything_for_me() );
 
     my $first_line = $editor->first;
@@ -173,7 +172,7 @@ sub motion_over_tab {
         $current_right += 1;
     }
     return if ( anything_for_me() );
-    if ( !defined $file_ref or CORE::ref $file_ref ne 'HASH' ) {
+    if ( !defined $file_ref or ref $file_ref ne 'HASH' ) {
 
         # Bug à voir
         $file_ref = {};
@@ -197,12 +196,10 @@ sub motion_over_tab {
     }
     else {
 
-#print "Avant demande de changement de focus |", $new_on_top->ref, $new_on_top->file_name, "|", $new_on_top->name,"|\n";
 #$new_on_top->focus;
         $new_on_top->async->focus;
     }
 
-#print "Fichier du nouveau new_on_top : |", $new_on_top->file_name, "|$new_on_top|", $new_on_top->ref, "|\n";
 }
 
 =head1 FUNCTIONS

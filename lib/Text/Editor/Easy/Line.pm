@@ -5,15 +5,15 @@ use strict;
 
 =head1 NAME
 
-Text::Editor::Easy::Line - Object oriented interface a file line (managed by "Text::Editor::Easy::Abstract" and "Text::Editor::Easy::File_manager").
+Text::Editor::Easy::Line - Object oriented interface to a file line (managed by "Text::Editor::Easy::Abstract" and "Text::Editor::Easy::File_manager").
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
@@ -39,7 +39,7 @@ sub new {
 
     return if ( !$ref_id );
 
-    my $ref_Editor = $editor->ref;
+    my $ref_Editor = $editor->get_ref;
     my $line       = $ref_line{$ref_Editor}{$ref_id};
     if ($line) {
         return $line;
@@ -149,21 +149,11 @@ sub displayed {
     }
 }
 
-sub set {
-    my ( $self, $text ) = @_;
-
-    my $ref = refaddr $self;
-    print "Dans line set, text = $ref|", $ref_id{$ref}, "$text\n";
-
-    # Vérifier que la ligne n'est pas affichée :
-    # ==> appel obligatoire à Abstract
-    # ==> si pas affichée, appel modify_line
-    my $editor = $ref_Editor{$ref};
-    return $editor->modify_line( $ref_id{$ref} );
-}
-
 my %sub =
-  ( 'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], );
+  ( 'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], 
+   'deselect' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_deselect ],
+   'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ], );
+
 
 sub AUTOLOAD {
     return if our $AUTOLOAD =~ /::DESTROY/;

@@ -1,14 +1,14 @@
 Text-Editor-Easy
 
-Version 0.1.
-Several demos to see if a pure perl
-editor can be usable, and more...
+Version 0.2.
+Pure perl editor module and program. 10 demos in the program,
+but still not usable.
 
 
 INSTALLATION
 
-Maybe this module could be installed with the standard cpan command.
-I will check it and try to fix it with version 0.2 if it doesn't work.
+I hope that this module can be installed with the standard cpan command.
+I have written the META.yml file for that purpose.
 
 Anyway, it contains pure perl modules and programs.
 So it shouldn't be hard to install it manually and run the demos.

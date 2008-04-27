@@ -9,7 +9,10 @@
 #      can sometimes be helpful)
 #    - learn the interface of the Text::Editor::Easy
 #      module interactively
-#    - extend the editor or configure it...
+#    - develop or extend the Editor program itself
+#      (part of the future standard menu or part
+#      of your own one...)
+#    - execute a very specific request...
 #    - debug (Don't tell me !)
 #
 # Be careful, this demo (and the
@@ -21,9 +24,9 @@
 # and will insert macro instructions
 # to be executed (at the bottom)
 #
-# As the "macro panel" is sensible to "insert"
+# As the "macro panel" is sensible to "change"
 # event, the macro instructions
-# will be automatically executed
+# will be automatically executed.
 #
 # The execution of these macro instructions
 # will display results in the "Eval_out" panel
@@ -36,12 +39,10 @@
 #
 # Once F5 has been pressed, you can
 # modify the macro-instructions.
-# The execution will follow after insertion
-# event (and only : well, it's not a
-# bug ! it's just version 0.01)
+# The execution will follow after any modification.
 #
 # Now, you can try any perl code insertion
 # and see in "real time" the execution of
-# the code. Well, this may be dangerous but
-# this is only a dangerous demo.
+# the code. Well, this maybe dangerous is
+# only for responsible users.
 #

@@ -5,15 +5,15 @@ use strict;
 
 =head1 NAME
 
-Text::Editor::Easy::Program::Motion - Manage various user events on "Text::Editor::Easy" objects.
+Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" objects.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
@@ -91,7 +91,7 @@ sub manage_events {
         my $editor = $self->{$ref_editor};
         if ( !defined $editor ) {
             $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-            $editor->reference($ref_editor);
+            Text::Editor::Easy::Comm::set_ref( $editor, $ref_editor);
             $self->{$ref_editor} = $editor;
         }
         $editor->transform_hash( undef, $hash_ref );
@@ -109,7 +109,7 @@ sub init_move {
     print "DANS INIT_MOVE $self, $unique_ref, $ref_editor, $zone\n";
     $show_calls_editor = bless \do { my $anonymous_scalar },
       "Text::Editor::Easy";
-    $show_calls_editor->reference($ref_editor);
+    Text::Editor::Easy::Comm::set_ref( $show_calls_editor, $ref_editor);
     $display_zone = $zone;
 }
 
@@ -238,7 +238,10 @@ sub move_over_out_editor {
     #print "move over out file : AVANT number : $number\n";
     my $line = $line_number{$file}{$number};
     if ( !$line ) {
-        $line = $new_editor->number($number);
+        $line = $new_editor->number($number, {
+				'lazy' => threads->tid,
+				'check_every' => 20,
+		});
     }
     if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
         return;
@@ -381,7 +384,10 @@ sub cursor_set_on_who_file {
         return if (anything_for_me);    # Abandonne si autre chose à faire
         my $line = $line_number{$file}{$number};
         if ( !$line ) {
-            $line = $new_editor->number($number);
+            $line = $new_editor->number($number, {
+				'lazy' => threads->tid,
+				'check_every' => 20,
+		    });
         }
         if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
             return;

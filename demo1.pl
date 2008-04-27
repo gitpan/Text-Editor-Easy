@@ -41,18 +41,13 @@
 #
 # You can move your mouse over the
 # "Editor_out" tab on the right
-# This will show you all the displays
-# that this running program is making.
-# We may call that the log of this
-# Editor program.
+# This will show you the first displays
+# that this program has made.
 #
 # This log is "interactive" : moving
 # your mouse over one display
 # will send you to the line of the file
 # that generated it.
-# Beware ! At the moment, this can
-# be very long because the line search
-# is not really done.
 #
 # The Eval_out will be used later.
 #

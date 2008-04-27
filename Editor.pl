@@ -4,6 +4,16 @@ use lib 'lib';
 use warnings;
 use strict;
 
+=head1 NAME
+
+Editor.pl - An editor written using Text::Editor::Easy module.
+
+=head1 VERSION
+
+Version 0.2
+
+=cut
+
 use Text::Editor::Easy;
 
 use IO::File;
@@ -17,9 +27,6 @@ if ( ! -d "tmp" ) {
 open EXEC, "| perl exec.pl" or die "Fork impossible\n";
 autoflush EXEC;
 
-use threads;
-use threads::shared;
-
 # Main tab "zone", area of the main window (syntax re-used : 'place' of Tk)
 my $zone4 = Text::Editor::Easy::Zone->new(
     {
@@ -28,12 +35,19 @@ my $zone4 = Text::Editor::Easy::Zone->new(
         '-relwidth' => 1,
         '-height'   => 25,
         'name'      => 'zone4',
+        'trace' => {
+            'all' => 'tmp/',
+
+            #	'Text::Editor::Easy::Data' => undef,
+            # 	'Text::Editor::Easy::Data' => 'tmp/',
+            'trace_print' => 'full',
+        },
     }
 );
 
 # List of main tab files (loading delayed)
 my @files_session;
-for my $demo ( 1 .. 9 ) {
+for my $demo ( 1 .. 10 ) {
     my $file_name = "demo${demo}.pl";
     push @files_session,
       {
@@ -52,7 +66,7 @@ for my $demo ( 1 .. 9 ) {
 Text::Editor::Easy->new(
     {
         'zone'        => $zone4,
-        'sub'         => 'main',
+        'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
         'motion_last' => {
             'use'     => 'Text::Editor::Easy::Program::Tab',
             'package' => 'Text::Editor::Easy::Program::Tab',
@@ -63,24 +77,19 @@ Text::Editor::Easy->new(
             'file_list' => \@files_session,
             'color'     => 'yellow',
         },
-        'trace' => {
-            #'all' => 'tmp/',
 
-            #	'Text::Editor::Easy::Data' => undef,
-            # 	'Text::Editor::Easy::Data' => 'tmp/',
-            'trace_print' => 'full',
-        },
     }
 );
 
+# In thread 0, the graphical MainLoop is over
+
 # End of launching perl process (F5 key management)
 print EXEC "quit\n";
+close EXEC; # This should be enough to stop process "exec.pl"
+# End of Editor.pl
 
 sub main {
     my ( $onglet, @parm ) = @_;
-
-    print "Reference de onglet : ", $onglet->get_unique_ref, "| threads tid : ",
-      threads->tid, "\n";
 
     my $out_tab_zone = Text::Editor::Easy::Zone->new(
         {
@@ -91,7 +100,6 @@ sub main {
             'name'      => 'out_tab_zone',
         }
     );
-    print "Apres creation de out_tab_zone\n";
 
     my $out_tab = Text::Editor::Easy->new(
         {
@@ -105,7 +113,6 @@ sub main {
             'save_info' => { 'color' => 'green', },
         }
     );
-    print "Apres creation de out_tab\n";
     my $zone1 = Text::Editor::Easy::Zone->new(
         {
             '-x'                   => 0,
@@ -117,11 +124,10 @@ sub main {
             'on_top_editor_change' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_main_editor_change', $onglet->ref ],
+                'sub'     => [ 'on_main_editor_change', $onglet->get_ref ],
             }
         }
     );
-    print "Apres creation de zone1\n";
     Text::Editor::Easy->new(
         {
             'zone'      => $zone1,
@@ -133,11 +139,8 @@ sub main {
             },
         }
     );
-    print "Apres creation de demo1.pl\n";
 
-# bind_key is (version 0.1 !) a pseudo-class method :
-# For key binding, there will be class call (all Text::Editor::Easy objects) and instance call (only one)
-    $out_tab->bind_key(
+    Text::Editor::Easy->bind_key(
         { 'package' => 'main', 'sub' => 'launch', 'key' => 'F5' } );
 
     # Zone des display
@@ -152,7 +155,7 @@ sub main {
             'on_top_editor_change' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_top_editor_change', $out_tab->ref ],
+                'sub'     => [ 'on_top_editor_change', $out_tab->get_ref ],
             }
         }
     );
@@ -195,7 +198,7 @@ sub main {
                 'package' => 'Text::Editor::Easy::Motion',
                 'sub'     => 'move_over_out_editor',
                 'mode'    => 'async',
-                'init'    => [ 'init_move', $who->ref, $zone1 ],
+                'init'    => [ 'init_move', $who->get_ref, $zone1 ],
             },
         }
     );
@@ -218,13 +221,14 @@ sub main {
     my $macro = Text::Editor::Easy->new(
         {
             'zone'        => $zone5,
-            'insert_last' => {
+			'name'        => 'macro',
+            'change_last' => {
                 'use'     => 'Text::Editor::Easy::Program::Search',
                 'package' => 'Text::Editor::Easy::Program::Search',
                 'sub'     => 'modify_pattern',
                 'mode'    => 'async',
                 'only'    => '$origin eq "graphic"',
-                'init'    => [ 'init_eval', $out->ref ],
+                'init'    => [ 'init_eval', $out->get_ref ],
             },
             'highlight' => {
                 'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
@@ -233,7 +237,6 @@ sub main {
             },
         }
     );
-
 }
 
 sub launch {
@@ -242,10 +245,11 @@ sub launch {
     my ($self) = @_;
 
     my $file_name = $self->file_name;
-    print "In sub 'launch' : $self|$file_name\n";
+    #print "In sub 'launch' : $self|$file_name\n";
     if (   $file_name eq 'demo7.pl'
         or $file_name eq 'demo8.pl'
-        or $file_name eq 'demo9.pl' )
+        or $file_name eq 'demo9.pl'
+        or $file_name eq 'demo10.pl' )
     {
         my $macro_instructions;
         if ( $file_name eq 'demo7.pl' ) {
@@ -268,7 +272,7 @@ $editor->add_method('demo8');
 print $editor->demo8(4, "bof");
 END_PROGRAM
         }
-        else {    # demo9.pl
+        elsif ( $file_name eq 'demo9.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
 my $editor = Text::Editor::Easy->whose_name('Key.pm');
 if ( ! $editor ) { $editor = Text::Editor::Easy->new({ 'zone' => 'zone1', 'file' => "lib/Text/Editor/Easy/Key.pm", 'highlight' => { 'use' => 'Text::Editor::Easy::Syntax::Perl_glue', 'package' => 'Text::Editor::Easy::Syntax::Perl_glue', 'sub' => 'syntax', },});};
@@ -280,13 +284,44 @@ for ( sort Text::Editor::Easy::Zone->list ) {
 }
 END_PROGRAM
         }
-        my $eval_editor = Text::Editor::Easy->get_in_zone( 'zone5', 0 );
+        else {    # demo10.pl
+            $macro_instructions = << 'END_PROGRAM';
+my $editor = Text::Editor::Easy->whose_name('demo10.pl');
+my $exp = qr/e.+s/;
+my ( $line, $start, $end, $regexp ) = $editor->search($exp);
+$editor->deselect;
+return if ( ! defined $line );
+$line->select($start, $end);
+$editor->visual_search( $regexp, $line, $end);
+END_PROGRAM
+
+            my $editor = Text::Editor::Easy->whose_name('stack_calls');
+			$editor->empty;
+			my @exp = ( 
+			    'qr/e.+s/', 
+				'qr/e.+?s/', 
+				'\'is\'', 
+				'qr/\\bis\\b/', 
+				'qr/F.*n/', 
+				'qr/F.*n/i', 
+				'qr/f[er]+[^e]+/'
+		    );
+			for ( @exp ) {
+					$editor->insert( "$_\n");
+			}
+			my $first = $editor->number(1);
+			$first->select;
+			$editor->cursor->set( 0, $first);
+            $self->bind_key({ 'package' => 'main', 'sub' => 'up_demo10', 'key' => 'Up' } );
+            $self->bind_key({ 'package' => 'main', 'sub' => 'down_demo10', 'key' => 'Down' } );
+        }
+        my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
         $eval_editor->empty;
         $eval_editor->insert($macro_instructions);
         return;
     }
     if ( defined $file_name ) {
-        print "fichier $file_name\n";
+        #print "fichier $file_name\n";
         print EXEC
 "$file_name|start|perl -Ilib -MText::Editor::Easy::Program::Flush $file_name\n";
     }
@@ -296,12 +331,47 @@ sub demo8 {
     my $editor = Text::Editor::Easy->whose_name('demo8.pl');
     Text::Editor::Easy->substitute_eval_with_file('demo8.pl');
 
-    #print "THREAD TID : ", threads->tid, "\n";
     my $sub_ref = eval $editor->slurp;
     return $sub_ref->(@_);
 
     #print "End of execution\n";
 }
+
+sub up_demo10 {
+    my $editor = Text::Editor::Easy->whose_name('stack_calls');
+    my ( $line ) = $editor->cursor->get;
+	#print "Dans up_demo10 : trouvé $line | ", $line->text, "\n";
+	if ( my $previous = $line->previous ) {
+		$editor->deselect;
+		my $exp = $previous->select;
+		$editor->cursor->set(0, $previous);
+		new_search ( $exp );
+    }
+}
+
+sub down_demo10 {
+    my $editor = Text::Editor::Easy->whose_name('stack_calls');
+    my ( $line ) = $editor->cursor->get;
+	#print "Dans down_demo10 : trouvé $line | ", $line->text, "\n";
+	if ( my $next = $line->next ) {
+		$editor->deselect;
+		my $exp = $next->select;
+		$editor->cursor->set(0, $next);
+		new_search ( $exp );
+    }
+}
+
+sub new_search {
+    my ( $exp ) = @_;
+
+    my $macro_ed = Text::Editor::Easy->whose_name('macro');
+	
+	# Hoping the automatic inserted lines are still there and in the right order !
+	# ==> the line number 2 or the macro editor will be set to "my \$exp = $exp;" and this will cause
+	# new execution of the macro instructions
+	$macro_ed->number(2)->set("my \$exp = $exp;");
+}
+
 
 =head1 COPYRIGHT & LICENSE
 

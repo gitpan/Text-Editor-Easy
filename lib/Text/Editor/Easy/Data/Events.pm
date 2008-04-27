@@ -5,6 +5,7 @@ return (
     'motion_last'     => 'Text::Editor::Easy',
     'on_top_last'     => 'Text::Editor::Easy',
     'insert_last'     => 'Text::Editor::Easy',
+    'change_last'     => 'Text::Editor::Easy',
 
     # Evènements de zones
     'on_top_editor_change' => 'Text::Editor::Easy::Zone',

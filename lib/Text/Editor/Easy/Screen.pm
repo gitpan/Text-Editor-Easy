@@ -11,11 +11,11 @@ This module shoud disappear. Screen will be separated into "Window" and "Zone".
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "screen_" puis reprennent
 # le nom de la méthode
@@ -96,6 +96,7 @@ my %method = (
     'wrap'         => \&Text::Editor::Easy::Abstract::screen_wrap,
     'set_wrap'     => \&Text::Editor::Easy::Abstract::screen_set_wrap,
     'unset_wrap'   => \&Text::Editor::Easy::Abstract::screen_unset_wrap,
+    'check_borders'   => \&Text::Editor::Easy::Abstract::screen_check_borders,
 
     # Autres méthodes à développer
     # set_geometry        avec hachage de correspondance

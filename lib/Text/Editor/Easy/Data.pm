@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Data::Dump qw(dump);
 use threads;
@@ -44,6 +44,8 @@ use constant {
     INSTANCE       => 12,
     FULL_TRACE     => 13,
     ZONE           => 14,
+	CURRENT => 15,
+	SEARCH => 16,
 
     #------------------------------------
     # LEVEL 2 : $self->[TOTAL][???]
@@ -235,13 +237,14 @@ my %function = (
     'print'    => \&trace_print,
     'call'     => \&trace_call,
     'response' => \&trace_response,
-    'new'      => \&trace_new,
+#    'new'      => \&trace_new,
     'start'    => \&trace_start,
 );
 
 sub trace {
     my ( $self, $function, @data ) = @_;
-
+    
+	print DBG "Dans sub trace pour fonction $function\n";
     $function{$function}->( $self, @data );
 }
 
@@ -250,7 +253,7 @@ my $trace_print_counter;
 sub trace_print {
     my ( $self, $dump_hash, @param ) = @_;
 
-    print DBG "Début trace_print $self, $dump_hash, @param\n";
+    #print DBG "Début trace_print $self, $dump_hash, @param\n";
 
     #Ecriture sur fichier
     my $seek_start = tell ENC;
@@ -262,7 +265,7 @@ sub trace_print {
 
     # Traçage des print
     my %options;
-    print DBG "trace_print avant eval dump\n";
+    #print DBG "trace_print avant eval dump\n";
     if ( defined $dump_hash ) {
         %options = eval $dump_hash;
         return if ($@);
@@ -270,7 +273,7 @@ sub trace_print {
     else {
         return;
     }
-    print DBG "trace_print après eval dump\n";
+    #print DBG "trace_print après eval dump\n";
     my @calls = eval $options{'calls'};
     trace_display_calls(@calls) if ( !$@ );
     my $tid = $options{'who'};
@@ -326,7 +329,7 @@ sub trace_print {
     }
 
     # Redirection éventuelle du print
-    print DBG "trace_print avant redirection\n";
+    #print DBG "trace_print avant redirection\n";
     if ( my $hash_list_ref = $self->[REDIRECT] ) {
 
    #print DBG "REDIRECTION effective pour appel ", $thread_ref->[CALL_ID], "\n";
@@ -352,9 +355,13 @@ sub trace_print {
                     and defined $call_id_ref->[THREAD_LIST]{$excluded} );
                 Text::Editor::Easy::Async->ask2( $redirect_ref->{'method'},
                     $param );
+# Redirection synchrone impossible : appel de méthode quasi-standard (ask2) donc demande
+# de traçage de la méthode (trace_call, trace_start puis trace_response) au thread Data qui ne peut
+# par conséquent pas attendre ici (sans quoi, il ne répondrait plus aux requêtes de traçage et tout se bloque...)
 
-# Danger redirection synchrone devrait être possible si le thread 0 ne fait pas partie de la liste...
-# Text::Editor::Easy->ask2( $redirect_ref->{'method'}, join ('', @param) );
+				# La seule façon d'être synchrone, ne plus activer la trace pour l'appel et ses successeurs et ne jamais
+				# rien demander au thread 2 en synchrone jusqu'à la fin...
+				# ==> paramètre supplémentaire à l'appel à passer à toute la chaîne d'appel (possible ? sans Data)
             }
 
            #print DBG "redirect_ref method = ", $redirect_ref->{'method'}, "\n";
@@ -378,7 +385,7 @@ sub trace_print {
     }
     Text::Editor::Easy::Async->trace_full( $seek_start, $seek_end, $tid,
         $call_id, $options{'calls'}, $param );
-    print DBG "Fin trace_print $self\n";
+    #print DBG "Fin trace_print $self\n";
     return
       ;  # Eviter autre chose que le context void pour Text::Editor::Easy::Async
 }
@@ -421,16 +428,17 @@ sub trace_call {
         $call_id_ref->[SYNC] = 0;
     }
 
+    #print DBG "Dans trace_call, définition de \$call_id_ref |$call_id_ref| effectuée, call_id $call_id, tid", threads->tid, "\n";
+
     # Le thread client est peut-être déjà au service d'un call...
     if ( $call_id_ref->[SYNC] ) {
 
         #print DBG "$call_id synchrone ($context)\n";
         if ( my $previous_call_id_ref = $thread_ref->[CALL_ID_REF] ) {
-
-#print DBG "Pour $call_id, récupération d'éléments de ", $thread_ref->[CALL_ID], "\n";
-#$call_id_ref->[PREVIOUS] = $previous_call_id_ref;
-
-            # Copies des valeurs, nouvelle références
+			#if ( ref $previous_call_id_ref->[THREAD_LIST] ne 'HASH' ) {
+			#	print DBG "PAs une référence de hachage pour thread client $client, call_id en cours $call_id\n" .
+			#	 "\t|$previous_call_id_ref|$previous_call_id_ref->[THREAD_LIST]|, tid", threads->tid, "\n";
+		    #}
             %{ $call_id_ref->[THREAD_LIST] } =
               %{ $previous_call_id_ref->[THREAD_LIST] };
             %{ $call_id_ref->[METHOD_LIST] } =
@@ -493,6 +501,14 @@ sub trace_response {
       ;    # Cela arrive pour les méthodes d'initialisation de thread
      # ==> tant qu'elles ne sont pas appelées de façon standard (avec traçage du call)
 
+	#print DBG "trace_response : début d'actions sur \$call_id_ref |$call_id_ref|, méthod $method call_id $call_id, tid", threads->tid, "\n";
+	#if ( ! defined $method ) {
+	#	print DBG "La méthode est non définie , tid", threads->tid, "\n";
+    #}
+	#else {
+	#	print DBG "La méthode vaut $method, tid", threads->tid, "\n";
+    #} 
+
     $self->[TOTAL][RESPONSES] += 1;
 
     if ( !defined $method ) {
@@ -501,7 +517,7 @@ sub trace_response {
         $self->[RESPONSE]{$call_id} = $response;
     }
 
-    #print DBG "R|$from|$call_id|$seconds|$micro|$method\n$response\n";
+    print DBG "R|$from|$call_id|$seconds|$micro|$method\n";
 
 # Ne faudrait-il pas faire plutot un shift de "$self->[THREAD][$from][STATUS]" ?
 # ==> permettre de tracer des requêtes interruptibles tout en traçant les requêtes internes
@@ -528,6 +544,9 @@ sub trace_response {
     #undef $self->[THREAD][$from][CALL_ID];
 
     my $call_id_client_ref = $self->[THREAD][$client][CALL_ID_REF];
+	#if ( defined $call_id_client_ref ) {
+	#    print DBG "Chargement de \$call_id_client_ref |$call_id_client_ref|, tid", threads->tid, "\n";
+    #}
 
 #if ( defined $call_id_client_ref ) {
 #        print DBG "Liste de threads avant ménage pour l'appelant (", $self->[THREAD][$client][CALL_ID], ")\n";
@@ -539,8 +558,8 @@ sub trace_response {
 #print DBG "Mise à zéro de la THREAD_LIST pour $call_id\n";
 
  # Ménage de CALL et RESPONSE (sauf si asynchrone avec récupération identifiant)
-    if ( $call_id_ref->[SYNC] or $call_id_ref->[CONTEXT] eq 'AV' )
-    {    # Asynchronous Void
+    if ( $call_id_ref->[SYNC] or $call_id_ref->[CONTEXT] eq 'AV' ) {    # Asynchronous Void
+		#print DBG "trace_response : suppressions des listes pour \$call_id_ref |$call_id_ref| call_id $call_id, tid", threads->tid, "\n";
         %{ $call_id_ref->[THREAD_LIST] }   = ();
         %{ $call_id_ref->[METHOD_LIST] }   = ();
         %{ $call_id_ref->[INSTANCE_LIST] } = ();
@@ -592,6 +611,8 @@ sub trace_start {
 
     my $call_id_ref = $self->[CALL]{$call_id};
     return if ( !defined $call_id_ref );
+	
+	#print DBG "Dans trace_start \$call_id_ref |$call_id_ref|, call_id $call_id, tid", threads->tid, "\n";
 
     $self->[TOTAL][STARTS] += 1;
 
@@ -601,7 +622,7 @@ sub trace_start {
 
     $call_id_ref->[STATUS] = 'started';
 
-    #print DBG "S|$who|$call_id|$seconds|$micro|$method\n";
+    print DBG "S|$who|$call_id|$seconds|$micro|$method\n";
 
     $call_id_ref->[THREAD_LIST]{$who} = 1;
 
@@ -771,6 +792,30 @@ sub zone_list {
     return keys %{ $self->[ZONE] };
 }
 
+sub save_current {
+    my ( $self, $ref ) = @_;
+	
+    $self->[CURRENT] = $ref;	
+}
+
+sub data_last_current {
+    my ( $self ) = @_;
+	
+    return $self->[CURRENT];
+}
+
+sub data_get_search_options {
+		my ( $self, $ref ) = @_;
+		
+		return $self->[SEARCH]{$ref};
+}
+
+sub data_set_search_options {
+		my ( $self, $ref, $options_ref ) = @_;
+		
+		$self->[SEARCH]{$ref} = $options_ref;
+}
+
 =head1 FUNCTIONS
 
 =head2 async_response
@@ -783,7 +828,19 @@ sub zone_list {
 
 =head2 data_get_editor_from_name
 
+=head2 data_get_search_options
+
+Get the previously saved options of the search (regexp, initial positions) : not yet finished.
+
+=head2 data_last_current
+
+Get the Text::Editor::Easy reference that had focus when ctrl-f was pressed.
+
 =head2 data_name
+
+=head2 data_set_search_options
+
+Set the search options (regexp, initial positions) : not yet finished.
 
 =head2 data_substitute_eval_with_file
 
@@ -806,6 +863,10 @@ sub zone_list {
 =head2 reference_print_redirection
 
 =head2 reference_zone
+
+=head2 save_current
+
+Save the reference of the Text::Editor::Easy instance that has the focus and in which a search begins.
 
 =head2 size_self_data
 

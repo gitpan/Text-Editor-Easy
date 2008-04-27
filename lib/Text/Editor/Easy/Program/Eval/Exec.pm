@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions 
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Text::Editor::Easy::Comm;
 use threads;    # Pour debug
@@ -21,12 +21,16 @@ use threads;    # Pour debug
 Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 
 sub exec_eval {
-    my ( $self, $program ) = @_;
+    my ( $self, $program, $hash_ref ) = @_;
 
 # Ajout d'une instruction "return if anything_for_me;" entre chaque ligne pour réactivité maximum
 
     $program =~ s/;(\n+)/;\nreturn if ( anything_for_me() );$1/g;
     print DBG "Dans exec_eval(", threads->tid, ") : \n$program\n\n";
+	print DBG "origin     = ", $hash_ref->{'origin'}, "\n";
+	print DBG "sub_origin = ", $hash_ref->{'sub_origin'}, "\n";
+	my $sub_sub_origin = $hash_ref->{'sub_sub_origin'};
+	print DBG "sub_sub_origin = ", $hash_ref->{'sub_sub_origin'}, "\n";
 
     #print substr ( $program, 0, 150 ), "\n\n";
     eval $program;

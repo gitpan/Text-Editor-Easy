@@ -1,9 +1,22 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
-0.01 : 20 January 2008 !
+0.3  : 1st June 2008   !
 -----------------------+
-        First version, 9 demos in Editor.pl program.
+        ?
+
+-----------------------+
+0.2  : 27 April 2008   !
+-----------------------+
+        Meta.yml file created by hand, I hope the tests will be all right this time... 
+        Lots of little things (and bugs) added : 
+				- start to implement the selection (just with keys, for the moment), copy (ctrl-c) and paste (ctrl-v)
+				- start to implement the search (ctrl-F and F3 short-cuts) + demo10
+				- key-function can be specific to a Text::Editor::Easy instance (see "up" and "down" in demo10)
+				- faster line search (mouse move on Editor displays is now usable)
+				- "change_last" event (to replace "insert_last" event for the macro instructions) : mactro panel is now sensitive to delete modifications too
+				- lazy call tests ("anything_for" sub called in "editor_number" or "editor_search" and recursive asynchronous call test with "editor_visual_search" for the graphic thread)
+		Still not usable. I planned to deliver this date, the content doesn't matter.
 
 -----------------------+
 0.1 : 16 March 2008    !
@@ -39,3 +52,10 @@ have even better : a complete dynamic explanations of all displays (history of t
 I'll try to have this complete debugging tool working before version 1.0. For the moment, history is done in only one thread and
 that's too limited to understand a multi-threaded program. I think that to debug complex mecanism you need powerful tool.
 Otherwise, you lose more and more time maintaining your complexity and your complexity brings you nothing but new problems.
+
+
+
+-----------------------+
+0.01 : 20 January 2008 !
+-----------------------+
+        First version, 9 demos in Editor.pl program.

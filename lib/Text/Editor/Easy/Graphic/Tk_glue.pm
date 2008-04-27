@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -30,16 +30,16 @@ my %graphic;    # Liste des objets graphiques créés
 my $repeat_id;
 
 my %zone;
+my $ctrl;
+my $shift;
+my $alt;
 
 use constant {
     TOP_LEVEL => 0,
     CANVA     => 1,
     SCROLLBAR => 2,
     FIND      => 3,
-    CTRL      => 4,
-    ALT       => 5,
-    SHIFT     => 6,
-    ZONE      => 7,
+    ZONE      => 4,
 
     # FIND
     #TOP_LEVEL => 0,
@@ -159,15 +159,15 @@ sub key_press {
     my $editor_ref = $editor{ refaddr $canva};
 
     if ( $key eq "Control_L" or $key eq "Control_R" ) {
-        $self->[CTRL] = 1;
+        $ctrl = 1;
         return;
     }
     if ( $key eq "Alt_L" ) {
-        $self->[ALT] = 1;
+        $alt = 1;
         return;
     }
     if ( $key eq "Shift_L" or $key eq "Shift_R" ) {
-        $self->[SHIFT] = 1;
+        $shift = 1;
         return;
     }
 
@@ -175,9 +175,9 @@ sub key_press {
         $editor_ref,
         $key, $ascii,
         {
-            'ctrl'  => $self->[CTRL],
-            'alt'   => $self->[ALT],
-            'shift' => $self->[SHIFT],
+            'ctrl'  => $ctrl,
+            'alt'   => $alt,
+            'shift' => $shift,
         }
     );
 
@@ -269,6 +269,28 @@ sub create_font {
         @underline,
         @slant,
     );
+}
+
+sub clipboard_get {
+		my ( $self ) = @_;
+		
+		my $string = $self->[TOP_LEVEL]->SelectionGet( 
+            -selection => "CLIPBOARD" ,
+            -type => "STRING"
+        );
+		$string =~ s/\x00.*$//;
+		return $string;
+}
+
+sub clipboard_set {
+		my ( $self, $string ) = @_;
+		
+		print "Dans clipboard_set de Tk_glue |$self|$string|\n";
+		# usefull ?
+		$self->[TOP_LEVEL]->clipboardClear;
+		
+		$self->[TOP_LEVEL]->clipboardAppend('--', $string);
+		return 1; # OK
 }
 
 sub manage_event {
@@ -505,15 +527,15 @@ sub key_release {
     my ( undef, $self, $key ) = @_;
 
     if ( $key eq "Control_L" or $key eq "Control_R" ) {
-        $self->[CTRL] = 0;
+        $ctrl = 0;
         return;
     }
     if ( $key eq "Alt_L" ) {
-        $self->[ALT] = 0;
+        $alt = 0;
         return;
     }
     if ( $key eq "Shift_L" or $key eq "Shift_R" ) {
-        $self->[SHIFT] = 0;
+        $shift = 0;
         return;
     }
 }
@@ -539,27 +561,37 @@ sub move_bottom {
 }
 
 sub add_tag {
-    my ( $self, $tag, $id ) = @_;
-
+    my ( $self, $tag, $id, $debug ) = @_;
+	
+#	if ( $debug ) {
+#		print "\$self $self, \$canva ", $self->[CANVA], " \$tag $tag, \$id $id\n";
+#    }		
     $self->[CANVA]->addtag( $tag, 'withtag', $id );
+#	if ( $debug ) {
+#		print "Fin de add_tag\n";
+#    }		
 }
 
 sub select {
-    my ( $self, $x1, $y1, $x2, $y2, $color ) = @_;
+    my ( $self, $x1, $y1, $x2, $y2, $color, $tag ) = @_;
 
     if ( !defined $color ) {
         $color = 'yellow';
     }
 
     #print "$x1|$y1|$x2|$y2|\n";
+	my @tag = ( '-tag'  => 'select' );
+    if ( defined $tag ) {
+		#print "Tag défini : $tag\n";
+		@tag = ( '-tag'  => [ 'select', $tag ] );
+	}
 
     $self->[CANVA]->createRectangle(
         $x1, $y1, $x2, $y2,
         -fill => $color,
-        -tag  => 'select'
+        @tag
     );
     $self->[CANVA]->lower( 'select', 'text' );
-
 }
 
 sub delete_select {
@@ -570,10 +602,24 @@ sub delete_select {
     $self->[CANVA]->delete('select');
 }
 
+sub delete_whose_tag {
+    my ($self, $tag) = @_;
+
+    return if ( ! defined $tag );
+
+    $self->[CANVA]->delete($tag);
+}
+
 sub get_mw {
     my ($self) = @_;
 
     return $self->[TOP_LEVEL];
+}
+
+sub cursor_set_shape {
+		my ( $self, $type ) = @_;
+		
+		$self->[CANVA]->configure(-cursor => 'hand2');
 }
 
 =head1 COPYRIGHT & LICENSE

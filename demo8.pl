@@ -15,7 +15,7 @@
 #       other change if you are not afraid of
 #       the interface of the Text::Editor::Easy module)
 #
-#  2 - then add characters to the macro
+#  2 - then add space characters to the macro
 #       panel at the bottom to force a new
 #       execution of the macro instructions
 #       or ... press F5
@@ -40,7 +40,7 @@ sub {
 
     $self->cursor->make_visible;
 
-    return $self->last->previous->previous->select( -3, 8 );
+    return $self->last->previous->previous->select( -6, 8 );
   }
 
   # And what ?

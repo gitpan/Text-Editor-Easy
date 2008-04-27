@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.1
+Version 0.2
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 use threads;    # Pour debug
 
@@ -27,7 +27,7 @@ sub init_print_eval {
     print DBG "Dans init_print_eval de 0.1 : $self|$reference|$unique_ref|",
       threads->tid, "|\n";
     $self->[0] = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    $self->[0]->reference($unique_ref);
+    Text::Editor::Easy::Comm::set_ref ($self->[0], $unique_ref);
 
     #$self->[0]->insert("Fin de print eval\n");
     $self->[1] = $self->[0]->async;

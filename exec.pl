@@ -32,6 +32,6 @@ while ( my $command = <STDIN> ) {
         }
     }
 
-    # Send action here (to send data from Editor to STDIN of launched process)
+    # Send action here (to send data from Editor.pl to STDIN of launched process)
 }
 
