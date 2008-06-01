@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy module.
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
@@ -47,7 +47,7 @@ my $zone4 = Text::Editor::Easy::Zone->new(
 
 # List of main tab files (loading delayed)
 my @files_session;
-for my $demo ( 1 .. 10 ) {
+for my $demo ( 1 .. 11 ) {
     my $file_name = "demo${demo}.pl";
     push @files_session,
       {
@@ -63,21 +63,29 @@ for my $demo ( 1 .. 10 ) {
 }
 
 # Main tab
+my $main_tab_name = 'main_tab';
+my $save_info = {
+            'file_list' => \@files_session,
+            'color'     => 'yellow',
+			'selected' => 0,
+        };
+if ( -f "editor.session_$main_tab_name" ) {
+    $save_info = do "editor.session_$main_tab_name";
+	@files_session = @{$save_info->{'file_list'}};
+}
 Text::Editor::Easy->new(
     {
         'zone'        => $zone4,
         'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
+		'name'        => $main_tab_name,
         'motion_last' => {
             'use'     => 'Text::Editor::Easy::Program::Tab',
             'package' => 'Text::Editor::Easy::Program::Tab',
             'sub'     => 'motion_over_tab',
             'mode'    => 'async',
         },
-        'save_info' => {
-            'file_list' => \@files_session,
-            'color'     => 'yellow',
-        },
-
+        'save_info' => $save_info,
+		'font_size' => 11,
     }
 );
 
@@ -104,6 +112,7 @@ sub main {
     my $out_tab = Text::Editor::Easy->new(
         {
             'zone'        => $out_tab_zone,
+			'name'        => 'out_tab',
             'motion_last' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
@@ -113,6 +122,7 @@ sub main {
             'save_info' => { 'color' => 'green', },
         }
     );
+	my $ref_onglet = $onglet->get_ref;
     my $zone1 = Text::Editor::Easy::Zone->new(
         {
             '-x'                   => 0,
@@ -124,21 +134,18 @@ sub main {
             'on_top_editor_change' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_main_editor_change', $onglet->get_ref ],
+                'sub'     => [ 'on_main_editor_change', $ref_onglet ],
+            },
+            'on_editor_destroy' => {
+                'use'     => 'Text::Editor::Easy::Program::Tab',
+                'package' => 'Text::Editor::Easy::Program::Tab',
+                'sub'     => [ 'on_editor_destroy', $ref_onglet ],
             }
         }
     );
-    Text::Editor::Easy->new(
-        {
-            'zone'      => $zone1,
-            'file'      => 'demo1.pl',
-            'highlight' => {
-                'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
-                'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
-                'sub'     => 'syntax',
-            },
-        }
-    );
+	my $new_ref = $files_session[$save_info->{'selected'}];
+	$new_ref->{'focus'} = 'yes';
+    Text::Editor::Easy->new( $new_ref );
 
     Text::Editor::Easy->bind_key(
         { 'package' => 'main', 'sub' => 'launch', 'key' => 'F5' } );
@@ -237,6 +244,8 @@ sub main {
             },
         }
     );
+	
+    Text::Editor::Easy->bind_key( { 'package' => 'main', 'sub' => 'restart', 'key' => 'F10' } );
 }
 
 sub launch {
@@ -249,7 +258,8 @@ sub launch {
     if (   $file_name eq 'demo7.pl'
         or $file_name eq 'demo8.pl'
         or $file_name eq 'demo9.pl'
-        or $file_name eq 'demo10.pl' )
+        or $file_name eq 'demo10.pl'
+        or $file_name eq 'demo11.pl' )
     {
         my $macro_instructions;
         if ( $file_name eq 'demo7.pl' ) {
@@ -284,7 +294,7 @@ for ( sort Text::Editor::Easy::Zone->list ) {
 }
 END_PROGRAM
         }
-        else {    # demo10.pl
+        elsif ( $file_name eq 'demo10.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
 my $editor = Text::Editor::Easy->whose_name('demo10.pl');
 my $exp = qr/e.+s/;
@@ -315,6 +325,16 @@ END_PROGRAM
             $self->bind_key({ 'package' => 'main', 'sub' => 'up_demo10', 'key' => 'Up' } );
             $self->bind_key({ 'package' => 'main', 'sub' => 'down_demo10', 'key' => 'Down' } );
         }
+        else { #demo11.pl
+		    $macro_instructions = << 'END_PROGRAM';
+for my $demo ( 1 .. 6 ) {
+    print "demo$demo.pl\n";
+    Text::Editor::Easy->on_editor_destroy('zone1', "demo${demo}.pl");
+}
+main::restart;
+END_PROGRAM
+	    }
+
         my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
         $eval_editor->empty;
         $eval_editor->insert($macro_instructions);
@@ -370,6 +390,24 @@ sub new_search {
 	# ==> the line number 2 or the macro editor will be set to "my \$exp = $exp;" and this will cause
 	# new execution of the macro instructions
 	$macro_ed->number(2)->set("my \$exp = $exp;");
+}
+
+sub restart {
+    print "\nDans restart...\n\n";
+
+    # Sauvegarde de la configuration
+	Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor->on_focus_lost('sync');
+	my %tab = Text::Editor::Easy->save_conf;
+	while ( my ($ref_tab, $tab_name) = each %tab ) {
+		print "Tab à sauver $ref_tab|$tab_name\n";
+	    Text::Editor::Easy::Comm::ask_named_thread($ref_tab, 'save_info_on_file', 'File_manager', "editor.session_${tab_name}");
+	}
+	
+	# Lancement d'un nouvel éditeur (qui récupèrera la configuration)
+    print EXEC "Editor.pl|start|perl Editor.pl\n";
+
+	# Fin de l'éditeur courant
+    Text::Editor::Easy->exit;
 }
 
 

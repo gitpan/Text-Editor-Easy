@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 =head1 SYNOPSIS
 
@@ -162,7 +162,7 @@ You may have a look at the tests included with "Text::Editor::Easy" if you want 
 =head1 EXPORT
 
 There are only 2 reasons to include this module in a private module of yours. Either you've created a pseudo-server with
-the "do_not_create" option during "create_new_server" call, or (a little more interesting), you wan't to create a server with
+the "do_not_create" option during "create_new_server" call, or (a little more interesting), you want to create a server with
 a "lazy behaviour" : that is to say, which implements interruptible tasks.
 
 =head2 anything_for_me
@@ -546,10 +546,6 @@ my $call_order = 0;
 sub ask2 {
     my ( $self, $method, @data ) = @_;
 
-    if ( $method eq 'clipboard_set' ) {
-		print "ASK2 : Appel clipboard_set, @data\n";
-    }
-
     my $server_tid;
 
     my $unique_ref;
@@ -634,6 +630,10 @@ sub ask2 {
 
 sub new_ask {
     my ( $self, $method, $unique_ref, $client_tid, $server_tid, @data ) = @_;
+
+    if ( $method eq 'save_info_on_file' ) {
+		print "APPEL save_info_on... @_\n";
+	}
 
     my $context = '';
 
@@ -764,6 +764,39 @@ sub ask_thread {
 	);
 }
 
+sub ask_named_thread {
+    my ( $self, $method, $server, @data ) = @_;
+
+    # En commun avec ask2 : à simplifier !!!
+    my $unique_ref;
+    if ( $self eq 'Text::Editor::Easy' or $self eq 'Text::Editor::Easy::Async' )
+    {    # Appel d'une méthode de classe
+        $unique_ref = '';
+    }
+    elsif ( ref $self ) {
+        $unique_ref = $com_unique{ refaddr $self };
+
+        if ( !defined $unique_ref ) {
+		    print STDERR "ask_named_thread : no reference found for object $self\n";
+			return;
+        }
+    }
+    else {
+		$unique_ref = $self;
+		$self = 'Text::Editor::Easy';
+    }
+	my $server_tid = $server;
+	if ( $server =~ /\D/ ) {
+		my $hash_ref = $get_tid_from_thread_name{$server};
+		$server_tid = $hash_ref->{$unique_ref};
+		print "Ask named thread, trouvé pour server $server tid $server_tid|@data\n";
+    }
+	
+# Attention, la première donnée de la fonction est $unique_ref || $self ==> cad la référence avec laquelle la méthode de thread
+# a été appelée
+    return new_ask( $self, $method, $unique_ref, threads->tid, $server_tid, @data );
+}
+
 sub create_thread {
     my ( undef, @param ) = @_;
 
@@ -885,6 +918,7 @@ sub verify_model_thread {
         $method{'create_thread'} = ('shared_thread:Text::Editor::Easy::Comm');
         $method{'add_method'}    = ('add_method');
         $method{'ask_thread'}    = ('ask_thread');
+		$method{'ask_named_thread'}    = ('ask_named_thread');
         create_data_thread();
     }
 	# Now that everything has been created, we can trace the 'new' call
@@ -1015,6 +1049,9 @@ sub create_data_thread {
 				'data_last_current',
 				'data_get_search_options',
 				'data_set_search_options',
+				'update_conf',
+				'link_editor_to_tab',
+				'save_conf',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data'],
@@ -1042,6 +1079,18 @@ sub verify_graphic {
     my $tid = threads->tid;
 
     if ( $tid == 0 ) {
+		if ( $get_tid_from_instance_method{'insert'} ) {
+		    #print "Pas de double création, serveur graphique déjà créé\n";
+				$editor->async->ask_thread(
+					'add_thread_object',
+					0,
+					{
+						'new' =>
+						  [ 'Text::Editor::Easy::Comm::new_editor', $ref, $hash_ref ]
+					}
+				);
+	    }
+		else {
         $editor->create_new_server(
             {
                 'use'     => 'Text::Editor::Easy::Abstract',
@@ -1132,6 +1181,9 @@ sub verify_graphic {
                     'cursor_make_visible',
 
                     'load_search',
+				    'debug_display_lines',
+					'on_focus_lost',
+					'graphic_kill',
                 ],
             }
         );
@@ -1147,6 +1199,8 @@ sub verify_graphic {
 						'manage_event', 
 						'clipboard_set', 
 						'clipboard_get', 
+						'on_top_ref_editor', 
+						'on_editor_destroy', 
 				    ]
             }
         );
@@ -1159,6 +1213,7 @@ sub verify_graphic {
 				'sub'      => 'bind_key_global',
             }
         );
+        }
     }
     else {
         $editor->ask_thread(
@@ -2002,6 +2057,10 @@ This is used to propagate lazyness between threads : a running task can be stopp
 =head2 ask_common
 
 =head2 ask_thread
+
+=head2 ask_named_thread
+
+ask_thread requires to know the tid of a thread. But an arbitrary number is not what we'd like to use.
 
 =head2 comm_eval
 

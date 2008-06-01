@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 use Data::Dump qw(dump);
 use threads;
@@ -64,7 +64,7 @@ use constant {
 
     #THREAD => 4,
     METHOD   => 5,
-    INSTANCE => 6,
+    C_INSTANCE => 6,
     PREVIOUS => 7,
     SYNC     => 8,
     CONTEXT  => 9,
@@ -79,9 +79,13 @@ use constant {
 };
 
 sub reference_editor {
-    my ( $self, $ref, $zone_ref, $file_name, $name ) = @_;
+    my ( $self, $ref, $options_ref ) = @_;
 
-#print DBG "Dans reference_editor de Data : $self |$ref|$zone_ref|$file_name|$name|\n";
+    my $zone_ref = $options_ref->{'zone'};
+	my $file_name = $options_ref->{'file'};
+	my $name = $options_ref->{'name'};
+	
+    print DBG "Dans reference_editor de Data : $self |$ref|$zone_ref|$file_name|$name|\n";
     my $zone;
     if ( defined $zone_ref ) {
         if (   ref $zone_ref eq 'HASH'
@@ -119,10 +123,10 @@ sub reference_editor {
 sub data_file_name {
     my ( $self, $ref ) = @_;
 
-    print DBG "Dans data_file_name $self|$ref|";
+    #print DBG "Dans data_file_name $self|$ref|";
     my $file_name = $self->[INSTANCE]{$ref}{'file_name'};
-    print DBG "$file_name" if ( defined $file_name );
-    print DBG "|\n";
+    #print DBG "$file_name" if ( defined $file_name );
+    #print DBG "|\n";
     return $self->[INSTANCE]{$ref}{'file_name'};
 }
 
@@ -137,12 +141,15 @@ sub data_get_editor_from_name {
 
     my $instance_ref = $self->[INSTANCE];
 
-    #print DBG "Dans data_get...$self|$wanted_name\n";
-    for my $key_ref ( %{$instance_ref} ) {
+    print DBG "Dans data_get...$self|$wanted_name|$instance_ref\n";
+	#return if ( ref $instance_ref ne 'HASH');
+    for my $key_ref ( keys %{$instance_ref} ) {
+		print DBG "Dans boucle data...$key_ref|$instance_ref->{$key_ref}|\n";
+		#return if ( ref $instance_ref->{$key_ref} ne 'HASH' );
         my $name = $instance_ref->{$key_ref}{'name'};
         if ( defined $name and $name eq $wanted_name ) {
 
-            #print "Dans boucle data...$key_ref|$name|$wanted_name\n";
+
             return $key_ref;
         }
     }
@@ -155,7 +162,7 @@ sub data_get_editor_from_file_name {
     my $instance_ref = $self->[INSTANCE];
 
     #print DBG "Dans data_get...$self|$wanted_name\n";
-    for my $key_ref ( %{$instance_ref} ) {
+    for my $key_ref ( keys %{$instance_ref} ) {
         my $name = $instance_ref->{$key_ref}{'file_name'};
 
         #print DBG "Dans boucle data...$key_ref|$name\n";
@@ -467,7 +474,7 @@ sub trace_call {
     $call_id_ref->[METHOD_LIST]{$method}       = 1;
     $call_id_ref->[INSTANCE_LIST]{$unique_ref} = 1;
     $call_id_ref->[METHOD]                     = $method;
-    $call_id_ref->[INSTANCE]                   = $unique_ref;
+    $call_id_ref->[C_INSTANCE]                   = $unique_ref;
 
     my $thread_status = $self->[THREAD][$server][STATUS][0];
     if ( defined $thread_status and $thread_status =~ /^P/ ) {
@@ -537,6 +544,7 @@ sub trace_response {
             shift @$status_ref;
         }
     }
+
     $self->[THREAD][$client][STATUS] = $status_ref;
 
     # Ménage de THREAD (systématique)
@@ -585,6 +593,8 @@ sub trace_response {
 #else {
 #	print DBG "$call_id plus défini...\n";
 #}
+
+
 }
 
 sub free_call_id {
@@ -816,6 +826,65 @@ sub data_set_search_options {
 		$self->[SEARCH]{$ref} = $options_ref;
 }
 
+my %tab_editor;
+
+sub update_conf {
+    my ( $self, $ref, $options_ref ) = @_;
+	
+    my $ref_tab = $self->[INSTANCE]{$ref}{'tab'};
+	if ( ! defined $ref_tab ) {
+		print "L'éditeur n'est pas géré par un onglet\n";
+		$self->[INSTANCE]{$ref}{'conf'} = $options_ref;
+		return;
+    }
+	my $tab_editor = $tab_editor{$ref_tab};
+	if ( ! defined $tab_editor ) {
+		print "L'onglet n'a pas encore été créé dans Data\n";
+        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
+        Text::Editor::Easy::Comm::set_ref( $tab_editor, $ref_tab);
+        $tab_editor{$ref_tab} = $tab_editor;
+    }
+	#print "Dans update conf, reçu |$ref|$options_ref|\n";
+	# On renvoie le 'call_id' de la dernière requête pour permettre un traitement synchrone par calc_conf appelant
+	return $tab_editor->async->update_tab_config( $self->[INSTANCE]{$ref}{'name'}, $options_ref );
+}
+
+sub save_conf {
+    my ( $self ) = @_;
+	
+	print "Dans save_conf\n";
+	my $instance_ref = $self->[INSTANCE];
+	my %saved_tab;
+	while ( my ($key, $value_ref) = each %{$instance_ref} ) {
+        if ( my $ref_tab = $value_ref->{'tab'} ) {
+		    print "L'éditeur ", $value_ref->{'name'}, " est géré par un onglet\n";
+			$saved_tab{$ref_tab} = 1;
+	    }
+		else {
+		    print "L'éditeur ", $value_ref->{'name'}, " doit être sauvegardé de façon individuelle\n";
+	    }
+    }
+	my %tab;
+	TAB: for my $ref ( keys %saved_tab ) {
+		my $name = $instance_ref->{$ref}{'name'};
+		$tab{$ref} = $name;
+		print DBG "Avant ouverture pour name = $name\n";
+		my $tab = $tab_editor{$ref};
+		next TAB if ( ! defined $tab );
+	    #open (SES, ">editor.session_$name") or die "Impossible d'ouvrir editor.session_$name\n";
+        #$tab->async->save_info_on_file("editor.session_$name");
+    }
+	return %tab;
+}
+
+sub link_editor_to_tab {
+    my ( $self, $ref_editor, $ref_tab ) = @_;
+
+    #print "Dans link_editor_to_tab : $ref_editor|$ref_tab\n";
+	$self->[INSTANCE]{$ref_editor}{'tab'} = $ref_tab;
+}
+
+
 =head1 FUNCTIONS
 
 =head2 async_response
@@ -852,6 +921,10 @@ Set the search options (regexp, initial positions) : not yet finished.
 
 =head2 init_data
 
+=head2 link_editor_to_tab
+
+This sub shouldn't have been created. The link should always be made by the Zone object and a Zone event.
+
 =head2 list_in_zone
 
 =head2 name_of_zone_order
@@ -863,6 +936,10 @@ Set the search options (regexp, initial positions) : not yet finished.
 =head2 reference_print_redirection
 
 =head2 reference_zone
+
+=head2 save_conf
+
+Return Text::Editor::Easy configurations : first line on the screen, at which height, cursor position...
 
 =head2 save_current
 
@@ -883,6 +960,10 @@ Save the reference of the Text::Editor::Easy instance that has the focus and in 
 =head2 trace_response
 
 =head2 trace_start
+
+=head2 update_conf
+
+Action performed when a Text::Editor::Easy instance is losing the focus.
 
 =head2 zone_list
 

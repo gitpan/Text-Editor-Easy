@@ -9,11 +9,11 @@ Text::Editor::Easy::Key - Key functions using object-oriented interface of "Text
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 use Data::Dump qw(dump);
 
 sub left {
@@ -964,9 +964,22 @@ sub f3_search {
 	$editor->visual_search( $regexp, $line, $end);
 }
 
+sub close {
+    my ( $self ) = @_;
+	
+	print "Dans key close, avant kill\n";
+	
+	$self->kill;
+}
+
+
 =head1 FUNCTIONS
 
 =head2 backspace
+
+=head2 close
+
+Should behave like a standard file close.
 
 =head2 copy
 

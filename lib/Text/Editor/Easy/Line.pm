@@ -9,11 +9,11 @@ Text::Editor::Easy::Line - Object oriented interface to a file line (managed by 
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
@@ -89,6 +89,14 @@ sub previous {
         , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
         $previous_id,
     );
+}
+
+sub number {
+    my ($self) = @_;
+
+    my $ref           = refaddr $self;
+    my $editor        = $ref_Editor{$ref};
+    return $editor->get_line_number_from_ref( $ref_id{$ref} );
 }
 
 sub seek_start {
@@ -202,6 +210,10 @@ sub linesize {
 =head2 linesize
 
 =head2 new
+
+=head2 number
+
+Returns the order of the line (that is, it's number).
 
 =head2 next
 

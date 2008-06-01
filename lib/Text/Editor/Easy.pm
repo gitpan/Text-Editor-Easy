@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 =head1 SYNOPSIS
 
@@ -96,7 +96,7 @@ sub new {
 
     my $zone = $hash_ref->{'zone'};
     if ( defined $zone and ! ref $zone ) {
-        $hash_ref->{'zone'} = Text::Editor::Easy::Zone->named($zone);
+        $hash_ref->{'zone'} = Text::Editor::Easy::Zone->whose_name($zone);
     }
 
     Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
@@ -131,7 +131,7 @@ sub new {
                 'ref_of_read_next',
                 'save_action',
                 'save_line_number',
-                'get_line_number_from_ref_internal',
+				'get_line_number_from_ref',
                 'get_ref_for_empty_structure',
                 'line_seek_start',
                 'empty_internal',
@@ -140,10 +140,14 @@ sub new {
                 'close',
 				'editor_number',
 				'editor_search',
+				'calc_conf',
+				'update_tab_config', # ne devrait pas être déclarée pour tous les objets Text::Editor::Easy...
+				'save_info_on_file',
             ],
             'object' => [],
             'init'   => [
                 'Text::Editor::Easy::File_manager::init_file_manager',
+				$ref,
                 $hash_ref->{'file'},
                 $hash_ref->{'growing_file'},
                 $hash_ref->{'save_info'},
@@ -153,8 +157,7 @@ sub new {
     );
 
     # Référencement de l'éditeur
-    Text::Editor::Easy->reference_editor( $ref, $hash_ref->{'zone'},
-        $hash_ref->{'file'}, $hash_ref->{'name'} );
+    Text::Editor::Easy->reference_editor( $ref, $hash_ref );
 
     my $new_editor;
 
@@ -168,7 +171,16 @@ sub new {
             print "Appel de la main loop (méthode new)\n";
             Text::Editor::Easy->manage_event;
             print "Fin de la main loop (méthode new)\n";
-
+			
+			# Sauvegarde de la configuration de l'éditeur de la zone principale 'zone1'
+			Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor->on_focus_lost('sync');
+			my %tab = Text::Editor::Easy->save_conf;
+		    while ( my ($ref_tab, $tab_name) = each %tab ) {
+				print "Tab à sauver $ref_tab|$tab_name\n";
+			    ask_named_thread($ref_tab, 'save_info_on_file', 'File_manager', "editor.session_${tab_name}");
+			}
+			#my $info = ask_named_thread($editor->get_ref, 'load_info', 'File_manager');
+		    #sleep 1;
             Text::Editor::Easy::Comm::untie_print;
             return $editor;
         }
@@ -184,9 +196,17 @@ sub new {
     elsif ( $focus eq 'yes' ) {
         $editor->focus($hash_ref);
     }
-    print "Après appel de editor_on_top\n";
     return $editor;
  }
+
+sub kill {
+    my ( $self ) = @_;
+	
+	$self->graphic_kill;
+	# Suppression des données sauvegardées pour cet éditeur dans Data
+	# Suppression de toutes les lignes stockées pour cet éditeur dans tous les threads... dur
+	# Fermeture du fichier et destruction du thread File_manager
+}
 
  sub file_name {
     my ($self) = @_;
@@ -531,31 +551,6 @@ sub number {
     return;
 }
 
-sub get_line_number_from_ref {
-    my ( $self, $ref ) = @_;
-
-    $| = 1;
-
-    #print "Recherche du numéro de la ligne ayant pour référence $ref\n";
-    my $current = $self->get_line_number_from_ref_internal($ref);
-    if ($current) {
-        return $current;
-    }
-    my $desc        = threads->tid;
-    my $ok          = $self->init_read($desc);
-    my $current_ref = $self->ref_of_read_next($desc);
-    while ( defined($current_ref) ) {
-
-        #while ( defined ($ref)  ) {
-        $current += 1;
-        if ( $current_ref == $ref ) {
-            return $current;
-        }
-        $current_ref = $self->ref_of_read_next($desc);
-    }
-    return;
-}
-
 sub append {
     my ( $self, $text ) = @_;
 
@@ -571,8 +566,6 @@ sub AUTOLOAD {
     my $what = $AUTOLOAD;
     $what =~ s/^Text::Editor::Easy:://;
     $what =~ s/^Async:://;
-    print( "Dans AUTOLOAD  appel clipboard_set|$self|\n" )
-      if ( $what eq 'manage_event' );
 
     return Text::Editor::Easy::Comm::ask2( $self, $what, @param );
 }
@@ -835,14 +828,32 @@ sub new {
         Text::Editor::Easy->reference_zone_event( $name, 'on_top_editor_change',
             $new_hash_ref, undef );
     }
+    if ( my $new_hash_ref = $hash_ref->{'on_editor_destroy'} ) {
+        Text::Editor::Easy->reference_zone_event( $name, 'on_editor_destroy',
+            $new_hash_ref, undef );
+    }
+    if ( my $new_hash_ref = $hash_ref->{'on_new_editor'} ) {
+        Text::Editor::Easy->reference_zone_event( $name, 'on_new_editor',
+            $new_hash_ref, undef );
+    }
     return $zone;
 }
 
-sub named {
+sub whose_name {
     my ( $self, $name ) = @_;
 
     return if ( !defined $name );
     return Text::Editor::Easy->zone_named($name);
+}
+
+sub on_top_editor {
+    my ( $self ) = @_;
+	
+    my $ref = Text::Editor::Easy->on_top_ref_editor($self);
+	print "Dans on_top_editor de Zone ", $self->{'name'}, ", ref = $ref\n";
+    my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
+	Text::Editor::Easy::Comm::set_ref($editor, $ref);
+	return $editor;
 }
 
 sub list {
@@ -931,6 +942,10 @@ Call to editor_visual_search : replacement of line object (scalar reference, mem
 =head2 whose_file_name
 
 =head2 whose_name
+
+=head2 kill
+
+Maybe destroy would be a better name...
 
 =cut
 

@@ -1,9 +1,15 @@
 Revision history for Text-Editor-Easy
 
+
+-----------------------+
+0.4  : 29 June 2008   !
+-----------------------+
+	?
+
 -----------------------+
 0.3  : 1st June 2008   !
 -----------------------+
-        ?
+        - start to implement session management (demo11, F10 key, start of Text::Editor::Easy objects destruction)
 
 -----------------------+
 0.2  : 27 April 2008   !
@@ -13,8 +19,8 @@ Revision history for Text-Editor-Easy
 				- start to implement the selection (just with keys, for the moment), copy (ctrl-c) and paste (ctrl-v)
 				- start to implement the search (ctrl-F and F3 short-cuts) + demo10
 				- key-function can be specific to a Text::Editor::Easy instance (see "up" and "down" in demo10)
-				- faster line search (mouse move on Editor displays is now usable)
-				- "change_last" event (to replace "insert_last" event for the macro instructions) : mactro panel is now sensitive to delete modifications too
+				- faster line search (mouse move on Editor log is now usable)
+				- "change_last" event (to replace "insert_last" event for the macro instructions) : macro panel is now sensitive to delete modifications too
 				- lazy call tests ("anything_for" sub called in "editor_number" or "editor_search" and recursive asynchronous call test with "editor_visual_search" for the graphic thread)
 		Still not usable. I planned to deliver this date, the content doesn't matter.
 

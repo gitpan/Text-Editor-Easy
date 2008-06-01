@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -21,8 +21,8 @@ use Tk::Canvas;       # perl2exe
 
 use Scalar::Util qw(refaddr);
 
-my %editor
-  ;    # A un canevas, on fait correspondre un éditeur, l'éditeur qui a le focus
+# A un canevas, on fait correspondre un éditeur, l'éditeur qui a le focus
+my %editor;
 
 #my %canva; # A un éditeur, on fait correspondre un canevas : inutile, car contenu
 # dans l'objet Graphic et accessible par ->[CANVA]
@@ -131,6 +131,9 @@ sub initialize {
         $canva->CanvasBind( '<Motion>',
             [ \&redirect, $hash_ref->{mouse_move}, Ev('x'), Ev('y') ] );
     }
+    $canva->CanvasBind( '<FocusOut>',
+        [ \&redirect, $hash_ref->{on_focus_lost} ] );
+
 
     $canva->xviewMoveto(0);
     $canva->yviewMoveto(0);
@@ -138,12 +141,16 @@ sub initialize {
     #$mw->repeat(10, [ $hash_ref->{repeat}, $editor{refaddr $canva} ] );
 }
 
+my $launched = 0;
+
 sub launch_loop {
     my ( $self, $sub, $editor ) = @_;
 
-    #print "Lancement de la boucle d'exécution examine...\n";
-    $repeat_id = $self->[TOP_LEVEL]->repeat( 15, [ $sub, $editor ] );
-
+	#if ( ! $launched ) {
+		print "Lancement de la boucle d'exécution examine...\n";
+        $repeat_id = $self->[TOP_LEVEL]->repeat( 15, [ $sub, $editor ] );
+		$launched = 1;
+    #}
     #$self->[TOP_LEVEL]->repeat(600, [ $sub, $editor ] );
 }
 
@@ -243,10 +250,11 @@ sub create_canva {
     #print "DAns create canva : ", $zone_ref->{'name'}, "\n";
     delete $zone_local{'name'};
     delete $zone_local{'on_top_editor_change'};
+    delete $zone_local{'on_editor_destroy'};
+	delete $zone_local{'on_new_editor'};
 
     my $canva = $mw->Canvas(
         -background => $color,
-
         #)->pack( -expand => 1, -fill => 'both' );
     )->place( -in => $mw, %zone_local );
     return ( $canva, $zone_ref );
@@ -425,6 +433,9 @@ sub on_top {
 
     delete $local_zone{'name'};
     delete $local_zone{'on_top_editor_change'};
+	delete $local_zone{'on_editor_destroy'};
+	delete $local_zone{'on_new_editor'};
+	
     $self->[CANVA]->place( -in => $self->[TOP_LEVEL], %local_zone );
 
     #$self->[CANVA]->CanvasFocus;
@@ -454,9 +465,23 @@ sub get_graphic_focused_in_zone {
     return $zone{$zone};
 }
 
+sub get_editor_focused_in_zone {
+    my ( $self, $zone ) = @_;
+
+    if ( !defined $zone ) {
+        print STDERR
+"Zone must be defined when calling Text::Editor::Graphic::Tk_gue::get_graphic_focused_in_zone\nCan't return Text::Editor::Easy who has focus in an undefined zone\n";
+        return;
+    }
+    my $graphic = $zone{$zone};
+	#print "Dans get_editor_focused_in_zone : zone $zone, graphic = $graphic|", $graphic->[CANVA], "\n";
+	return $editor{ refaddr ($graphic->[CANVA]) };
+}
+
 sub forget {
     my ($self) = @_;
 
+    return if ( ! $self->[CANVA] );
     $self->[CANVA]->placeForget;
 }
 
@@ -493,6 +518,12 @@ sub change_reference {
 
     $editor{ refaddr $self->[CANVA] } = $edit_ref;
     $self->[TOP_LEVEL]->configure( -title => $file_name );
+}
+
+sub edit_ref {
+    my ( $self ) = @_;
+	
+	return $editor{ refaddr $self->[CANVA] };
 }
 
 sub get_displayed_editor {
@@ -620,6 +651,15 @@ sub cursor_set_shape {
 		my ( $self, $type ) = @_;
 		
 		$self->[CANVA]->configure(-cursor => 'hand2');
+}
+
+sub kill {
+    my ( $self ) = @_;
+	
+    $self->[CANVA]->destroy;
+	undef $self->[CANVA];
+    delete $editor{ refaddr($self->[CANVA]) };
+    delete $graphic{ refaddr $self};
 }
 
 =head1 COPYRIGHT & LICENSE

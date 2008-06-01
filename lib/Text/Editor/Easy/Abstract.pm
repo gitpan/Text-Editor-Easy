@@ -9,11 +9,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 =head1 SYNOPSIS
 
@@ -79,8 +79,7 @@ use constant {
     PREVIOUS_SAME =>
       6,          # booléen : la ligne précédente est "la même" : mode "wrap"
     HEIGHT    => 7,
-    NEXT_SAME =>,
-    10,           # booléen : la ligne suivante est "la même" : mode "wrap"
+    NEXT_SAME => 10,           # booléen : la ligne suivante est "la même" : mode "wrap"
     DISPLAYED => 8,    # booléen : la ligne est affichée à l'écran
     REF       => 9
     , # Référence à stoker pour communiquer avec le thread gestionnaire du fichier et des mises à jour
@@ -147,7 +146,8 @@ use constant {
     PARENT    => 13,
     REDIRECT  => 14,
     ASSIST    => 15,
-    KEY => 16
+    KEY => 16,
+    H_FONT => 17,
 };
 
 use Text::Editor::Easy::Key;
@@ -183,6 +183,9 @@ my %key = (
 
     'ctrl_c' => \&Text::Editor::Easy::Key::copy,
     'ctrl_C' => \&Text::Editor::Easy::Key::copy,
+    'ctrl_l' => \&Text::Editor::Easy::Key::close,
+    'ctrl_L' => \&Text::Editor::Easy::Key::close,
+
 
     'ctrl_r' => \&revert,
     'ctrl_R' => \&revert,
@@ -233,7 +236,6 @@ my %key = (
 
 );
 
-my %font;
 my %color;
 my %abstract
   ;   # A une référence d'éditeur unique, on fait correspondre un objet Abstract
@@ -358,6 +360,7 @@ sub new {
             'resize'                      => \&resize,
             'key_press'                   => \&key_press,
             'mouse_wheel_event'           => \&mouse_wheel_event,
+			'on_focus_lost'           => \&on_focus_lost,
 
             #'key_release' => \&key_release,
             %{$hash_ref},
@@ -365,7 +368,8 @@ sub new {
         }
     );
 
-    $edit_ref->[SCREEN][FONT_HEIGHT] = 15;
+    $edit_ref->[SCREEN][FONT_HEIGHT] = $hash_ref->{'font_size'} || 15;
+	print "FONTE : font_size = ", $hash_ref->{'font_size'}, ", HEIGHT = ", $edit_ref->[SCREEN][FONT_HEIGHT], "\n";
     $edit_ref->[SCREEN][LINE_HEIGHT] = $edit_ref->[GRAPHIC]->line_height;
     $edit_ref->[SCREEN][MARGIN]      = $edit_ref->[GRAPHIC]->margin;
 
@@ -406,7 +410,7 @@ sub new {
         }
     );
 
-    %font = (
+    $edit_ref->[H_FONT] = {
         'default'           => $default_font,
         'comment'           => $font_comment,
         'error'             => $default_font,
@@ -444,7 +448,7 @@ sub new {
         'CodeTerm'          => $bold_font,
         'DATA'              => $default_font,
         'DEFAULT'           => $default_font,
-    );
+    };
     %color = (
         'default'           => '#000000000000',
         'comment'           => 'blue',
@@ -485,11 +489,11 @@ sub new {
         'DEFAULT'           => 'violet red',
     );
 
-    $edit_ref->[INIT_TAB] = $hash_ref->{config};
+    $edit_ref->[INIT_TAB] = $hash_ref->{'config'};
 
     return $edit_ref;
 
-}    # Fin sub init_ref
+}    # Fin new
 
 my %ref_sub;
 
@@ -505,7 +509,7 @@ sub examine_external_request {
 	    }	
         $sub_origin = $what;
         execute_this_task( $what, $call_id, @param );
-		print "Retour de execute task $sub_origin, $param[2]\n";
+		#print "Retour de execute task $sub_origin, $param[2]\n";
     }
     $origin     = "graphic";
     $sub_origin = undef;
@@ -718,11 +722,11 @@ sub create_text_in_line {
         }
         $total_letters += length( $text_ref->[TEXT] );
         my $format = $element_ref->[1];
-        if ( !$font{$format} ) {
+        if ( ! $edit_ref->[H_FONT]{$format} ) {
             print "Pas de font pour le format : $format\n";
             exit 1;
         }
-        $text_ref->[FONT]  = $font{$format};
+        $text_ref->[FONT]  = $edit_ref->[H_FONT]{$format};
         $text_ref->[COLOR] = $color{$format};
         if ( !$color{$format} ) {
             print "Pas de couleur pour le format : $format\n";
@@ -770,7 +774,7 @@ sub create_text_in_line {
             $text_ref = $text_ref->[NEXT];
         }
         $line_ref->[FIRST][TEXT] = $line_ref->[TEXT];
-        $text_ref->[FONT]        = $font{"default"};
+        $text_ref->[FONT]        = $edit_ref->[H_FONT]{"default"};
         $text_ref->[COLOR]       = $color{"default"};
         $text_ref->[WIDTH]       =
           $edit_ref->[GRAPHIC]
@@ -836,7 +840,7 @@ sub display_text_from_memory {
 
     #    if (!$text_ref->[WIDTH]) {
     $text_ref->[WIDTH] =
-      $edit_ref->[GRAPHIC]->length_text( $text_ref->[TEXT], $text_ref->[FONT] );
+    $edit_ref->[GRAPHIC]->length_text( $text_ref->[TEXT], $text_ref->[FONT] );
 
 #$text_ref->[ORD] = $ord;
 #print "|", $text_ref->[TEXT], "|", $width, "|", $text_ref->[WIDTH], "|", $height, "|\n";
@@ -886,7 +890,6 @@ sub trunc {
         }
     }
     if ($position) {
-
 # On ne peut pas avoir un nombre de caractères négatifs : on sait que le texte précédent rentre
 # (il n'a pas dépassé la longueur pour déclencher le trunc avant, mais il peut être tombé sur la limite : égalité)
 # Il est possible de ne mettre aucun caractère du "$text_ref" actuel mais pas -1
@@ -895,7 +898,6 @@ sub trunc {
 # Ce cas très particulier arrive uniquement lorsqu'il y a égalité entre $text_ref->[ABS] et la partie droite
         $position -= 1;
     }
-
 #print "Dans trunc MT |", length($line_ref->[TEXT]), "| M1 |",  $position, "| M2 |", length($line_ref->[TEXT]) - $position, "|\n";
     return divide_line( $edit_ref, $line_ref, $text_ref,
         $current_curs - length( $text_ref->[TEXT] ) + $position,
@@ -903,14 +905,12 @@ sub trunc {
 }
 
 sub divide_line {
-
 # On divise une ligne en 2 (création d'une nouvelle ligne) :
 #    - soit parce que l'on est en mode 'wrap' et que la ligne est trop longue (dans
 #         ce cas, $new est 'false')
 #    - soit parce que l'on en crée une (appui sur "return"), $new est 'true'
 #
 #
-
     my ( $edit_ref, $line_ref, $text_ref, $position_in_line, $position_in_text,
         $where, $new )
       = @_;
@@ -1250,15 +1250,14 @@ sub resize {
         # Au premier resize
         $edit_ref->[PARENT]->get_synchronized;
         init($edit_ref);
-
 # On lance le "serveur" de thread mais uniquement lorsque l'éditeur est affiché entièrement (revoir dans le cas multi-fichier
 # ==> désactivation puis réactivation ?)
 #print "Dans Abstract resize, lancement de examine_external_request\n";
 
 # Cette boucle, "multi-instances", ne doit être lancée qu'une seule fois (==> dans verify_graphic ?)
 # Donc pas dans le premier resize de chaque éditeur
-        $edit_ref->[GRAPHIC]
-          ->launch_loop( \&examine_external_request, $edit_ref );
+        $edit_ref->[GRAPHIC]->launch_loop( \&examine_external_request, $edit_ref );
+		return;
     }
 
 # En cas de resize, on réaffiche en gardant constante la position de départ de la première ligne entière
@@ -1270,17 +1269,18 @@ sub resize {
 sub init {
     my ($edit_ref) = @_;
 
-    my $ref;
-    if ( $edit_ref->[INIT_TAB]{first_line_number} ) {
-        my $line =
-          $edit_ref->[PARENT]
-          ->number( $edit_ref->[INIT_TAB]{first_line_number} );
-        $ref = $line->ref if ($line);
-    }
-    else {
-        my $line = $edit_ref->[PARENT]->number(1);
-        $ref = $line->ref if ($line);
-        $edit_ref->[INIT_TAB]{first_line_pos} = 0;
+    my $ref = $edit_ref->[INIT_TAB]{'line_ref'};
+	
+	if ( ! defined $ref or ! defined ( $edit_ref->[PARENT]->get_text_from_ref($ref) ) ) {
+        if ( my $line_number = $edit_ref->[INIT_TAB]{'first_line_number'} ) {
+            my $line = $edit_ref->[PARENT]->number( $line_number );
+            $ref = $line->ref if ($line);
+        }
+        else {
+            my $line = $edit_ref->[PARENT]->number(1);
+            $ref = $line->ref if ($line);
+            $edit_ref->[INIT_TAB]{'first_line_pos'} = 0;
+        }
     }
 
     my $line_ref;
@@ -1300,18 +1300,22 @@ sub init {
         # Cas où la ligne est indéfinie à gérer
 
     }
-    $edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
+	if ( my $line_ord = $edit_ref->[INIT_TAB]{'first_line_ord'} ) {
+        $edit_ref->display( $line_ref->[REF], { 'at' => "ord_$line_ord", 'from' => 'bottom', 'no_check' => 1 } );
+    }
+	else {
+		$edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
+    }
 
     # Positionnement du curseur
     my $ref_cursor;
-    if ( $edit_ref->[INIT_TAB]{cursor_line_number} ) {
-        $ref_cursor =
-          $edit_ref->[PARENT]
-          ->go_to( $edit_ref->[INIT_TAB]{cursor_line_number} );
+    if ( my $cursor_number = $edit_ref->[INIT_TAB]{'cursor_line_number'} ) {
+        my $line = $edit_ref->[PARENT]->number( $cursor_number );
+		$ref_cursor = $line->ref;
     }
     else {
         $ref_cursor = $line_ref->[REF];
-        $edit_ref->[INIT_TAB]{cursor_pos_in_line} = 0;
+        $edit_ref->[INIT_TAB]{'cursor_pos'} = 0;
     }
 
 #print "Référence trouvée pour le curseur : $ref\n";
@@ -1328,15 +1332,15 @@ sub init {
         }
     }
     if ( $cursor_line_ref->[REF] != $ref_cursor ) {
-
 # A la dernière sauvegarde de session, le curseur n'était pas dans la zone affichable
 # Pour l'instant non géré : on le place au début de la première ligne affichée à l'écran
 # A modifier éventuellement lorsque le curseur pourra être hors de l'écran à l'initialisation
         $cursor_line_ref = $line_ref;
-        $edit_ref->[INIT_TAB]{cursor_pos_in_line} = 0;
+        $edit_ref->[INIT_TAB]{'cursor_pos'} = 0;
     }
     $edit_ref->[CURSOR][LINE_REF] = $cursor_line_ref;
-    cursor_set( $edit_ref, $edit_ref->[INIT_TAB]{cursor_pos_in_line} );
+    cursor_set( $edit_ref, $edit_ref->[INIT_TAB]{'cursor_pos'} );
+	#print "Fin de init\n";
 }
 
 sub get_first_complete_line {
@@ -1426,7 +1430,7 @@ sub key_press {
     $key_code .= '_' if ($key_code);
     $key_code .= $key;
 
-    #print "$key_code\n";
+    print "$key_code\n";
     #return;
 	$sub_sub_origin = $key_code;
 
@@ -1579,14 +1583,16 @@ sub verify_if_cursor_is_visible_vertically {
         $edit_ref->[CURSOR][ABS]         -= $decalage;
         $edit_ref->[CURSOR][VIRTUAL_ABS] -= $decalage;
         $edit_ref->[SCREEN][VERTICAL_OFFSET] += $decalage;
-        $edit_ref->[GRAPHIC]->move_tag( 'text', -$decalage, 0 );
+        #$edit_ref->[GRAPHIC]->move_tag( 'text', -$decalage, 0 );
+		$edit_ref->[GRAPHIC]->move_tag( 'all', -$decalage, 0 );
     }
     if ( $edit_ref->[CURSOR][ABS] < $edit_ref->[GRAPHIC]->margin ) {
         my $decalage = 10 - $edit_ref->[CURSOR][ABS];
         $edit_ref->[CURSOR][ABS]         += $decalage;
         $edit_ref->[CURSOR][VIRTUAL_ABS] += $decalage;
         $edit_ref->[SCREEN][VERTICAL_OFFSET] -= $decalage;
-        $edit_ref->[GRAPHIC]->move_tag( 'text', $decalage, 0 );
+        #$edit_ref->[GRAPHIC]->move_tag( 'text', $decalage, 0 );
+		$edit_ref->[GRAPHIC]->move_tag( 'all', $decalage, 0 );
     }
 }
 
@@ -1921,7 +1927,7 @@ sub increase_font {
     print "Taille de la fonte actuelle : $edit_ref->[SCREEN][FONT_HEIGHT]\n";
     $edit_ref->[SCREEN][FONT_HEIGHT] += 1;
     my %distinct_fonts;
-    for my $font ( values %font ) {
+    for my $font ( values %{$edit_ref->[H_FONT]} ) {
         $distinct_fonts{$font} = $font;
     }
     for my $font ( keys %distinct_fonts ) {
@@ -2376,6 +2382,7 @@ sub display {
     my $at = $options_ref->{'at'};
     my $ord;
     if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+		print "Dans display , ord précisée : $1\n";
         $ord = $1;
     }
     elsif ( defined $at ) {
@@ -2393,7 +2400,6 @@ sub display {
         }
     }
     else {
-
         # On positionne la ligne vers le haut (middle_top)
         $ord = $edit_ref->[SCREEN][HEIGHT] / 4;
     }
@@ -2414,6 +2420,15 @@ sub display {
 
     display_reference( $edit_ref, $ref, $ord, $options_ref->{'from'} );
 
+    if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+		print "\nDans display 1: liste des lignes \n";
+		my $line_ref = $edit_ref->[SCREEN][FIRST];
+		while ( defined $line_ref ) {
+		    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+			$line_ref = $line_ref->[NEXT];
+	    }
+    }
+
     #Appel en boucle pour affichage de toutes les lignes
     # Recuperation de la derniere ligne qui devrait etre affichee
     display_bottom_of_the_screen($edit_ref);
@@ -2422,6 +2437,15 @@ sub display {
     display_top_of_the_screen($edit_ref);
 	
 	screen_check_borders ( $edit_ref ) unless ( $options_ref->{'no_check'} );
+
+    if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+		print "\nDans display 2 : liste des lignes \n";
+		my $line_ref = $edit_ref->[SCREEN][FIRST];
+		while ( defined $line_ref ) {
+		    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+			$line_ref = $line_ref->[NEXT];
+	    }
+    }
 
     return update_vertical_scrollbar($edit_ref);
 }
@@ -2449,7 +2473,7 @@ sub display_reference {
         my ($line_ref) = get_line_ref_from_display_ref( $edit_ref, $ref );
         if ( !$line_ref )
         {    # On avait vérifié  avant ! Impossible, normalement ...
-            print "Curieux...\n";
+            print STDERR "Curieux...\n";
             $line_ref = $edit_ref->[SCREEN][LAST];
         }
         my $y;
@@ -2472,6 +2496,9 @@ sub display_reference {
         my $y = $ord - $bottom_ord + int( ( $bottom_ord - $top_ord ) / 2 );
         screen_move( $edit_ref, 0, $y );
     }
+    my ( $top_ord, $bottom_ord ) =  get_line_ords( $edit_ref->[SCREEN][LAST] );
+	print "Display reference : top_ord = $top_ord, bottom_ord = $bottom_ord\n";
+
 }
 
 sub display_reference_line {
@@ -3006,8 +3033,7 @@ sub line_set {
 
 	$edit_ref->[PARENT]->modify_line( $ref, $text );
 	my $line_ref = get_line_ref_from_ref ( $edit_ref, $ref );
-	if ( ! defined $line_ref ) {
-
+	if ( defined $line_ref ) {
 			#print "La ligne est à l'écran, il faut la réafficher\n";
 			my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
 			suppress_from_screen_line( $edit_ref, $line_ref );
@@ -3713,8 +3739,18 @@ sub focus {
     $self->[GRAPHIC]->focus;
 }
 
+sub on_top_ref_editor {
+    my ( $self, $zone ) = @_;
+	
+	if ( ref $zone ) {
+		$zone = $zone->{'name'};
+    }
+    my $edit_ref = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
+	return $edit_ref->[UNIQUE];
+}
+
 sub on_top {
-    my ( $self, $hash_ref ) = @_;    # hash_ref est défini qu'en création
+    my ( $self, $hash_ref ) = @_;    # hash_ref n'est défini qu'en création
     my $zone = $self->[GRAPHIC]->get_zone;
 
     #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
@@ -3722,12 +3758,13 @@ sub on_top {
     my $graphic =
       Text::Editor::Easy::Graphic->get_graphic_focused_in_zone($zone);
     if ( defined $graphic and ref $graphic eq 'Text::Editor::Easy::Graphic' ) {
-        return if ( $graphic == $self->[GRAPHIC] );
+        #return if ( $graphic == $self->[GRAPHIC] );
+		if ( $graphic != $self->[GRAPHIC] ) {
 
-        #print "Réel changement de on_top...\n";
-        $graphic->forget;
+        #print "Réel changement de on_top...$graphic|", $self->[GRAPHIC], "|\n";
+            $graphic->forget;
+	    }
     }
-
     $self->[GRAPHIC]->on_top;
 
 # Recherche de tous les éditeurs qui ont "on_top" comme évènements : à revoir (un peu long)
@@ -3746,8 +3783,7 @@ sub on_top {
     if ( defined $event_ref
         and my $data_ref = $event_ref->{'on_top_editor_change'} )
     {
-        $data_ref->{'sub_ref'}
-          ->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref );
+        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref );
     }
 }
 
@@ -3854,23 +3890,17 @@ sub resize_all {
             $abstract_ref->[SCREEN][WIDTH],
             $abstract_ref->[SCREEN][HEIGHT]
         );
-
-        #next ZONE;
-        #}
     }
-
-    #}
 }
 
 sub reference_zone_event {
     my ( $self, $name, $event, $hash_ref ) = @_;
 
-    print "Dans reference_zone_event $name,$event, ", $hash_ref->{sub}[0],
-      $hash_ref->{sub}[1], "\n";
+    #print "Dans reference_zone_event $name,$event, ", $hash_ref->{sub}[0], $hash_ref->{sub}[1], "\n";
     my $use = $hash_ref->{'use'};
     if ( defined $use and !$use{$use} ) {
         eval "use $use";
-        print "EVAL use $use en erreur\n$@\n" if ($@);
+        #print "EVAL use $use en erreur\n$@\n" if ($@);
         $use{$use} = 1;
     }
     my $package = $hash_ref->{'package'};
@@ -3898,7 +3928,71 @@ sub exit {
     exit $rc;
 }
 
+sub on_focus_lost {
+    my ( $edit_ref, $sync ) = @_;
+	
+	print "Dans focus_lost : FIRST =\n\t", $edit_ref->[SCREEN][FIRST][TEXT], "\n";
+	# Il faut : la première ligne à l'écran, sa position (ord et abs car décalage possible)
+	# Il faut la position du curseur (ligne + position dans la ligne)
+	# Il faut le mode wrap
+	# La taille de la zone et la zone elle-même sont connues pas ailleurs
+	my $screen_ref = $edit_ref->[SCREEN];
+	my $first_line_ref = $screen_ref->[FIRST];
+	my ( $cursor_line_ref, $cursor_pos ) = cursor_get ($edit_ref );
+	
+	my $caller = $edit_ref->[PARENT];
+	if ( ! defined $sync ) {
+		$caller = $caller->async;
+    }
+	$caller->calc_conf( {
+        'first_line_ref' => $first_line_ref->[REF],
+		'first_line_ord' => $first_line_ref->[ORD],
+		'offset' => $screen_ref->[VERTICAL_OFFSET],
+		'cursor_line_ref' => $cursor_line_ref,
+		'cursor_pos' => $cursor_pos,
+		'wrap' => $screen_ref->[WRAP],
+    }, $sync );
+	# Le file manager, après avoir fini le calcul des 2 lignes, renvoie à son tour ses informations au thread Data
+	# On dispose alors de toute la configuration de tous les éditeurs dans Data en minimisant les traitements dans
+	# le thread graphic
+}
 
+sub debug_display_lines {
+    my ( $edit_ref ) = @_;
+
+    print "Dans debug_display_lines\n";
+    my $line_ref = $edit_ref->[SCREEN][FIRST];
+	while ( defined $line_ref ) {
+		print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+		$line_ref = $line_ref->[NEXT];
+	}
+}
+
+sub graphic_kill {
+    my ( $self ) = @_;
+	
+	print "Dans graphic_kill\n";
+	$self->[GRAPHIC]->kill;	
+	# Suppression des fontes, structures...
+	
+	# Evènement de Tab : on_editor_destroy
+	my $zone = $self->[GRAPHIC]->get_zone;
+    my $event_ref = $event_zone{$zone};
+    if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
+        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, {'name' => $self->[PARENT]->name } );
+    }
+}
+
+sub on_editor_destroy { # zone event called on a Zone object
+    my ( $self, $zone, $name ) = @_;
+	
+	#print "Dans on_editor_destroy $zone|$name\n";
+	return if ( ! defined $zone );
+    my $event_ref = $event_zone{$zone};
+    if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
+        $data_ref->{'sub_ref'}->( undef, $data_ref->{'tab_ref'}, {'name' => $name} );
+    }
+}
 
 =head1 FUNCTIONS
 
@@ -3971,6 +4065,10 @@ Test for future use of motion event according to position (borders of Text::Edit
 =head2 cursor_set
 
 =head2 cursor_virtual_abs
+
+=head2 debug_display_lines
+
+What is on the screen according to Abstract... ?
 
 =head2 decrease_line_space
 
@@ -4074,6 +4172,11 @@ Selection of visible text that matches the search.
 
 =head2 get_screen_size
 
+=head2 graphic_kill
+
+When an Text::Editor::Easy instance is created, data is created in several modules and for several threads.
+Destruction is not properly done at the moment.
+
 =head2 if
 
 =head2 increase_font
@@ -4116,7 +4219,19 @@ Set the content of a line.
 
 =head2 new
 
+=head2 on_editor_destroy
+
+A zone event called when an editor has been closed : useful to change the tab state.
+
+=head2 on_focus_lost
+
+Event used to update Text::Editor::Easy configuration.
+
 =head2 on_top
+
+=head2 on_top_ref_editor
+
+Returns the reference of the Text::Editor::Easy instance that is above the other.
 
 =head2 parent
 

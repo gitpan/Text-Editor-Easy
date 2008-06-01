@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.2
+Version 0.3
 
 =cut
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
@@ -218,6 +218,7 @@ sub move_over_out_editor {
         if ( !$new_editor ) {
             $new_editor = Text::Editor::Easy->new(
                 {
+				    'zone'      => 'zone1',
                     'file'      => $file,
                     'zone'      => $display_zone,
                     'highlight' => {
@@ -311,7 +312,7 @@ sub move_over_out_editor {
 
       #          return if (anything_for_me); # Abandonne si autre chose à faire
 
-        $string_to_insert .= "Package $package|File $file|Line $line\n";
+        $string_to_insert .= "File $file|Line $line|Package $package\n";
     }
     chomp $string_to_insert;
     $show_calls_editor->insert($string_to_insert);
@@ -352,8 +353,8 @@ sub cursor_set_on_who_file {
     return if ( !$hash_ref_line );
     my $text = $hash_ref_line->text;
     return if (anything_for_me);    # Abandonne si autre chose à faire
-    if ( my ( $package, $file, $number ) =
-        $text =~ /^Package (.+)\|File (.+)\|Line (\d+)$/ )
+    if ( my ( $file, $number, $package ) =
+        $text =~ /^File (.+)\|Line (\d+)\|Package (.+)$/ )
     {
 
         #print "P $1, $2, $3\n";
