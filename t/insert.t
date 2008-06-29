@@ -1,6 +1,4 @@
 use strict;
-use Time::HiRes qw(gettimeofday);
-my $start_s = gettimeofday();
 
 use Text::Editor::Easy;
 

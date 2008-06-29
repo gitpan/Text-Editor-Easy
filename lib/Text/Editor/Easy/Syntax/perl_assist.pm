@@ -19,7 +19,7 @@ use strict;
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 

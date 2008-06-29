@@ -1,28 +1,19 @@
 #
-# And what now ?
+# What about an interactive test of perl regexp ?
 #
-# If you want to go further,
-# you may have a look at the code
-# (try F5 for that, unless this editor is too ugly).
-# Key.pm is executed when you type a
-# key function : simple, isn't it ?
-# But static, sorry : you'll have to restart
-# the program if you make any change there.
-#
-# The module interface is not yet
-# finalized, but the more I use the module
-# to write the program, the more (I think)
-# I understand what should be
-# the interface, and the more I test it too.
-#
-#
-# Before version 1.0, don't send me bugs,
-# only constructive comments, like :
-# "A much better module than you are
-# writing has been delivered
-# 234 years ago at CPAN and is called ..."
-#
-# Please tell me ! I didn't want to write
-# that ugly editor ! I only wanted to use
-# an existing one ! I swear it !
+# Search implementation is not yet finished, but here is an other possibility
+# of what a perl Editor could be used to. Interactive tutorials are a more
+# friendly way to learn than a text file. If there are more funny ways to learn
+# perl, maybe there will be more perl programmers and less wasted time
+# to learn other inefficient langages !
+# 
+# As usual, press F5 to insert search code in the macro panel
+# You can then press the arrows "Up" or "Down" to navigate into
+# the different expressions to be searched.
+# You can also put your own expression in the second line of the macro
+# instructions.
+# 
+# You'll notice that, for the $exp variable, you can put a string for an
+# exact match (not a regular expression search) or a regexp with the perl
+# syntax : qr/regexp/modifiers
 #

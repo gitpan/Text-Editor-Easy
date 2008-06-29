@@ -9,11 +9,11 @@ Text::Editor::Easy::Line - Object oriented interface to a file line (managed by 
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
@@ -160,6 +160,8 @@ sub displayed {
 my %sub =
   ( 'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], 
    'deselect' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_deselect ],
+   'top_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_top_ord ],
+   'bottom_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_bottom_ord ],
    'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ], );
 
 

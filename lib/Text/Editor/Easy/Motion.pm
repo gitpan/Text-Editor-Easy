@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
@@ -213,12 +213,12 @@ sub move_over_out_editor {
     return if ( !-f $file );        # Eval non géré...
 
     #print "move over out file : AVANT new_editor : $file\n";
+	my $line;
     if ( !$new_editor ) {
         $new_editor = Text::Editor::Easy->whose_file_name($file);
         if ( !$new_editor ) {
             $new_editor = Text::Editor::Easy->new(
                 {
-				    'zone'      => 'zone1',
                     'file'      => $file,
                     'zone'      => $display_zone,
                     'highlight' => {
@@ -226,33 +226,37 @@ sub move_over_out_editor {
                         'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
                         'sub'     => 'syntax',
                     },
+					'config' => {
+						'first_line_number' => $number,
+						'first_line_at' => 'middle',
+				    },
                 }
             );
         }
         $editor{$file} = $new_editor;
+        $line = $new_editor->number($number);
+		return if ( ! defined $line );
+		$line_number{$file}{$number} = $line;
     }
     else {
         return if (anything_for_me);    # Abandonne si autre chose à faire
-        $new_editor->on_top;
-    }
-
-    #print "move over out file : AVANT number : $number\n";
-    my $line = $line_number{$file}{$number};
-    if ( !$line ) {
-        $line = $new_editor->number($number, {
+        #print "move over out file : AVANT number : $number\n";
+        $line = $line_number{$file}{$number};
+        if ( !$line ) {
+            $line = $new_editor->number($number, {
 				'lazy' => threads->tid,
 				'check_every' => 20,
-		});
-    }
-    if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
-        return;
-    }
-    $line_number{$file}{$number} = $line;
+		    });
+        }
+        if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
+            return;
+        }
+        $line_number{$file}{$number} = $line;
 
-    # Bloquant maintenant
-    $new_editor->async->display( $line,
-        { 'at' => 'middle', 'from' => 'bottom' } );
-
+        # Bloquant maintenant
+        $new_editor->on_top;
+		$new_editor->async->display( $line, { 'at' => 'middle' } );
+    }
     #return if (anything_for_me); # Abandonne si autre chose à faire
 
     #print "AVA?T DISPLAYED\n";

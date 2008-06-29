@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 =head1 SYNOPSIS
 
@@ -106,7 +106,7 @@ sub new {
     if ( defined $hash_ref->{'growing_file'} ) {
         print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
     }
-    print "Avant appel pour création d'un nouveau thread file_manager\n";
+    #print "Avant appel pour création d'un nouveau thread file_manager\n";
 
     my $file_tid = $editor->create_new_server(
         {
@@ -171,16 +171,6 @@ sub new {
             print "Appel de la main loop (méthode new)\n";
             Text::Editor::Easy->manage_event;
             print "Fin de la main loop (méthode new)\n";
-			
-			# Sauvegarde de la configuration de l'éditeur de la zone principale 'zone1'
-			Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor->on_focus_lost('sync');
-			my %tab = Text::Editor::Easy->save_conf;
-		    while ( my ($ref_tab, $tab_name) = each %tab ) {
-				print "Tab à sauver $ref_tab|$tab_name\n";
-			    ask_named_thread($ref_tab, 'save_info_on_file', 'File_manager', "editor.session_${tab_name}");
-			}
-			#my $info = ask_named_thread($editor->get_ref, 'load_info', 'File_manager');
-		    #sleep 1;
             Text::Editor::Easy::Comm::untie_print;
             return $editor;
         }
@@ -191,7 +181,9 @@ sub new {
 
     my $focus = $hash_ref->{'focus'};
     if ( !defined $focus ) {
+		print "Création de l'éditeur $editor : mise au premier plan (appel on_top)\n";
         $editor->on_top($hash_ref);
+		print "Fin de la mise au premier plan pour $editor\n";
     }
     elsif ( $focus eq 'yes' ) {
         $editor->focus($hash_ref);
@@ -211,9 +203,7 @@ sub kill {
  sub file_name {
     my ($self) = @_;
     my $ref    = $self->get_ref;
-    my $retour = Text::Editor::Easy->data_file_name($ref);
-
-    return $retour;
+    return Text::Editor::Easy->data_file_name($ref);
 }
 
 sub name {
@@ -301,24 +291,6 @@ sub save {
     #if ( $file_name ) {
     #        $self->change_title($file_name);
     #}
-}
-
-sub insert_mode {
-    my ($self) = @_;
-
-    return $self->ask2('editor_insert_mode');
-}
-
-sub set_insert {
-    my ($self) = @_;
-
-    return $self->ask2('editor_set_insert');
-}
-
-sub set_replace {
-    my ($self) = @_;
-
-    return $self->ask2('editor_set_replace');
 }
 
 sub regexp {
@@ -849,6 +821,7 @@ sub whose_name {
 sub on_top_editor {
     my ( $self ) = @_;
 	
+	print "Dans on_top_editor de Zone ", $self->{'name'}, "\n";
     my $ref = Text::Editor::Easy->on_top_ref_editor($self);
 	print "Dans on_top_editor de Zone ", $self->{'name'}, ", ref = $ref\n";
     my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
@@ -869,31 +842,52 @@ our @ISA = 'Text::Editor::Easy';
 
 =head2 append
 
+Insert text at the end of the "Text::Editor::Easy" instance. Not yet finished (only one line can be inserted, now).
+
 =head2 cursor
+
+Returns a Cursor object from a "Text::Editor::Easy" instance. See "Text::Editor::Easy::Cursor" for a list of methods
+available for the Cursor object. 
 
 =head2 delete_key
 
+Delete one character. Used with "Text::Editor::Easy::Abstract". Should not be part of the interface...
+
 =head2 display
 
-=head2 enter
-
-=head2 erase
+Allow the use of Line object with the "display" instance method : the internal reference of the Line object, an integer, 
+is given to the display sub of "Text::Editor::Easy::Abstract". Line objects are scalar reference (for encapsulation),
+and they can't be recovered between threads after a dump of the structure (the substitution is done by the calling
+thread but the "display execution" is done by the graphical thread with the help of the "File_manager" thread).
 
 =head2 erase_text
 
+Delete one or more characters. Used with "Text::Editor::Easy::Abstract". Should not be part of the interface...
+
 =head2 file_name
+
+In scalar context, this method returns the name of the file (without the path) if any (undef if the Text::Editor::Easy instance
+is a memory edition).
+In list context, returns the absolute path, the file name (without path), the relative path (to current path) and the name of the instance.
 
 =head2 first
 
-=head2 get_displayed_editor
+Returns a Line object that represents the first line of the "Text::Editor::Easy" instance.
 
 =head2 get_in_zone
+
+Given the name of a Zone object and a number, this class method returns the instance of the Text::Editor::Easy object
+if it is found. Undef otherwise : 
 
 =head2 get_line_number_from_ref
 
 =head2 insert
 
-=head2 insert_mode
+As "display" method, this sub makes substitution of Line objects. Here, this substitution is made for the return value.
+If the calling context is a list context, the insert method returns the Line objects that represents the lines that have
+been inserted. But as Line objects are scalar references (for encapsulation), each thread must have its own addresses
+of scalar references (the substitution is done by the calling thread but the "insert execution" is done by the graphical 
+thread and the "File_manager" thread).
 
 =head2 insert_return
 
@@ -927,21 +921,21 @@ Class method : returns the editor instance who had the focus when ctrl-f was pre
 
 =head2 search
 
-=head2 set_insert
-
-=head2 set_replace
-
 =head2 slurp
 
 =head2 substitute_eval_with_file
 
 =head2 visual_search
 
-Call to editor_visual_search : replacement of line object (scalar reference, memory adress specific to one thread) by the reference of the line (common for all threads).
+Call to editor_visual_search : replacement of line object (scalar reference, memory adress specific to one thread) by the internal reference of the line (common for all threads).
 
 =head2 whose_file_name
 
+Class method. Returns a "Text::Editor::Easy" object whose file name is the parameter given.
+
 =head2 whose_name
+
+Class method. Returns a "Text::Editor::Easy" object whose name is the parameter given.
 
 =head2 kill
 

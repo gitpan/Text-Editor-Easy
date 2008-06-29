@@ -54,14 +54,14 @@ sub main {
 
     my $line = $editor->number(4);
     $line->select( 1, 5 );
-    sleep 3;
+    sleep 1;
 
     $editor->cursor->set( 3, $line );
     $editor->deselect;
-    sleep 2;
+    sleep 1;
 
     $editor->insert( $line->text . " : copied\n" );
-    sleep 2;
+    sleep 1;
 
     $editor->erase(3);
     $editor->save("Uninteresting_data.txt");

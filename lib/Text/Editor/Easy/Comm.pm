@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 =head1 SYNOPSIS
 
@@ -275,7 +275,7 @@ our @EXPORT =
   qw ( execute_this_task anything_for_me anything_for ask2 get_task_to_do reference_event_conditions have_task_done);
 
 our @EXPORT_OK =
-  qw(get_anything_for_me get_task_to_do execute_this_task reference_event_conditions)
+  qw(ask_named_thread)
   ;    # symbols to export on request
 
 use Data::Dump qw(dump);
@@ -336,12 +336,24 @@ sub add_thread_method {
 
     my $method = $options_ref->{'method'};
     return if ( !defined $method );
-	if ( ref $method ) { # ARRAY
-		# Appel récursif : à optimiser par la suite...
-		for my $new_method ( @$method ) {
-		    $options_ref->{'method'} = $new_method;
-		    add_thread_method ( $self_server, $reference, $options_ref );
-		}
+	if ( my $ref_method = ref $method ) { 
+		if ( $ref_method eq 'ARRAY' ) {
+		    # ARRAY
+		    # Appel récursif : à optimiser par la suite... (?)
+		    for my $new_method ( @$method ) {
+		        $options_ref->{'method'} = $new_method;
+		        add_thread_method ( $self_server, $reference, $options_ref );
+		    }
+	    }
+		else {
+		    # HASH
+		    # Appel récursif : à optimiser par la suite... (?)
+		    while ( my ($key, $value) = each %$method) { 
+		        $options_ref->{'method'} = $key;
+				$options_ref->{'sub'} = $value;
+		        add_thread_method ( $self_server, $reference, $options_ref );
+		    }
+	    }
 		return;
     }
     my $method_ref;
@@ -374,12 +386,14 @@ sub add_thread_method {
         $method_ref->[SUB] = $sub;
         $method_ref->[REF] = eval "\\&${package}::$sub";
     }
+	my $is_initial_reference = 0;
     if ( !$initial_instance_ref->{$reference} ) {
         #print "Ajout pour la nouvelle classe/méthode $reference de $method\n";
         $ref_method{$method}[OTHER]{$reference} = $method_ref;
     }
     else {
         $ref_method{$method} = $method_ref;
+		$is_initial_reference = 1;
     }
 
     # Mise à jour des méthodes gérées (hachages shared)
@@ -392,8 +406,14 @@ sub add_thread_method {
         if ( defined $hash_ref ) {
             %hash = %{$hash_ref};
         }
-        $hash{$reference}                      = threads->tid;
-        $get_tid_from_instance_method{$method} = \%hash;
+		my $class = $options_ref->{'class'};
+		if ( $is_initial_reference and defined $class ) {
+		    $hash{$class} = threads->tid;
+		}
+		else {
+            $hash{$reference} = threads->tid;
+	    }
+		$get_tid_from_instance_method{$method} = \%hash;
     }
     else {                            # Class method
         my %hash;
@@ -444,7 +464,9 @@ sub simple_call {
 		#print DBG "Appel asynchrone pour $sub_name, call_id $call_id, tid ", threads->tid, "\n";
 		
 		# Thread Data will memorize the answer (if "call_id" has been fetched by the client when calling the method)
-        Text::Editor::Easy->trace_response( threads->tid, $call_id, undef, gettimeofday(), $response );
+		my ( $return_call_id, $return_message ) = split( /;/, $response, 2 );
+		#print DBG "Pour appel call_id = $return_call_id, je renvoie la réponse $return_message\n";
+        Text::Editor::Easy->trace_response( threads->tid, $call_id, undef, gettimeofday(), $return_message );
     }
 }
 
@@ -457,13 +479,9 @@ sub simple_context_call {
         my @return = $sub_ref->( $self, @param );
         $response = dump @return;
     }
-    elsif ( $context eq 'S' or $context eq 'AS' ) {
+    else {
         my $return = $sub_ref->( $self, @param );
         $response = dump $return;
-    }
-    else {    # $context = 'V' (void)
-        $sub_ref->( $self, @param );
-        $response = dump;
     }
     return "$call_id;$response";
 }
@@ -569,19 +587,14 @@ sub ask2 {
 
         if ( !defined $tid ) {
             $tid = $hash_ref->{ ref($self) };
-            if ( defined $tid and $tid =~ /\D/ ) {
+            if ( ! defined $tid ) { #Tester l'héritage ici ... long
+				$tid = $hash_ref->{'Text::Editor::Easy'};
+		    }
+			if ( defined $tid and $tid =~ /\D/ ) {
                 print DBG "Trouvé un appel nommé : méthode $method, nom $tid\n";
                 my $hash_ref = $get_tid_from_thread_name{$tid};
                 $tid = $hash_ref->{$unique_ref};
                 print DBG "TID de l'appel nommé : $tid\n";
-            }
-            else {
-                # Tester l'héritage ici (long) : fait ici de façon simplifiée
-                $tid = $hash_ref->{'Text::Editor::Easy'};
-                if ( defined $tid and $tid =~ /\D/ ) {
-                    my $hash_ref = $get_tid_from_thread_name{$tid};
-                    $tid = $hash_ref->{$unique_ref};
-                }
             }
         }
     }
@@ -602,7 +615,7 @@ sub ask2 {
     print DBG "Recherche pour méthode $method...\n";
 
     if ( defined $tid ) {
-		 print DBG "TID défini pour méthode $method...\n";
+		 print DBG "TID défini pour méthode $method... : $tid\n";
         $server_tid = $tid;
         return new_ask( $self, $method, $unique_ref, $client_tid, $server_tid, @data );
     }
@@ -660,8 +673,10 @@ sub new_ask {
         my $call_id     = $client_tid . '_' . $call_order;
         my $self_server = $thread_knowledge{'self_server'};
 
-        print DBG
-"Contexte avant appel execute_task |$context| pour appel méthode $method\n";
+#        print DBG "Contexte avant appel execute_task |$context| pour appel méthode $method\n";
+#        print DBG "\tSELF SERVER : $self_server\n";
+#        print DBG "\tCALL_ID     : $call_id\n";
+
         return execute_task( 'sync', $self_server, $method, $call_id,
             $unique_ref || $self,
             $context, @data );
@@ -1024,8 +1039,6 @@ sub create_data_thread {
                 'find_in_zone',
                 'list_in_zone',
                 'reference_editor',
-                'file_name_of_zone_order',
-                'name_of_zone_order',
                 'data_file_name',
                 'data_name',
 				'trace',
@@ -1049,9 +1062,6 @@ sub create_data_thread {
 				'data_last_current',
 				'data_get_search_options',
 				'data_set_search_options',
-				'update_conf',
-				'link_editor_to_tab',
-				'save_conf',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data'],
@@ -1081,7 +1091,8 @@ sub verify_graphic {
     if ( $tid == 0 ) {
 		if ( $get_tid_from_instance_method{'insert'} ) {
 		    #print "Pas de double création, serveur graphique déjà créé\n";
-				$editor->async->ask_thread(
+				#$editor->async->ask_thread(
+				ask_thread( $editor,
 					'add_thread_object',
 					0,
 					{
@@ -1127,9 +1138,6 @@ sub verify_graphic {
                     'abstract_size',
 
                     'new_editor',
-                    'editor_insert_mode',
-                    'editor_set_insert',
-                    'editor_set_replace',
 					'editor_visual_search',
 
                     'screen_first',
@@ -1168,6 +1176,8 @@ sub verify_graphic {
                     'line_select',
 					'line_deselect',
 					'line_set',
+					'line_top_ord',
+					'line_bottom_ord',
 
                     'cursor_position_in_display',
                     'cursor_position_in_text',
@@ -1184,9 +1194,29 @@ sub verify_graphic {
 				    'debug_display_lines',
 					'on_focus_lost',
 					'graphic_kill',
+					
+					# Event generation
+					'clic',
+					'motion',
                 ],
             }
         );
+		# Intégrer la possibilité de mettre un hachage dans "create_new_server" (quand 'sub' ne 'method')
+		# Bug à voir => méthodes non reportées sur les instances suivantes...
+		$editor->ask_thread(
+            'add_thread_method',
+            0,
+		    {
+				'package' => 'Text::Editor::Easy::Abstract',
+                'method' => {
+				    'insert_mode' => 'editor_insert_mode',
+                    'set_insert' => 'editor_set_insert',
+                    'set_replace' => 'editor_set_replace',
+			    },
+				'class' => 'Text::Editor::Easy',
+		    }
+		);
+
         Text::Editor::Easy->ask_thread(
             'add_thread_method',
             0,
@@ -1741,7 +1771,10 @@ sub execute_task {
          # en cas d'erreur réelle
         #print DBG "Appel d'une fonction non définie par défaut : $method\n";
         my $ref_sub = eval "\\&$method";
-        eval {
+		
+		# Problème, on ne récupère pas la valeur retour dans l'appelant (par exemple, lorque on fait un
+		# ask_thread dans le même thread...)
+        my @return = eval {
 
             #simple_call( $self_server, $ref_sub, $call_id, @param );
             simple_call( $self_server, $method, $ref_sub, $call_id, @param )
@@ -1751,7 +1784,13 @@ sub execute_task {
         };
 		if ( $@ ) {
             print STDERR "Wrong execution of pseudo-method $method for tid ", threads->tid, " :\n$@\n";
+			if ( $call eq 'sync' ) {
+			    return;
+		    }
         }
+		elsif ( $call eq 'sync' ) {
+		    return @return;
+	    }
 
         #print "Fin de l'appel spécial de $method\n";
     }
@@ -2036,6 +2075,10 @@ sub execute_this_task {
     my $self_server = $thread_knowledge{'self_server'};
     execute_task( 'async', $self_server, $method, $call_id, $reference,
         @param );
+}
+
+sub get_tid {
+    return threads->tid;
 }
 
 

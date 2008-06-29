@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -131,9 +131,6 @@ sub initialize {
         $canva->CanvasBind( '<Motion>',
             [ \&redirect, $hash_ref->{mouse_move}, Ev('x'), Ev('y') ] );
     }
-    $canva->CanvasBind( '<FocusOut>',
-        [ \&redirect, $hash_ref->{on_focus_lost} ] );
-
 
     $canva->xviewMoveto(0);
     $canva->yviewMoveto(0);
@@ -475,7 +472,13 @@ sub get_editor_focused_in_zone {
     }
     my $graphic = $zone{$zone};
 	#print "Dans get_editor_focused_in_zone : zone $zone, graphic = $graphic|", $graphic->[CANVA], "\n";
-	return $editor{ refaddr ($graphic->[CANVA]) };
+	my $editor = $editor{ refaddr ($graphic->[CANVA]) };
+	if ( wantarray ) {
+		return ( $graphic, $editor );
+    }
+	else {
+	    return $editor;
+    }
 }
 
 sub forget {

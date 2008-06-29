@@ -9,11 +9,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 =head1 SYNOPSIS
 
@@ -51,6 +51,9 @@ use Text::Editor::Easy::Graphic::Tk_glue;
 # Syntaxe
 use Text::Editor::Easy::Syntax::perl_assist;
 
+# Touches
+use Text::Editor::Easy::Abstract::Key;
+
 # Communication
 use Text::Editor::Easy::Comm
   qw(anything_for_me get_task_to_do execute_this_task reference_event_conditions);
@@ -63,6 +66,7 @@ my $sub_origin;            # Idem
 my $sub_sub_origin;            # Idem
 my $last_graphic_event; # Interruptible task which takes into account user events
 # Chaque element ligne de la liste chaînée fera référence à un tableau contenant les elements suivants
+
 use constant {
 
     #------------------------------------
@@ -148,28 +152,26 @@ use constant {
     ASSIST    => 15,
     KEY => 16,
     H_FONT => 17,
+	SELECTION => 18,
 };
 
 use Text::Editor::Easy::Key;
 my %key = (
     'Insert' => \&Text::Editor::Easy::Key::inser,
-    'Prior'  => \&Text::Editor::Easy::Key::page_up,
-    'Next'   => \&Text::Editor::Easy::Key::page_down,
+    'Prior'  => [ \&Text::Editor::Easy::Abstract::Key::page_up, 'Abstract' ],
+    'Next'   => [ \&Text::Editor::Easy::Abstract::Key::page_down, 'Abstract' ],
 
-    'Down'  => \&Text::Editor::Easy::Key::down,
-    'Up'    => \&Text::Editor::Easy::Key::up,
-    'Home'  => \&Text::Editor::Easy::Key::home,
-    'End'   => \&Text::Editor::Easy::Key::end,
-    'Left'  => \&Text::Editor::Easy::Key::left,
-    'Right' => \&Text::Editor::Easy::Key::right,
+    'Down'  => [ \&Text::Editor::Easy::Abstract::Key::down, 'Abstract' ],
+    'Up'    => [ \&Text::Editor::Easy::Abstract::Key::up, 'Abstract' ],
+    'Home'  => [ \&Text::Editor::Easy::Abstract::Key::home, 'Abstract' ],
+    'End'   => [ \&Text::Editor::Easy::Abstract::Key::end, 'Abstract' ],
+    'Left'  => [ \&Text::Editor::Easy::Abstract::Key::left, 'Abstract' ],
+    'Right' => [ \&Text::Editor::Easy::Abstract::Key::right, 'Abstract' ],
+    'Return'   => [ \&Text::Editor::Easy::Abstract::Key::enter, 'Abstract' ],
+    'KP_Enter' => [ \&Text::Editor::Easy::Abstract::Key::enter, 'Abstract' ],
+	'Delete'   => [ \&Text::Editor::Easy::Abstract::Key::delete, 'Abstract' ],
+    'BackSpace'  => [ \&Text::Editor::Easy::Abstract::Key::backspace, 'Abstract' ],
 
-# Fonctions déroutées vers Text::Editor::Easy pour récupérer l'objet Abstract en entrée des procédures
-# (utilisation du mécanisme d'AUTOLOAD du package Text::Editor::Easy)
-    'Return'   => [ \&Text::Editor::Easy::enter, { 'indent' => 'auto' } ],
-    'KP_Enter' => [ \&Text::Editor::Easy::enter, { 'indent' => 'auto' } ],
-    'Delete'   => [ \&Text::Editor::Easy::erase, 1 ],
-
-    'BackSpace'  => \&Text::Editor::Easy::Key::backspace,
     'ctrl_End'   => \&Text::Editor::Easy::Key::end_file,
     'ctrl_Home'  => \&Text::Editor::Easy::Key::top_file,
     'ctrl_Right' => \&Text::Editor::Easy::Key::jump_right,
@@ -181,8 +183,8 @@ my %key = (
 
     'F3' => \&Text::Editor::Easy::next_search,
 
-    'ctrl_c' => \&Text::Editor::Easy::Key::copy,
-    'ctrl_C' => \&Text::Editor::Easy::Key::copy,
+    'ctrl_c' => [ \&Text::Editor::Easy::Abstract::Key::copy, 'Abstract' ],
+    'ctrl_C' => [ \&Text::Editor::Easy::Abstract::Key::copy, 'Abstract' ],
     'ctrl_l' => \&Text::Editor::Easy::Key::close,
     'ctrl_L' => \&Text::Editor::Easy::Key::close,
 
@@ -190,19 +192,20 @@ my %key = (
     'ctrl_r' => \&revert,
     'ctrl_R' => \&revert,
 
-    #'ctrl_v' => \&Text::Editor::Easy::Key::paste,
-    #'ctrl_V' => \&Text::Editor::Easy::Key::paste,
-    'ctrl_v' => \&paste,
-    'ctrl_V' => \&paste,
+    'ctrl_v' => [ \&Text::Editor::Easy::Abstract::Key::paste, 'Abstract' ],
+    'ctrl_V' => [ \&Text::Editor::Easy::Abstract::Key::paste, 'Abstract' ],
+    #'ctrl_v' => \&paste,
+    #'ctrl_V' => \&paste,
 
     'ctrl_w' => \&Text::Editor::Easy::Key::wrap,
     'ctrl_W' => \&Text::Editor::Easy::Key::wrap,
 
-    'ctrl_x'    => \&Text::Editor::Easy::Key::cut_line,
-    'ctrl_X'    => \&Text::Editor::Easy::Key::cut_line,
+    'ctrl_x'    => [ \&Text::Editor::Easy::Abstract::Key::cut, 'Abstract' ],
+    'ctrl_X'    => [ \&Text::Editor::Easy::Abstract::Key::cut, 'Abstract' ],
     'ctrl_f'    => \&Text::Editor::Easy::Key::search,
-    'F3'    => \&Text::Editor::Easy::Key::f3_search,
     'ctrl_F'    => \&Text::Editor::Easy::Key::search,
+    'F3'    => \&Text::Editor::Easy::Key::f3_search,
+	
     'ctrl_Up'   => \&Text::Editor::Easy::Key::jump_up,
     'ctrl_Down' => \&Text::Editor::Easy::Key::jump_down,
     'alt_Up'    => \&Text::Editor::Easy::Key::move_up,
@@ -225,14 +228,14 @@ my %key = (
     'alt_eacute'    => \&Text::Editor::Easy::Key::sel_second,
 	
 	# Selection
-    'shift_Down'  => \&Text::Editor::Easy::Key::shift_down,
-    'shift_Up'    => \&Text::Editor::Easy::Key::shift_up,
-    'shift_Left'  => \&Text::Editor::Easy::Key::shift_left,
-    'shift_Right' => \&Text::Editor::Easy::Key::shift_right,
-    'shift_Home'  => \&Text::Editor::Easy::Key::shift_home,
-    'shift_End'   => \&Text::Editor::Easy::Key::shift_end,
-    'shift_Prior'  => \&Text::Editor::Easy::Key::shift_page_up,
-    'shift_Next'   => \&Text::Editor::Easy::Key::shift_page_down,
+    'shift_Down'  => [\&Text::Editor::Easy::Abstract::Key::shift_down, 'Abstract' ],
+    'shift_Up'    => [ \&Text::Editor::Easy::Abstract::Key::shift_up, 'Abstract' ],
+    'shift_Left'  => [ \&Text::Editor::Easy::Abstract::Key::shift_left, 'Abstract' ],
+    'shift_Right' => [ \&Text::Editor::Easy::Abstract::Key::shift_right, 'Abstract' ],
+    'shift_Home'  => [ \&Text::Editor::Easy::Abstract::Key::shift_home, 'Abstract' ],
+    'shift_End'   => [ \&Text::Editor::Easy::Abstract::Key::shift_end, 'Abstract' ],
+    'shift_Prior'  => [ \&Text::Editor::Easy::Abstract::Key::shift_page_up, 'Abstract' ],
+    'shift_Next'   => [ \&Text::Editor::Easy::Abstract::Key::shift_page_down, 'Abstract' ],
 
 );
 
@@ -355,12 +358,11 @@ sub new {
             'vertical_scrollbar_sub'      => \&scrollbar_move,
             'vertical_scrollbar_position' => 'right',
             'background'                  => 'light grey',
-            'clic'                        => \&clic_text,
-            'mouse_move'                  => \&move_text,
+            'clic'                        => \&clic,
+            'mouse_move'                  => \&motion,
             'resize'                      => \&resize,
             'key_press'                   => \&key_press,
             'mouse_wheel_event'           => \&mouse_wheel_event,
-			'on_focus_lost'           => \&on_focus_lost,
 
             #'key_release' => \&key_release,
             %{$hash_ref},
@@ -1079,7 +1081,7 @@ sub suppress_text {
     }
 }
 
-sub clic_text {
+sub clic {
     my ( $edit_ref, $x, $y ) = @_;
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
@@ -1093,7 +1095,7 @@ sub clic_text {
     my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $x );
     my $ref_under_cursor = $line_ref->[REF];
 
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_last'} ) {
+    if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_replace'} ) {
         $edit_ref->[PARENT]->redirect(
             $sub_ref,
             $edit_ref,
@@ -1110,9 +1112,23 @@ sub clic_text {
         $edit_ref->deselect;
         cursor_make_visible($edit_ref);
     }
+	
+    if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_last'} ) {
+        $edit_ref->[PARENT]->redirect(
+            $sub_ref,
+            $edit_ref,
+            {
+                'line'        => $ref_under_cursor,
+                'display'     => $display_ref,
+                'display_pos' => $pos,
+				'x' => $x,
+				'y' => $y,
+            }
+        );
+    }
 }
 
-sub move_text {
+sub motion {
     my ( $edit_ref, $x, $y ) = @_;
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
@@ -1257,6 +1273,7 @@ sub resize {
 # Cette boucle, "multi-instances", ne doit être lancée qu'une seule fois (==> dans verify_graphic ?)
 # Donc pas dans le premier resize de chaque éditeur
         $edit_ref->[GRAPHIC]->launch_loop( \&examine_external_request, $edit_ref );
+		
 		return;
     }
 
@@ -1302,6 +1319,9 @@ sub init {
     }
 	if ( my $line_ord = $edit_ref->[INIT_TAB]{'first_line_ord'} ) {
         $edit_ref->display( $line_ref->[REF], { 'at' => "ord_$line_ord", 'from' => 'bottom', 'no_check' => 1 } );
+    }
+	elsif ( my $line_at = $edit_ref->[INIT_TAB]{'first_line_at'} ) {
+		$edit_ref->display( $line_ref->[REF], { 'at' => $line_at } );
     }
 	else {
 		$edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
@@ -1430,7 +1450,7 @@ sub key_press {
     $key_code .= '_' if ($key_code);
     $key_code .= $key;
 
-    print "$key_code\n";
+    #print "$key_code\n";
     #return;
 	$sub_sub_origin = $key_code;
 
@@ -1453,7 +1473,14 @@ sub key_press {
             my $code_ref = shift @tab;
 
             #$code_ref->( $edit_ref, @tab );
-            $code_ref->( $edit_ref->[PARENT], @tab );
+			my $first_parameter = shift @tab;
+			if ( $first_parameter eq 'Abstract' ) {
+				$first_parameter = $edit_ref;
+		    }
+			else {
+				$first_parameter = $edit_ref->[PARENT];
+		    }
+            $code_ref->( $first_parameter, @tab );
         }
 
         return;
@@ -1463,6 +1490,12 @@ sub key_press {
     #print "|$key|$ascii|";
     return if ( length($ascii) != 1 );
 
+
+	
+	if ( defined $edit_ref->[SELECTION] ) {
+		Text::Editor::Easy::Abstract::Key::delete_selection($edit_ref);
+	}
+	
     # assist doit pointer sur une référence à un package ou une fonction
     return insert( $edit_ref, $ascii,
         { 'assist' => $edit_ref->[ASSIST], 'indent' => 'auto' } );
@@ -2124,7 +2157,6 @@ sub insert {
 }
 
 sub enter {                                 # <=> insert("\n")
-
     my ( $edit_ref, $options_ref ) = @_;
 
     cursor_make_visible($edit_ref) if ( $origin eq 'graphic' );
@@ -2478,6 +2510,7 @@ sub display_reference {
         }
         my $y;
         if ( !$from or $from eq 'top' ) {
+		    # Par défaut, on affiche à partir du haut
             $y = $ord - $line_ref->[ORD] + $line_ref->[HEIGHT];
         }
         elsif ( $from eq 'middle' ) {
@@ -2834,22 +2867,26 @@ sub position_cursor_in_display {
 sub cursor_get {
     my ($self) = @_;
 
-    my $cursor   = $self->[CURSOR];
-    my $position = $cursor->[POSITION_IN_DISPLAY];
-    my $line_ref = $cursor->[LINE_REF];
+    my $cursor_ref   = $self->[CURSOR];
+    my $position = $cursor_ref->[POSITION_IN_DISPLAY];
+    my $line_ref = $cursor_ref->[LINE_REF];
     my $count = 1;
     while ( $line_ref->[PREVIOUS_SAME] ) {
         $line_ref = $line_ref->[PREVIOUS];
         $position += length( $line_ref->[TEXT] );
 		$count += 1;
     }
-    my $ref = $cursor->[LINE_REF][REF];
+    my $ref = $cursor_ref->[LINE_REF][REF];
     if (wantarray) {
         return (
-            $ref, $position,
-            $ref . '_' . $count, $cursor->[POSITION_IN_DISPLAY],
-            $cursor->[ABS],                 $cursor->[VIRTUAL_ABS],
-			$cursor->[POSITION_IN_TEXT],
+            $ref, 
+			$position,
+            $ref . '_' . $count, 
+			$cursor_ref->[POSITION_IN_DISPLAY],
+            $cursor_ref->[ABS],
+		    $cursor_ref->[VIRTUAL_ABS],
+			$cursor_ref->[POSITION_IN_TEXT],
+			$cursor_ref->[LINE_REF][ORD],
         );
     }
     else {
@@ -3028,7 +3065,7 @@ sub line_deselect {
 sub line_set {
     my ( $edit_ref, $ref, $text ) = @_;
 
-    #print "Dans line_set : $ref, $text\n";
+    print "Dans line_set : $ref, $text\n";
     return if ( !defined $ref );
 
 	$edit_ref->[PARENT]->modify_line( $ref, $text );
@@ -3198,6 +3235,34 @@ sub line_select {
     #print "Line select : retourne $return_value\n";
     return $return_value;
 }
+
+sub line_top_ord {
+    my ( $self, $ref ) = @_;
+
+    return if ( !defined $ref );
+
+    my $line_ref = get_line_ref_from_ref( $self, $ref );
+	
+	return if ( ! $line_ref );
+	
+	return $line_ref->[ORD] - $line_ref->[HEIGHT];
+}
+
+sub line_bottom_ord {
+    my ( $self, $ref ) = @_;
+
+    return if ( !defined $ref );
+
+    my $line_ref = get_line_ref_from_ref( $self, $ref );
+	return if ( ! $line_ref );
+	
+	while ( $line_ref->[NEXT_SAME] ) {
+		$line_ref = $line_ref->[NEXT];
+    }
+	
+	return $line_ref->[ORD];
+}
+
 
 sub bind_key {
     my ( $self, $hash_ref ) = @_;
@@ -3745,6 +3810,7 @@ sub on_top_ref_editor {
 	if ( ref $zone ) {
 		$zone = $zone->{'name'};
     }
+	print "Dans on_top_ref_editor : tid = ", threads->tid, "\n";
     my $edit_ref = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
 	return $edit_ref->[UNIQUE];
 }
@@ -3755,10 +3821,15 @@ sub on_top {
 
     #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
 
-    my $graphic =
-      Text::Editor::Easy::Graphic->get_graphic_focused_in_zone($zone);
+    my ( $graphic, $old_editor ) = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
+	my $conf_ref;
     if ( defined $graphic and ref $graphic eq 'Text::Editor::Easy::Graphic' ) {
         #return if ( $graphic == $self->[GRAPHIC] );
+        if ( defined $old_editor ) {
+		    #$call_id = on_focus_lost ( $old_editor );
+			$conf_ref = on_focus_lost ( $old_editor );
+		    $old_editor = $old_editor->[PARENT];
+	    }
 		if ( $graphic != $self->[GRAPHIC] ) {
 
         #print "Réel changement de on_top...$graphic|", $self->[GRAPHIC], "|\n";
@@ -3778,12 +3849,15 @@ sub on_top {
 #				);
 #		}
 #}
+
+    print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
     return if ( !defined $zone );
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref
         and my $data_ref = $event_ref->{'on_top_editor_change'} )
     {
-        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref );
+        #$data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $call_id );
+		$data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
     }
 }
 
@@ -3865,11 +3939,8 @@ sub decrease_line_space {
 }
 
 sub paste {
-		my ( $editor ) = @_;
-	    
-        my $unique_ref = $editor->get_ref;
-        my $edit_ref = $abstract{$unique_ref};
-   		
+		my ( $edit_ref ) = @_;
+	     		
 		my $string = $edit_ref->[GRAPHIC]->clipboard_get;
 		insert($edit_ref, $string);
 }		
@@ -3931,7 +4002,7 @@ sub exit {
 sub on_focus_lost {
     my ( $edit_ref, $sync ) = @_;
 	
-	print "Dans focus_lost : FIRST =\n\t", $edit_ref->[SCREEN][FIRST][TEXT], "\n";
+	#print "Dans focus_lost : FIRST =\n\t", $edit_ref->[SCREEN][FIRST][TEXT], "\n";
 	# Il faut : la première ligne à l'écran, sa position (ord et abs car décalage possible)
 	# Il faut la position du curseur (ligne + position dans la ligne)
 	# Il faut le mode wrap
@@ -3941,17 +4012,20 @@ sub on_focus_lost {
 	my ( $cursor_line_ref, $cursor_pos ) = cursor_get ($edit_ref );
 	
 	my $caller = $edit_ref->[PARENT];
-	if ( ! defined $sync ) {
-		$caller = $caller->async;
-    }
-	$caller->calc_conf( {
+	#if ( ! defined $sync ) {
+	#	$caller = $caller->async;
+    #}
+	#return $caller->calc_conf( {
+	return {
         'first_line_ref' => $first_line_ref->[REF],
 		'first_line_ord' => $first_line_ref->[ORD],
 		'offset' => $screen_ref->[VERTICAL_OFFSET],
 		'cursor_line_ref' => $cursor_line_ref,
 		'cursor_pos' => $cursor_pos,
 		'wrap' => $screen_ref->[WRAP],
-    }, $sync );
+    #}, $sync );
+	};
+	
 	# Le file manager, après avoir fini le calcul des 2 lignes, renvoie à son tour ses informations au thread Data
 	# On dispose alors de toute la configuration de tous les éditeurs dans Data en minimisant les traitements dans
 	# le thread graphic
@@ -3979,7 +4053,9 @@ sub graphic_kill {
 	my $zone = $self->[GRAPHIC]->get_zone;
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
-        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, {'name' => $self->[PARENT]->name } );
+        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, {
+				'name' => $self->[PARENT]->name ,
+		    } );
     }
 }
 
@@ -4028,7 +4104,7 @@ Affectation of code to a specific key for all instances (initial class call "bin
 
 =head2 clear_screen
 
-=head2 clic_text
+=head2 clic
 
 =head2 clipboard_get
 
@@ -4211,11 +4287,11 @@ Set the content of a line.
 
 =head2 manage_event
 
+=head2 motion
+
 =head2 mouse_wheel_event
 
 =head2 move_bottom
-
-=head2 move_text
 
 =head2 new
 

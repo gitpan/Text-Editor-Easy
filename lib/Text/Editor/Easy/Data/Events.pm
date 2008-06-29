@@ -6,7 +6,7 @@ return (
     'on_top_last'     => 'Text::Editor::Easy',
     'insert_last'     => 'Text::Editor::Easy',
     'change_last'     => 'Text::Editor::Easy',
-	#'on_focus_lost'     => 'Text::Editor::Easy',
+	'clic_last'     => 'Text::Editor::Easy',
 
     # Evènements de zones
     'on_top_editor_change' => 'Text::Editor::Easy::Zone',

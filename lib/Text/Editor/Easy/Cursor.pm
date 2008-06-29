@@ -9,11 +9,11 @@ Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed b
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode
@@ -71,7 +71,7 @@ sub set {
 	if ( ! wantarray ) {
         return $ref_Editor{$ref}->cursor_set( $position, $line );
     }
-    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position ) =
+    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position, $ord ) =
 		    $ref_Editor{$ref}->cursor_get( $position, $line );
 	$line = Text::Editor::Easy::Line->new(
             $ref_Editor{$ref},
@@ -81,7 +81,7 @@ sub set {
             $ref_Editor{$ref},
             $ref_display,
 	    );
-	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position );
+	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position, $ord );
 }
 
 sub get {
@@ -91,7 +91,7 @@ sub get {
 	if ( ! wantarray ) {
         return $ref_Editor{$ref}->cursor_get();
     }
-    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position ) =
+    my ( $ref_line, $line_pos, $ref_display, $display_pos, $abs, $virtual_abs, $text_position, $ord ) =
 		    $ref_Editor{$ref}->cursor_get();
 	my $line = Text::Editor::Easy::Line->new(
             $ref_Editor{$ref},
@@ -101,7 +101,7 @@ sub get {
             $ref_Editor{$ref},
             $ref_display,
 	    );
-	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position );
+	return ( $line, $line_pos, $display, $display_pos, $abs, $virtual_abs, $text_position, $ord );
 }
 
 my %method = (

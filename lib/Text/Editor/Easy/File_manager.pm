@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 =head1 SYNOPSIS
 
@@ -25,7 +25,7 @@ that this module exists, thanks to "Text::Editor::Easy::Comm").
 It manages "file" or "memory" data in a very lazy way. Too lazy for now. I'm going to ask more to this module
 soon.
 
-You can read data from the start of the file, from the bottom, from the midde, ... from where you want in fact.
+You can read data from the start of the file, from the bottom, from the middle, ... from where you want in fact.
 I just use the "seek" instruction for that. You can read a line, its next or its previous.
 
 This module is lazy because it doesn't read the file even once. I will change this to compute the line number and
@@ -43,7 +43,7 @@ part you can see on the screen. Said like that, this seems obvious not to ask mo
 Editors think it's useful to read everything (well, it's surely because most programmers don't want to manage the
 complexity !). And when the file is huge, your entire system blocks. This seems stupid, because who is able
 to watch several Go of text data in a single day ? Well, I should say in a single year : but, nowadays, with 
-cheap hard drive, most people don't know any more what can contain 1 single Go of text data.
+cheap hard drives, most people don't know any more what can contain 1 Go of text data.
 
 =cut
 
@@ -1123,15 +1123,6 @@ sub load_info {
     return $self->[SAVED_INFO];
 }
 
-sub save_info_on_file {
-    my ( $self, $file ) = @_;
-	
-	print "Dans save_info_on_file : tid ", threads->tid, ", file $file\n";
-	open (INFO, ">$file" ) or die "Impossible d'ouvrir $file : $!\n";
-	print INFO dump $self->[SAVED_INFO];
-	CORE::close INFO;
-}
-
 sub editor_number {
     my ( $self, $number, $options_ref ) = @_;
 	
@@ -1254,26 +1245,6 @@ sub editor_search {
 	return;
 }
 
-sub calc_conf {
-    my ( $self, $options_ref, $sync ) = @_;
-
-	#print "Dans calc_conf : $options_ref->{'cursor_pos'}\n";
-	$options_ref->{'first_line_number'} = get_line_number_from_ref ( $self, $options_ref->{'first_line_ref'} );
-	$options_ref->{'cursor_line_number'} = get_line_number_from_ref ( $self, $options_ref->{'cursor_line_ref'} );
-		
-	# print "Dans calc_conf, après calcul :\n\tfirst : $first_line_number\n\tcursor $cursor_line_number\n";
-	# print "\tfirst_line_ord  : ", $options_ref->{'first_line_ord'},"\n";
-	# print "\toffset          : ", $options_ref->{'offset'},"\n";
-	# print "\tcursor_pos      : ", $options_ref->{'cursor_pos'},"\n";
-	# print "\twrap            : ", $options_ref->{'wrap'},"\n";
-
-    my $call_id = Text::Editor::Easy->update_conf( $self->[UNIQUE_REF], $options_ref, $sync );
-	return if ( ! defined $sync or ! defined $call_id );
-    while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
-		# Attente pour synchronisme
-	}
-}
-
 sub get_line_number_from_ref {
     my ( $self, $ref, $options_ref ) = @_;
 	
@@ -1308,22 +1279,6 @@ sub get_line_number_from_ref {
     return $number;
 }
 
-# Tab method => should be defined elsewhere : possible if methods can be added with a sub-object (SAVED_INFO given to the new method
-# and not the complete $self object)
-sub update_tab_config {
-    my ( $self, $name, $options_ref ) = @_;
-	
-	print "Dans update_tab_config : $name|$options_ref\n";
-	my $files_session_ref = $self->[SAVED_INFO]{'file_list'};
-	for my $file_ref ( @{$files_session_ref} ) {
-		if ( $file_ref->{'name'} eq $name ) {
-		    print "Trouvé $name dans file_list...|ligne curseur :|", $options_ref->{'cursor_line_number'}, "|\n";
-			print "Ancienne valeur mémorisée ... |ligne curseur :|", $file_ref->{'config'}{'cursor_line_number'}, "|\n";
-			$file_ref->{'config'} = $options_ref;
-			return;
-	    }
-    }
-}
 
 =head1 FUNCTIONS
 
@@ -1419,8 +1374,6 @@ Return the line of a Text::Editor::Easy instance and the position (start and end
 =head2 save_line
 
 =head2 save_line_number
-
-=head2 update_tab_config
 
 =head1 COPYRIGHT & LICENSE
 

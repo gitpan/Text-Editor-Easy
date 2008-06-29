@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.3
+Version 0.31
 
 =cut
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 use Data::Dump qw(dump);
 use threads;
@@ -21,6 +21,7 @@ use Thread::Queue;
 
 use Devel::Size qw(size total_size);
 use File::Basename;
+use File::Spec;
 
 my $self_global;
 
@@ -32,7 +33,7 @@ use constant {
     ZONE_ORDER     => 0,
     FILE_OF_ZONE   => 1,
     EDITOR_OF_ZONE => 2,
-    FILE_NAME      => 3,
+    #FILE_NAME      => 3,
     THREAD         => 4,
     CALL           => 5,
     RESPONSE       => 6,
@@ -82,7 +83,24 @@ sub reference_editor {
     my ( $self, $ref, $options_ref ) = @_;
 
     my $zone_ref = $options_ref->{'zone'};
-	my $file_name = $options_ref->{'file'};
+	
+	my $file = $options_ref->{'file'};
+	my ($file_name, $absolute_path, $relative_path );
+	if ( defined $file ) {
+			my $file_path;
+			($file_name, $file_path ) = fileparse($options_ref->{'file'});
+			my $is_absolute = File::Spec->file_name_is_absolute( $file_path );
+			
+			if ( $is_absolute ) {
+				$absolute_path = $file_path;
+				$relative_path = File::Spec->abs2rel( $file_path ) ;
+			}
+			else {
+				$relative_path = $file_path;
+				$absolute_path = File::Spec->rel2abs( $file_path ) ;
+			}
+	}
+
 	my $name = $options_ref->{'name'};
 	
     print DBG "Dans reference_editor de Data : $self |$ref|$zone_ref|$file_name|$name|\n";
@@ -113,21 +131,43 @@ sub reference_editor {
         push @{ $self->[NAME_OF_ZONE]{$zone}{$name} }, $order;
     }
     $self->[EDITOR_OF_ZONE]{$zone}[$order] = $ref;
-    $self->[FILE_NAME]{$zone}[$order]      = $file_name;
-    $self->[NAME]{$zone}[$order]           = $name;
+    $self->[NAME]{$name} = 1;
     $self->[INSTANCE]{$ref}{'name'}        = $name;
     $self->[INSTANCE]{$ref}{'file_name'}   = $file_name;
+	$self->[INSTANCE]{$ref}{'absolute_path'}   = $absolute_path;
+	$self->[INSTANCE]{$ref}{'relative_path'}   = $relative_path;
+	my ( $volume, $directory ) = File::Spec->splitpath( $absolute_path, 'no_file' );
+	my $full_absolute = File::Spec->catpath( $volume, $directory, $file_name );
+	$self->[INSTANCE]{$ref}{'full_absolute'} = $full_absolute;
+	my $full_relative = File::Spec->abs2rel( $full_absolute ) ;
+	if ( $full_relative ne $full_absolute ) {
+		$self->[INSTANCE]{$ref}{'full_relative'} = $full_relative;
+    }
+ 
     $self->[ZONE_ORDER]{$zone} += 1;    # Valeur de retour, ordre dans la zone
+	#return data_file_name ( $self, $ref );
 }
 
 sub data_file_name {
     my ( $self, $ref ) = @_;
 
     #print DBG "Dans data_file_name $self|$ref|";
-    my $file_name = $self->[INSTANCE]{$ref}{'file_name'};
+    my $instance_ref = $self->[INSTANCE]{$ref};
     #print DBG "$file_name" if ( defined $file_name );
     #print DBG "|\n";
-    return $self->[INSTANCE]{$ref}{'file_name'};
+	if ( wantarray ) {
+		return (
+		    $instance_ref->{'absolute_path'},
+		    $instance_ref->{'file_name'},
+			$instance_ref->{'relative_path'},
+			$instance_ref->{'full_absolute'},
+			$instance_ref->{'full_relative'},
+			$instance_ref->{'name'},
+		)
+	}
+	else {
+		return $instance_ref->{'file_name'};
+    }
 }
 
 sub data_name {
@@ -196,25 +236,6 @@ sub list_in_zone {
         push @ref_editor, $_;
     }
     return @ref_editor;
-}
-
-sub file_name_of_zone_order {
-    my ( $self, $zone, $order ) = @_;
-
-    my $zone_ref = $self->[FILE_NAME]{$zone};
-    if ( defined $zone_ref ) {    # Pas d'autovivification
-        return $zone_ref->[$order];
-    }
-}
-
-sub name_of_zone_order {
-    my ( $self, $zone, $order ) = @_;
-
-    #print "Dans name_of_zone_order $zone|$order\n";
-    my $zone_ref = $self->[NAME]{$zone};
-    if ( defined $zone_ref ) {    # Pas d'autovivification
-        return $zone_ref->[$order];
-    }
 }
 
 sub init_data {
@@ -828,63 +849,6 @@ sub data_set_search_options {
 
 my %tab_editor;
 
-sub update_conf {
-    my ( $self, $ref, $options_ref ) = @_;
-	
-    my $ref_tab = $self->[INSTANCE]{$ref}{'tab'};
-	if ( ! defined $ref_tab ) {
-		print "L'éditeur n'est pas géré par un onglet\n";
-		$self->[INSTANCE]{$ref}{'conf'} = $options_ref;
-		return;
-    }
-	my $tab_editor = $tab_editor{$ref_tab};
-	if ( ! defined $tab_editor ) {
-		print "L'onglet n'a pas encore été créé dans Data\n";
-        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $tab_editor, $ref_tab);
-        $tab_editor{$ref_tab} = $tab_editor;
-    }
-	#print "Dans update conf, reçu |$ref|$options_ref|\n";
-	# On renvoie le 'call_id' de la dernière requête pour permettre un traitement synchrone par calc_conf appelant
-	return $tab_editor->async->update_tab_config( $self->[INSTANCE]{$ref}{'name'}, $options_ref );
-}
-
-sub save_conf {
-    my ( $self ) = @_;
-	
-	print "Dans save_conf\n";
-	my $instance_ref = $self->[INSTANCE];
-	my %saved_tab;
-	while ( my ($key, $value_ref) = each %{$instance_ref} ) {
-        if ( my $ref_tab = $value_ref->{'tab'} ) {
-		    print "L'éditeur ", $value_ref->{'name'}, " est géré par un onglet\n";
-			$saved_tab{$ref_tab} = 1;
-	    }
-		else {
-		    print "L'éditeur ", $value_ref->{'name'}, " doit être sauvegardé de façon individuelle\n";
-	    }
-    }
-	my %tab;
-	TAB: for my $ref ( keys %saved_tab ) {
-		my $name = $instance_ref->{$ref}{'name'};
-		$tab{$ref} = $name;
-		print DBG "Avant ouverture pour name = $name\n";
-		my $tab = $tab_editor{$ref};
-		next TAB if ( ! defined $tab );
-	    #open (SES, ">editor.session_$name") or die "Impossible d'ouvrir editor.session_$name\n";
-        #$tab->async->save_info_on_file("editor.session_$name");
-    }
-	return %tab;
-}
-
-sub link_editor_to_tab {
-    my ( $self, $ref_editor, $ref_tab ) = @_;
-
-    #print "Dans link_editor_to_tab : $ref_editor|$ref_tab\n";
-	$self->[INSTANCE]{$ref_editor}{'tab'} = $ref_tab;
-}
-
-
 =head1 FUNCTIONS
 
 =head2 async_response
@@ -913,21 +877,15 @@ Set the search options (regexp, initial positions) : not yet finished.
 
 =head2 data_substitute_eval_with_file
 
-=head2 file_name_of_zone_order
-
 =head2 find_in_zone
 
 =head2 free_call_id
 
 =head2 init_data
 
-=head2 link_editor_to_tab
-
 This sub shouldn't have been created. The link should always be made by the Zone object and a Zone event.
 
 =head2 list_in_zone
-
-=head2 name_of_zone_order
 
 =head2 print_thread_list
 
@@ -960,10 +918,6 @@ Save the reference of the Text::Editor::Easy instance that has the focus and in 
 =head2 trace_response
 
 =head2 trace_start
-
-=head2 update_conf
-
-Action performed when a Text::Editor::Easy instance is losing the focus.
 
 =head2 zone_list
 
