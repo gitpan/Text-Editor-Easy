@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
@@ -49,8 +49,8 @@ sub reference_event {
 
         #async_call (threads->tid, @$init_ref );
         my ( $false_method, @param ) = @$init_ref;
-        print "FALSE METHOD ", $false_method . ' ' . threads->tid,
-          "|$unique_ref|", join( "|", @param ), "\n";
+        #print "FALSE METHOD ", $false_method . ' ' . threads->tid,
+        #  "|$unique_ref|", join( "|", @param ), "\n";
 
         #Text::Editor::Easy::Async->ask2( 'init ' . threads->tid,
         #    $false_method, $unique_ref, @param );
@@ -106,7 +106,7 @@ my $display_zone;
 sub init_move {
     my ( $self, $reference, $unique_ref, $ref_editor, $zone ) = @_;
 
-    print "DANS INIT_MOVE $self, $unique_ref, $ref_editor, $zone\n";
+    #print "DANS INIT_MOVE $self, $unique_ref, $ref_editor, $zone\n";
     $show_calls_editor = bless \do { my $anonymous_scalar },
       "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref( $show_calls_editor, $ref_editor);
@@ -213,7 +213,7 @@ sub move_over_out_editor {
     return if ( !-f $file );        # Eval non géré...
 
     #print "move over out file : AVANT new_editor : $file\n";
-	my $line;
+    my $line;
     if ( !$new_editor ) {
         $new_editor = Text::Editor::Easy->whose_file_name($file);
         if ( !$new_editor ) {
@@ -226,17 +226,17 @@ sub move_over_out_editor {
                         'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
                         'sub'     => 'syntax',
                     },
-					'config' => {
-						'first_line_number' => $number,
-						'first_line_at' => 'middle',
-				    },
+                    'config' => {
+                        'first_line_number' => $number,
+                        'first_line_at' => 'middle',
+                    },
                 }
             );
         }
         $editor{$file} = $new_editor;
         $line = $new_editor->number($number);
-		return if ( ! defined $line );
-		$line_number{$file}{$number} = $line;
+        return if ( ! defined $line );
+        $line_number{$file}{$number} = $line;
     }
     else {
         return if (anything_for_me);    # Abandonne si autre chose à faire
@@ -244,9 +244,9 @@ sub move_over_out_editor {
         $line = $line_number{$file}{$number};
         if ( !$line ) {
             $line = $new_editor->number($number, {
-				'lazy' => threads->tid,
-				'check_every' => 20,
-		    });
+                'lazy' => threads->tid,
+                'check_every' => 20,
+            });
         }
         if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
             return;
@@ -255,7 +255,7 @@ sub move_over_out_editor {
 
         # Bloquant maintenant
         $new_editor->on_top;
-		$new_editor->async->display( $line, { 'at' => 'middle' } );
+        $new_editor->async->display( $line, { 'at' => 'middle' } );
     }
     #return if (anything_for_me); # Abandonne si autre chose à faire
 
@@ -390,9 +390,9 @@ sub cursor_set_on_who_file {
         my $line = $line_number{$file}{$number};
         if ( !$line ) {
             $line = $new_editor->number($number, {
-				'lazy' => threads->tid,
-				'check_every' => 20,
-		    });
+                'lazy' => threads->tid,
+                'check_every' => 20,
+            });
         }
         if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
             return;
@@ -408,6 +408,10 @@ sub cursor_set_on_who_file {
         $line->select( undef, undef, 'white' );
         $hash_ref->{'line'}->select( undef, undef, 'orange' );
     }
+}
+
+sub nop {
+   # Just to stop other potential useless processing
 }
 
 =head1 FUNCTIONS

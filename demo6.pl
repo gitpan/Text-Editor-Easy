@@ -1,5 +1,5 @@
 #
-# Syntax highlighting :
+# Syntax highlighting :h
 #    3) imagine an interactive application
 #
 # Imagine you are editing your data,

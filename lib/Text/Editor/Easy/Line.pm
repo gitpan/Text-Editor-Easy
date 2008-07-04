@@ -9,11 +9,11 @@ Text::Editor::Easy::Line - Object oriented interface to a file line (managed by 
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode

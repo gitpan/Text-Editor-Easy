@@ -1,3 +1,15 @@
+BEGIN {
+  use Config;
+  if (! $Config{'useithreads'}) {
+      print("1..0 # Skip: Perl not compiled with 'useithreads'\n");
+      exit(0);
+  }
+  if (! -f 'tk_is_ok' ) {
+      print("1..0 # Skip: Tk can't work : graphical environment is out ?\n");
+      exit(0);
+  }
+}
+
 use strict;
 
 use Text::Editor::Easy;

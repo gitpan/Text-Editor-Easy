@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
@@ -20,8 +20,8 @@ use Text::Editor::Easy::Comm;
 use IO::File;
 
 if ( ! -d "tmp" ) {
-	print STDERR "Need a \"tmp\" directory under your current directory to be executed...\n";
-	exit 1;
+    print "Pas de tmp : arrêt\n";
+    exit 1;
 }
 
 # Start of launching perl process (F5 key management)
@@ -39,8 +39,8 @@ my $zone4 = Text::Editor::Easy::Zone->new(
         'trace' => {
             'all' => 'tmp/',
 
-            #	'Text::Editor::Easy::Data' => undef,
-            # 	'Text::Editor::Easy::Data' => 'tmp/',
+            #    'Text::Editor::Easy::Data' => undef,
+            #     'Text::Editor::Easy::Data' => 'tmp/',
             'trace_print' => 'full',
         },
     }
@@ -68,17 +68,17 @@ my $main_tab_name = 'main_tab';
 my $save_info = {
             'file_list' => \@files_session,
             'color'     => 'yellow',
-			'selected' => 0,
+            'selected' => 0,
         };
 if ( -f "editor.session_$main_tab_name" ) {
     $save_info = do "editor.session_$main_tab_name";
-	@files_session = @{$save_info->{'file_list'}};
+    @files_session = @{$save_info->{'file_list'}};
 }
 Text::Editor::Easy->new(
     {
         'zone'        => $zone4,
         'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
-		'name'        => $main_tab_name,
+        'name'        => $main_tab_name,
         'motion_last' => {
             'use'     => 'Text::Editor::Easy::Program::Tab',
             'package' => 'Text::Editor::Easy::Program::Tab',
@@ -86,20 +86,13 @@ Text::Editor::Easy->new(
             'mode'    => 'async',
         },
         'save_info' => $save_info,
-		'font_size' => 11,
+        'font_size' => 11,
     }
 );
 
 # In thread 0, the graphical MainLoop is over
 
 Text::Editor::Easy->save_conf_thread_0("editor.session_main_tab");
-
-#my $call_id = Text::Editor::Easy::Async->save_conf("editor.session_main_tab");
-#while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
-#    if ( anything_for_me )  {
-#        have_task_done;
-#    }
-#}
 
 # End of launching perl process (F5 key management)
 print EXEC "quit\n";
@@ -108,42 +101,42 @@ close EXEC; # This should be enough to stop process "exec.pl"
 
 sub main {
     my ( $onglet, @parm ) = @_;
-	
-	my $tab_tid = $onglet->ask_named_thread( 'get_tid', 'File_manager');
-	$onglet->ask_thread('add_thread_method', $tab_tid,
-		{
-				'use' => 'Text::Editor::Easy::Program::Tab',
-				'package' => 'Text::Editor::Easy::Program::Tab',
-				'method' =>  [ 
-						'select_new_on_top',
-						],
-		}
+    
+    my $tab_tid = $onglet->ask_named_thread( 'get_tid', 'File_manager');
+    $onglet->ask_thread('add_thread_method', $tab_tid,
+        {
+                'use' => 'Text::Editor::Easy::Program::Tab',
+                'package' => 'Text::Editor::Easy::Program::Tab',
+                'method' =>  [ 
+                        'select_new_on_top',
+                        ],
+        }
     );
-	Text::Editor::Easy->ask_thread('add_thread_method', $tab_tid,
-		{
-				'use' => 'Text::Editor::Easy::Program::Tab',
-				'package' => 'Text::Editor::Easy::Program::Tab',
-				'method' =>  [ 
-				    'save_conf',
-			        'update_conf',
-					'get_conf_for_absolute_file_name',
-					],
-		}
+    Text::Editor::Easy->ask_thread('add_thread_method', $tab_tid,
+        {
+                'use' => 'Text::Editor::Easy::Program::Tab',
+                'package' => 'Text::Editor::Easy::Program::Tab',
+                'method' =>  [ 
+                    'save_conf',
+                    'update_conf',
+                    'get_conf_for_absolute_file_name',
+                    ],
+        }
     );
-	Text::Editor::Easy->ask_thread('add_thread_method', 0,
-		{
-				'use' => 'Text::Editor::Easy::Program::Tab',
-				'package' => 'Text::Editor::Easy::Program::Tab',
-				'method' =>  'save_conf_thread_0',
-		}
+    Text::Editor::Easy->ask_thread('add_thread_method', 0,
+        {
+                'use' => 'Text::Editor::Easy::Program::Tab',
+                'package' => 'Text::Editor::Easy::Program::Tab',
+                'method' =>  'save_conf_thread_0',
+        }
     );
-	Text::Editor::Easy->ask_thread('add_thread_method', 0,
-		{
-				'package' => 'main',
-				'method' =>  'restart',
-		}
+    Text::Editor::Easy->ask_thread('add_thread_method', 0,
+        {
+                'package' => 'main',
+                'method' =>  'restart',
+        }
     );
-	
+    
 
     my $out_tab_zone = Text::Editor::Easy::Zone->new(
         {
@@ -158,7 +151,7 @@ sub main {
     my $out_tab = Text::Editor::Easy->new(
         {
             'zone'        => $out_tab_zone,
-			'name'        => 'out_tab',
+            'name'        => 'out_tab',
             'motion_last' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
@@ -168,7 +161,7 @@ sub main {
             'save_info' => { 'color' => 'green', },
         }
     );
-	my $ref_onglet = $onglet->get_ref;
+    my $ref_onglet = $onglet->get_ref;
     my $zone1 = Text::Editor::Easy::Zone->new(
         {
             '-x'                   => 0,
@@ -189,8 +182,8 @@ sub main {
             }
         }
     );
-	my $new_ref = $files_session[$save_info->{'selected'}];
-	$new_ref->{'focus'} = 'yes';
+    my $new_ref = $files_session[$save_info->{'selected'}];
+    $new_ref->{'focus'} = 'yes';
     Text::Editor::Easy->new( $new_ref );
 
     Text::Editor::Easy->bind_key(
@@ -274,7 +267,7 @@ sub main {
     my $macro = Text::Editor::Easy->new(
         {
             'zone'        => $zone5,
-			'name'        => 'macro',
+            'name'        => 'macro',
             'change_last' => {
                 'use'     => 'Text::Editor::Easy::Program::Search',
                 'package' => 'Text::Editor::Easy::Program::Search',
@@ -290,24 +283,42 @@ sub main {
             },
         }
     );
-	
+    
     Text::Editor::Easy->bind_key( { 'package' => 'main', 'sub' => 'restart', 'key' => 'F10' } );
-	Text::Editor::Easy->bind_key({ 
-			'package' => 'Text::Editor::Easy::Program::Open_editor',
-			'use' => 'Text::Editor::Easy::Program::Open_editor',
-			'sub' => 'open',
-			'key' => 'ctrl_o'
-	} );
-	Text::Editor::Easy->bind_key({ 
-			'package' => 'Text::Editor::Easy::Program::Open_editor',
-			'use' => 'Text::Editor::Easy::Program::Open_editor',
-			'sub' => 'open',
-			'key' => 'ctrl_O'
-	} );
+    Text::Editor::Easy->bind_key({ 
+            'package' => 'Text::Editor::Easy::Program::Open_editor',
+            'use' => 'Text::Editor::Easy::Program::Open_editor',
+            'sub' => 'open',
+            'key' => 'ctrl_o'
+    } );
+    Text::Editor::Easy->bind_key({ 
+            'package' => 'Text::Editor::Easy::Program::Open_editor',
+            'use' => 'Text::Editor::Easy::Program::Open_editor',
+            'sub' => 'open',
+            'key' => 'ctrl_O'
+    } );
+    
+    # Self designing : no annulation management yet, frequent save for the moment
+    if ( -d "../save" ) {
+            Text::Editor::Easy->create_new_server(
+        {
+                'use' => 'Text::Editor::Easy::Program::Save',
+                'package' => 'Text::Editor::Easy::Program::Save',
+                'methods' =>  [ 
+                        'save_arbo',
+                        ],
+                'object' => {},
+                'init'   => [
+                    'Text::Editor::Easy::Program::Save::init',
+                ],
+                'name' => 'Save',
+        }
+    );
+
+    }
 }
 
 sub launch {
-
     # Appui sur F5
     my ($self) = @_;
 
@@ -351,34 +362,34 @@ $editor->visual_search( $regexp, $line, $end);
 END_PROGRAM
 
             my $editor = Text::Editor::Easy->whose_name('stack_calls');
-			$editor->empty;
-			my @exp = ( 
-			    'qr/e.+s/', 
-				'qr/e.+?s/', 
-				'\'is\'', 
-				'qr/\\bis\\b/', 
-				'qr/F.*n/', 
-				'qr/F.*n/i', 
-				'qr/f[er]+[^e]+/'
-		    );
-			for ( @exp ) {
-					$editor->insert( "$_\n");
-			}
-			my $first = $editor->number(1);
-			$first->select;
-			$editor->cursor->set( 0, $first);
+            $editor->empty;
+            my @exp = ( 
+                'qr/e.+s/', 
+                'qr/e.+?s/', 
+                '\'is\'', 
+                'qr/\\bis\\b/', 
+                'qr/F.*n/', 
+                'qr/F.*n/i', 
+                'qr/f[er]+[^e]+/'
+            );
+            for ( @exp ) {
+                    $editor->insert( "$_\n");
+            }
+            my $first = $editor->number(1);
+            $first->select;
+            $editor->cursor->set( 0, $first);
             $self->bind_key({ 'package' => 'main', 'sub' => 'up_demo9', 'key' => 'Up' } );
             $self->bind_key({ 'package' => 'main', 'sub' => 'down_demo9', 'key' => 'Down' } );
         }
         else { #demo10.pl
-		    $macro_instructions = << 'END_PROGRAM';
+            $macro_instructions = << 'END_PROGRAM';
 for my $demo ( 1 .. 6 ) {
     print "demo$demo.pl\n";
     Text::Editor::Easy->on_editor_destroy('zone1', "demo${demo}.pl");
 }
 Text::Editor::Easy->restart;
 END_PROGRAM
-	    }
+        }
 
         my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
         $eval_editor->empty;
@@ -405,24 +416,24 @@ sub demo8 {
 sub up_demo9 {
     my $editor = Text::Editor::Easy->whose_name('stack_calls');
     my ( $line ) = $editor->cursor->get;
-	#print "Dans up_demo9 : trouvé $line | ", $line->text, "\n";
-	if ( my $previous = $line->previous ) {
-		$editor->deselect;
-		my $exp = $previous->select;
-		$editor->cursor->set(0, $previous);
-		new_search ( $exp );
+    #print "Dans up_demo9 : trouvé $line | ", $line->text, "\n";
+    if ( my $previous = $line->previous ) {
+        $editor->deselect;
+        my $exp = $previous->select;
+        $editor->cursor->set(0, $previous);
+        new_search ( $exp );
     }
 }
 
 sub down_demo9 {
     my $editor = Text::Editor::Easy->whose_name('stack_calls');
     my ( $line ) = $editor->cursor->get;
-	#print "Dans down_demo9 : trouvé $line | ", $line->text, "\n";
-	if ( my $next = $line->next ) {
-		$editor->deselect;
-		my $exp = $next->select;
-		$editor->cursor->set(0, $next);
-		new_search ( $exp );
+    #print "Dans down_demo9 : trouvé $line | ", $line->text, "\n";
+    if ( my $next = $line->next ) {
+        $editor->deselect;
+        my $exp = $next->select;
+        $editor->cursor->set(0, $next);
+        new_search ( $exp );
     }
 }
 
@@ -430,11 +441,11 @@ sub new_search {
     my ( $exp ) = @_;
 
     my $macro_ed = Text::Editor::Easy->whose_name('macro');
-	
-	# Hoping the automatic inserted lines are still there and in the right order !
-	# ==> the line number 2 of the macro editor will be set to "my \$exp = $exp;" and this will cause
-	# new execution of the macro instructions
-	$macro_ed->number(2)->set("my \$exp = $exp;");
+    
+    # Hoping the automatic inserted lines are still there and in the right order !
+    # ==> the line number 2 of the macro editor will be set to "my \$exp = $exp;" and this will cause
+    # new execution of the macro instructions
+    $macro_ed->number(2)->set("my \$exp = $exp;");
 }
 
 sub restart {
@@ -442,18 +453,18 @@ sub restart {
 
     # Sauvegarde de la configuration
     Text::Editor::Easy->save_conf_thread_0("editor.session_main_tab");
-	
+    
     #my $call_id = Text::Editor::Easy::Async->save_conf("editor.session_main_tab");
-	#while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
-	#	if ( anything_for_me )  {
-	#		have_task_done;
-	#	}
-	#}
-	
-	# Lancement d'un nouvel éditeur (qui récupèrera la configuration)
+    #while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
+    #    if ( anything_for_me )  {
+    #        have_task_done;
+    #    }
+    #}
+    
+    # Lancement d'un nouvel éditeur (qui récupèrera la configuration)
     print EXEC "Editor.pl|start|perl Editor.pl\n";
 
-	# Fin de l'éditeur courant
+    # Fin de l'éditeur courant
     Text::Editor::Easy->exit;
 }
 
@@ -467,4 +478,3 @@ under the same terms as Perl itself.
 
 
 =cut
-

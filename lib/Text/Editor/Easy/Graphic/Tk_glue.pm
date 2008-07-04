@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -138,17 +138,17 @@ sub initialize {
     #$mw->repeat(10, [ $hash_ref->{repeat}, $editor{refaddr $canva} ] );
 }
 
-my $launched = 0;
-
 sub launch_loop {
-    my ( $self, $sub, $editor ) = @_;
+    my ( $self, $sub, $seconds ) = @_;
 
-	#if ( ! $launched ) {
-		print "Lancement de la boucle d'exécution examine...\n";
-        $repeat_id = $self->[TOP_LEVEL]->repeat( 15, [ $sub, $editor ] );
-		$launched = 1;
-    #}
-    #$self->[TOP_LEVEL]->repeat(600, [ $sub, $editor ] );
+   print "Lancement d'une boucle seconds = $seconds\n";
+    
+   return $self->[TOP_LEVEL]->repeat( $seconds * 1000, $sub );
+}
+
+sub set_repeat_id {
+    my ( $self, $id ) = @_;
+    $repeat_id = $id;
 }
 
 sub redirect {
@@ -248,7 +248,7 @@ sub create_canva {
     delete $zone_local{'name'};
     delete $zone_local{'on_top_editor_change'};
     delete $zone_local{'on_editor_destroy'};
-	delete $zone_local{'on_new_editor'};
+    delete $zone_local{'on_new_editor'};
 
     my $canva = $mw->Canvas(
         -background => $color,
@@ -277,25 +277,25 @@ sub create_font {
 }
 
 sub clipboard_get {
-		my ( $self ) = @_;
-		
-		my $string = $self->[TOP_LEVEL]->SelectionGet( 
+        my ( $self ) = @_;
+        
+        my $string = $self->[TOP_LEVEL]->SelectionGet( 
             -selection => "CLIPBOARD" ,
             -type => "STRING"
         );
-		$string =~ s/\x00.*$//;
-		return $string;
+        $string =~ s/\x00.*$//;
+        return $string;
 }
 
 sub clipboard_set {
-		my ( $self, $string ) = @_;
-		
-		print "Dans clipboard_set de Tk_glue |$self|$string|\n";
-		# usefull ?
-		$self->[TOP_LEVEL]->clipboardClear;
-		
-		$self->[TOP_LEVEL]->clipboardAppend('--', $string);
-		return 1; # OK
+        my ( $self, $string ) = @_;
+        
+        print "Dans clipboard_set de Tk_glue |$self|$string|\n";
+        # usefull ?
+        $self->[TOP_LEVEL]->clipboardClear;
+        
+        $self->[TOP_LEVEL]->clipboardAppend('--', $string);
+        return 1; # OK
 }
 
 sub manage_event {
@@ -309,7 +309,17 @@ sub manage_event {
 
 sub length_text {
     my ( $self, $text, $font ) = @_;
-
+    
+    if ( $text =~ /^(-+)/ ) {
+        # Le texte "-d" est malheureusement vu comme une option "display_of" de la méthode fontMeasure dans Tk
+        # L'appel Tk font->measure ne marchant pas mieux (pas du tout !), il faut décomposer toutes les chaînes qui commencent par un "-"
+        my $length = 0;
+        $length += $self->[CANVA]->fontMeasure( $font, "$1" );
+        $text = substr ( $text, length($1) );
+        $length += $self->[CANVA]->fontMeasure( $font, $text );
+        return $length;
+    }
+        
     return $self->[CANVA]->fontMeasure( $font, $text );
 }
 
@@ -425,14 +435,16 @@ sub on_top {
     my ($self) = @_;
 
     my %local_zone = %{ $self->[ZONE] };
+    
+    return if ( ! defined $local_zone{'name'} );
 
     $zone{ $local_zone{'name'} } = $self;
 
     delete $local_zone{'name'};
     delete $local_zone{'on_top_editor_change'};
-	delete $local_zone{'on_editor_destroy'};
-	delete $local_zone{'on_new_editor'};
-	
+    delete $local_zone{'on_editor_destroy'};
+    delete $local_zone{'on_new_editor'};
+    
     $self->[CANVA]->place( -in => $self->[TOP_LEVEL], %local_zone );
 
     #$self->[CANVA]->CanvasFocus;
@@ -471,13 +483,17 @@ sub get_editor_focused_in_zone {
         return;
     }
     my $graphic = $zone{$zone};
-	#print "Dans get_editor_focused_in_zone : zone $zone, graphic = $graphic|", $graphic->[CANVA], "\n";
-	my $editor = $editor{ refaddr ($graphic->[CANVA]) };
-	if ( wantarray ) {
-		return ( $graphic, $editor );
+    #print "Dans get_editor_focused_in_zone : zone $zone, graphic = $graphic|", $graphic->[CANVA], "\n";
+    if ( ! defined $graphic or ! defined ( refaddr $graphic->[CANVA] ) ) {
+        #print STDERR "Can't find focused canva in zone $zone\n";
+        return;
     }
-	else {
-	    return $editor;
+    my $editor = $editor{ refaddr ($graphic->[CANVA]) };
+    if ( wantarray ) {
+        return ( $graphic, $editor );
+    }
+    else {
+        return $editor;
     }
 }
 
@@ -525,8 +541,8 @@ sub change_reference {
 
 sub edit_ref {
     my ( $self ) = @_;
-	
-	return $editor{ refaddr $self->[CANVA] };
+    
+    return $editor{ refaddr $self->[CANVA] };
 }
 
 sub get_displayed_editor {
@@ -581,10 +597,9 @@ sub position_bottom_tag_for_text_lower_than {
     $self->[CANVA]->dtag( 'bottom', 'bottom' );
     return if ( $bottom <= $top );
 
-    #print "Tag bottom à positionner entre $top et $bottom\n";
-    $self->[CANVA]
-      ->addtag( 'bottom', 'enclosed', 0, $top - 4, 1000, $bottom + 17 );
-
+    #print "Tag bottom à positionner entre $top et $bottom\n"; zzzzz
+    #print "Dans position_bottom tk_glue : \$top = $top, bottom = $bottom\n";
+    $self->[CANVA]->addtag( 'bottom', 'enclosed', 0, $top - 4, 1000, $bottom + 17 );
 }
 
 sub move_bottom {
@@ -596,14 +611,14 @@ sub move_bottom {
 
 sub add_tag {
     my ( $self, $tag, $id, $debug ) = @_;
-	
-#	if ( $debug ) {
-#		print "\$self $self, \$canva ", $self->[CANVA], " \$tag $tag, \$id $id\n";
-#    }		
+    
+#    if ( $debug ) {
+#        print "\$self $self, \$canva ", $self->[CANVA], " \$tag $tag, \$id $id\n";
+#    }        
     $self->[CANVA]->addtag( $tag, 'withtag', $id );
-#	if ( $debug ) {
-#		print "Fin de add_tag\n";
-#    }		
+#    if ( $debug ) {
+#        print "Fin de add_tag\n";
+#    }        
 }
 
 sub select {
@@ -614,11 +629,11 @@ sub select {
     }
 
     #print "$x1|$y1|$x2|$y2|\n";
-	my @tag = ( '-tag'  => 'select' );
+    my @tag = ( '-tag'  => 'select' );
     if ( defined $tag ) {
-		#print "Tag défini : $tag\n";
-		@tag = ( '-tag'  => [ 'select', $tag ] );
-	}
+        #print "Tag défini : $tag\n";
+        @tag = ( '-tag'  => [ 'select', $tag ] );
+    }
 
     $self->[CANVA]->createRectangle(
         $x1, $y1, $x2, $y2,
@@ -651,17 +666,18 @@ sub get_mw {
 }
 
 sub cursor_set_shape {
-		my ( $self, $type ) = @_;
-		
-		$self->[CANVA]->configure(-cursor => 'hand2');
+        my ( $self, $type ) = @_;
+        
+        $self->[CANVA]->configure(-cursor => 'hand2');
 }
 
 sub kill {
     my ( $self ) = @_;
-	
+    
     $self->[CANVA]->destroy;
-	undef $self->[CANVA];
+
     delete $editor{ refaddr($self->[CANVA]) };
+    undef $self->[CANVA];
     delete $graphic{ refaddr $self};
 }
 

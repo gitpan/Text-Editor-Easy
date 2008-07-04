@@ -1,5 +1,7 @@
 package Text::Editor::Easy::Abstract;
 
+my $zzz = 0;
+
 use warnings;
 use strict;
 
@@ -9,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 =head1 SYNOPSIS
 
@@ -92,7 +94,7 @@ use constant {
     LAST =>
       13,    # Référence au dernier élément texte du segment : jamais utilisé !
      # alors que seulement la 1ère et la dernière sont utiles pour le positionnement de la scollbar
-	 # Zones sélectionnées
+     # Zones sélectionnées
      #------------------------------------
      # CURSOR_REF
      #------------------------------------
@@ -152,7 +154,8 @@ use constant {
     ASSIST    => 15,
     KEY => 16,
     H_FONT => 17,
-	SELECTION => 18,
+    SELECTION => 18,
+    AT_END => 19,
 };
 
 use Text::Editor::Easy::Key;
@@ -169,10 +172,10 @@ my %key = (
     'Right' => [ \&Text::Editor::Easy::Abstract::Key::right, 'Abstract' ],
     'Return'   => [ \&Text::Editor::Easy::Abstract::Key::enter, 'Abstract' ],
     'KP_Enter' => [ \&Text::Editor::Easy::Abstract::Key::enter, 'Abstract' ],
-	'Delete'   => [ \&Text::Editor::Easy::Abstract::Key::delete, 'Abstract' ],
+    'Delete'   => [ \&Text::Editor::Easy::Abstract::Key::delete, 'Abstract' ],
     'BackSpace'  => [ \&Text::Editor::Easy::Abstract::Key::backspace, 'Abstract' ],
 
-    'ctrl_End'   => \&Text::Editor::Easy::Key::end_file,
+    'ctrl_End'   => [ \&Text::Editor::Easy::Abstract::Key::end_file, 'Abstract' ],
     'ctrl_Home'  => \&Text::Editor::Easy::Key::top_file,
     'ctrl_Right' => \&Text::Editor::Easy::Key::jump_right,
     'ctrl_Left'  => \&Text::Editor::Easy::Key::jump_left,
@@ -205,7 +208,7 @@ my %key = (
     'ctrl_f'    => \&Text::Editor::Easy::Key::search,
     'ctrl_F'    => \&Text::Editor::Easy::Key::search,
     'F3'    => \&Text::Editor::Easy::Key::f3_search,
-	
+    
     'ctrl_Up'   => \&Text::Editor::Easy::Key::jump_up,
     'ctrl_Down' => \&Text::Editor::Easy::Key::jump_down,
     'alt_Up'    => \&Text::Editor::Easy::Key::move_up,
@@ -226,8 +229,8 @@ my %key = (
 
     'alt_ampersand' => \&Text::Editor::Easy::Key::sel_first,
     'alt_eacute'    => \&Text::Editor::Easy::Key::sel_second,
-	
-	# Selection
+    
+    # Selection
     'shift_Down'  => [\&Text::Editor::Easy::Abstract::Key::shift_down, 'Abstract' ],
     'shift_Up'    => [ \&Text::Editor::Easy::Abstract::Key::shift_up, 'Abstract' ],
     'shift_Left'  => [ \&Text::Editor::Easy::Abstract::Key::shift_left, 'Abstract' ],
@@ -267,6 +270,8 @@ sub new {
         $edit_ref->[RETURN] = $hash_ref->{return};
     }
 
+    #print "Création dans abstract growing = ", $hash_ref->{'growing'}, "\n";
+
     # Affectation des fonctions de redirection
     for my $redirect ( keys %redirect ) {
         my $redirect_ref = $hash_ref->{$redirect};
@@ -305,6 +310,15 @@ sub new {
                     $sub_ref->( $editor, @init );
                 }
             }
+        }
+        elsif ( $redirect eq 'motion_last' ) {
+                    $hash_ref->{'motion_last'} = {
+                            'use'     => 'Text::Editor::Easy::Motion',
+                            'package' => 'Text::Editor::Easy::Motion',
+                            'sub'     => 'nop',
+                            'mode'    => 'async',
+                        },
+                $edit_ref->[REDIRECT]{$redirect} = $redirect;
         }
     }
     reference_event_conditions( $unique_ref, $hash_ref );
@@ -371,7 +385,7 @@ sub new {
     );
 
     $edit_ref->[SCREEN][FONT_HEIGHT] = $hash_ref->{'font_size'} || 15;
-	print "FONTE : font_size = ", $hash_ref->{'font_size'}, ", HEIGHT = ", $edit_ref->[SCREEN][FONT_HEIGHT], "\n";
+    #print "FONTE : font_size = ", $hash_ref->{'font_size'}, ", HEIGHT = ", $edit_ref->[SCREEN][FONT_HEIGHT], "\n";
     $edit_ref->[SCREEN][LINE_HEIGHT] = $edit_ref->[GRAPHIC]->line_height;
     $edit_ref->[SCREEN][MARGIN]      = $edit_ref->[GRAPHIC]->margin;
 
@@ -505,13 +519,13 @@ sub examine_external_request {
     if ( anything_for_me() ) {
         my ( $what, $call_id, @param ) = get_task_to_do();
         $origin     = $call_id;
-		if ( defined $sub_origin ) {
-		    # Il y a eu un évènement graphique
-			$last_graphic_event = $sub_origin;
-	    }	
+        if ( defined $sub_origin ) {
+            # Il y a eu un évènement graphique
+            $last_graphic_event = $sub_origin;
+        }    
         $sub_origin = $what;
         execute_this_task( $what, $call_id, @param );
-		#print "Retour de execute task $sub_origin, $param[2]\n";
+        #print "Retour de execute task $sub_origin, $param[2]\n";
     }
     $origin     = "graphic";
     $sub_origin = undef;
@@ -559,7 +573,7 @@ sub manage_event {
 sub clipboard_set {
     my ( $self, $string ) = @_;
 
-	print "Dans clipboard_set de abstract : |$string|\n";
+    print "Dans clipboard_set de abstract : |$string|\n";
     for ( keys %abstract ) {
         return $abstract{$_}->[GRAPHIC]->clipboard_set( $string );
     }
@@ -736,6 +750,10 @@ sub create_text_in_line {
         }
 
  #print "graphic = $edit_ref->[GRAPHIC],$text_ref->[TEXT]:$text_ref->[FONT]:\n";
+        if ( $zzz ) {
+            print "Recherche longueur de |$text_ref->[TEXT]|$text_ref->[FONT]|\n";
+        }
+ 
         $text_ref->[WIDTH] =
           $edit_ref->[GRAPHIC]
           ->length_text( $text_ref->[TEXT], $text_ref->[FONT] );
@@ -863,9 +881,15 @@ sub check_cursor {
         # On utilise maintenant [CURSOR][POSITION_IN_LINE]
         my $prev_line_ref = start_line($line_ref);
         my $position      = $edit_ref->[CURSOR][POSITION_IN_LINE];
-        while ( $position > length( $prev_line_ref->[TEXT] ) ) {
+        DISP: while ( $position > length( $prev_line_ref->[TEXT] ) ) {
             $position -= length( $prev_line_ref->[TEXT] );
             $prev_line_ref = $prev_line_ref->[NEXT];
+            if ( ! defined $prev_line_ref ) {
+                print STDERR "Can't position cursor in display \"$edit_ref->[CURSOR][LINE_REF]\" or following (position $position)\n";
+                $position = 0;
+                $prev_line_ref = start_line($line_ref);
+                last DISP;
+            }
         }
         position_cursor_in_display( $edit_ref, $prev_line_ref, $position );
     }
@@ -1112,7 +1136,7 @@ sub clic {
         $edit_ref->deselect;
         cursor_make_visible($edit_ref);
     }
-	
+    
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_last'} ) {
         $edit_ref->[PARENT]->redirect(
             $sub_ref,
@@ -1121,8 +1145,8 @@ sub clic {
                 'line'        => $ref_under_cursor,
                 'display'     => $display_ref,
                 'display_pos' => $pos,
-				'x' => $x,
-				'y' => $y,
+                'x' => $x,
+                'y' => $y,
             }
         );
     }
@@ -1133,7 +1157,7 @@ sub motion {
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'motion';
-        print "Move text : $x|$y|\n";
+        #print "Move text : $x|$y|\n";
     }
 
     my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
@@ -1258,6 +1282,9 @@ sub resize {
         $sub_origin = 'resize';
     }
 
+    my $old_width = $edit_ref->[SCREEN][WIDTH];
+    my $old_height = $edit_ref->[SCREEN][HEIGHT];
+
     $edit_ref->[SCREEN][WIDTH]  = $width;
     $edit_ref->[SCREEN][HEIGHT] = $height;
 
@@ -1272,9 +1299,16 @@ sub resize {
 
 # Cette boucle, "multi-instances", ne doit être lancée qu'une seule fois (==> dans verify_graphic ?)
 # Donc pas dans le premier resize de chaque éditeur
-        $edit_ref->[GRAPHIC]->launch_loop( \&examine_external_request, $edit_ref );
-		
-		return;
+        my $id = $edit_ref->[GRAPHIC]->launch_loop( \&examine_external_request, 0.015 );
+        $edit_ref->[GRAPHIC]->set_repeat_id( $id );
+        
+        return;
+    }
+
+    if ( $height == $old_height and ! $edit_ref->[SCREEN][WRAP] ) {
+        # Optimisation à checker : en particulier, en cas d'offset, il faudrait déplacer éventuellement le canevas vers la gauche
+        # pour voir plus de choses si l'on agrandit et que l'on était en limite droite à l'affichage
+        return;
     }
 
 # En cas de resize, on réaffiche en gardant constante la position de départ de la première ligne entière
@@ -1283,12 +1317,60 @@ sub resize {
     $edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
 }
 
+sub repeat {
+    my ( $self, $seconds, $options_ref ) = @_;
+    
+    my $use = $options_ref->{'use'};
+    if ( defined $use ) {
+        if ( !$use{$use} ) {
+            eval "use $use";
+            if ($@) {
+                print STDERR "Wrong code for module $use :\n$@\n";
+            }
+            $use{$use}{'messages'} = $@;
+        }
+    }
+    my $package = $options_ref->{'package'} || 'main';
+    my $sub = $options_ref->{'sub'};
+    my $sub_ref = eval "\\&${package}::$sub";
+
+    return $self->[GRAPHIC]->launch_loop( $sub_ref, $seconds );
+}
+
+sub repeat_class_method {
+   # Cette méthode permet de ne pas réévaluer un autre module pour faire une tâche répétitive :
+   # => le thread 0 est l'horloge qui donne le top mais il ne faut ni le saturer en traitements, ni charger sa mémoire en évaluation
+   # de modules qu'il n'utiliserait pas
+   my ( $self, $seconds, $method ) = @_;
+      
+   # Tk est plutôt moyen en ce sens que l'on ne peut pas donner de paramètre en plus de la callback 
+   # aux procédures du genre "after"
+   #              Mais perl est tellement dynamique !
+   # ====>  Création de la nouvelle sub à la volée qui appelle la méthode de classe donnée en paramètre !!!
+   my $sub_ref = sub { Text::Editor::Easy::Async->$method };
+   
+   return $self->[GRAPHIC]->launch_loop( $sub_ref, $seconds );
+}
+
+sub repeat_instance_method {
+   my ( $self, $seconds, $method ) = @_;
+      
+   # Tk est plutôt moyen en ce sens que l'on ne peut pas donner de paramètre en plus de la callback 
+   # aux procédures du genre "after"
+   #              Mais perl est tellement dynamique !
+   # ====>  Création de la nouvelle sub à la volée qui appelle la méthode de classe donnée en paramètre !!!
+   my $async = $self->[PARENT]->async;
+   my $sub_ref = sub { $async->$method };
+   
+   return $self->[GRAPHIC]->launch_loop( $sub_ref, $seconds );
+}
+
 sub init {
     my ($edit_ref) = @_;
 
     my $ref = $edit_ref->[INIT_TAB]{'line_ref'};
-	
-	if ( ! defined $ref or ! defined ( $edit_ref->[PARENT]->get_text_from_ref($ref) ) ) {
+    
+    if ( ! defined $ref or ! defined ( $edit_ref->[PARENT]->get_text_from_ref($ref) ) ) {
         if ( my $line_number = $edit_ref->[INIT_TAB]{'first_line_number'} ) {
             my $line = $edit_ref->[PARENT]->number( $line_number );
             $ref = $line->ref if ($line);
@@ -1317,21 +1399,21 @@ sub init {
         # Cas où la ligne est indéfinie à gérer
 
     }
-	if ( my $line_ord = $edit_ref->[INIT_TAB]{'first_line_ord'} ) {
+    if ( my $line_ord = $edit_ref->[INIT_TAB]{'first_line_ord'} ) {
         $edit_ref->display( $line_ref->[REF], { 'at' => "ord_$line_ord", 'from' => 'bottom', 'no_check' => 1 } );
     }
-	elsif ( my $line_at = $edit_ref->[INIT_TAB]{'first_line_at'} ) {
-		$edit_ref->display( $line_ref->[REF], { 'at' => $line_at } );
+    elsif ( my $line_at = $edit_ref->[INIT_TAB]{'first_line_at'} ) {
+        $edit_ref->display( $line_ref->[REF], { 'at' => $line_at } );
     }
-	else {
-		$edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
+    else {
+        $edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
     }
 
     # Positionnement du curseur
     my $ref_cursor;
     if ( my $cursor_number = $edit_ref->[INIT_TAB]{'cursor_line_number'} ) {
         my $line = $edit_ref->[PARENT]->number( $cursor_number );
-		$ref_cursor = $line->ref;
+        $ref_cursor = $line->ref;
     }
     else {
         $ref_cursor = $line_ref->[REF];
@@ -1360,7 +1442,7 @@ sub init {
     }
     $edit_ref->[CURSOR][LINE_REF] = $cursor_line_ref;
     cursor_set( $edit_ref, $edit_ref->[INIT_TAB]{'cursor_pos'} );
-	#print "Fin de init\n";
+    #print "Fin de init\n";
 }
 
 sub get_first_complete_line {
@@ -1388,7 +1470,7 @@ sub clear_screen {
     my ($edit_ref) = @_;
 
     my $line_to_suppress_ref = $edit_ref->[SCREEN][FIRST];
-	$edit_ref->[GRAPHIC]->delete_select;
+    $edit_ref->[GRAPHIC]->delete_select;
     return if ( !$line_to_suppress_ref );
 
     #SUPP: while ($line_to_suppress_ref->[DISPLAYED] ) {
@@ -1452,11 +1534,11 @@ sub key_press {
 
     #print "$key_code\n";
     #return;
-	$sub_sub_origin = $key_code;
+    $sub_sub_origin = $key_code;
 
     my $reference = $edit_ref->[KEY]{$key_code};
-	if ( ! $reference ) {
-		$reference = $key{$key_code};
+    if ( ! $reference ) {
+        $reference = $key{$key_code};
     }
 
     if ( $reference ) {
@@ -1473,13 +1555,13 @@ sub key_press {
             my $code_ref = shift @tab;
 
             #$code_ref->( $edit_ref, @tab );
-			my $first_parameter = shift @tab;
-			if ( $first_parameter eq 'Abstract' ) {
-				$first_parameter = $edit_ref;
-		    }
-			else {
-				$first_parameter = $edit_ref->[PARENT];
-		    }
+            my $first_parameter = shift @tab;
+            if ( $first_parameter eq 'Abstract' ) {
+                $first_parameter = $edit_ref;
+            }
+            else {
+                $first_parameter = $edit_ref->[PARENT];
+            }
             $code_ref->( $first_parameter, @tab );
         }
 
@@ -1491,11 +1573,11 @@ sub key_press {
     return if ( length($ascii) != 1 );
 
 
-	
-	if ( defined $edit_ref->[SELECTION] ) {
-		Text::Editor::Easy::Abstract::Key::delete_selection($edit_ref);
-	}
-	
+    
+    if ( defined $edit_ref->[SELECTION] ) {
+        Text::Editor::Easy::Abstract::Key::delete_selection($edit_ref);
+    }
+    
     # assist doit pointer sur une référence à un package ou une fonction
     return insert( $edit_ref, $ascii,
         { 'assist' => $edit_ref->[ASSIST], 'indent' => 'auto' } );
@@ -1566,30 +1648,50 @@ sub verify_if_cursor_is_visible_horizontally {
 # On a une ligne précédente
 # Le curseur est bien positionné vis-à-vis du haut si la ligne précédente est vue entièrement
     my $previous_line_ref = $cursor_line_ref->[PREVIOUS];
+    
     if ( $previous_line_ref->[ORD] - $previous_line_ref->[HEIGHT] < 0 ) {
         screen_move( $edit_ref, 0,
             $previous_line_ref->[HEIGHT] - $previous_line_ref->[ORD] );
     }
-
+    #print "Dicho : avant Plantage ?\n";
     # Le curseur est assez loin du haut, on regarde en bas
     my $next_line_ref = $cursor_line_ref->[NEXT];
     if ( !$next_line_ref ) {
-        $next_line_ref = read_next_line( $edit_ref, $cursor_line_ref );
+        #print "Dicho : est-on avant le Plantage ?\n";
+        #$zzz = 1;
+        
+        $next_line_ref = read_next_line( $edit_ref, $cursor_line_ref ); # zzzzz
         if ( !$next_line_ref ) {
 
+            #print "Pas de référence trouvée...\n";
             # On positionne la ligne qui contient le curseur en bas de l'écran
             my $shift = $edit_ref->[SCREEN][HEIGHT] - $cursor_line_ref->[ORD];
             return if ( $shift > 0 );
             return screen_move( $edit_ref, 0, $shift );
         }
+
+        #print "Dicho : encore avant Plantage ?\n";
         $edit_ref->[SCREEN][LAST] =
-          display_line_from_top( $edit_ref, $next_line_ref,
-            $cursor_line_ref->[ORD] );
+          display_line_from_top( $edit_ref, $next_line_ref, $cursor_line_ref->[ORD] );
+        add_tag_complete( $edit_ref, $edit_ref->[SCREEN][LAST], 'bottom' );
     }
+    
+
 
 # On a une ligne suivante
 # Le curseur est bien positionné vis-à-vis du bas si la ligne suivante est vue entièrement
+    #print "Avant appel screen_move : \$next_line_ref = $next_line_ref\n",
+    #    "\t\$edit_ref->[SCREEN][HEIGHT] = ", $edit_ref->[SCREEN][HEIGHT], "\n",
+    #    "\t\$next_line_ref->[ORD] = ", $next_line_ref->[ORD], "\n",
+    #    "\t\$cursor_line_ref = ", $cursor_line_ref, "\n",
+    #    "\t\$cursor_line_ref->[ORD] = ", $cursor_line_ref->[ORD], "\n"; # zzzzz
+    
     if ( $next_line_ref->[ORD] > $edit_ref->[SCREEN][HEIGHT] ) {
+        if ( ! defined $next_line_ref->[ORD] ) {
+            print "Abstract : problème à venir :\n",
+              "\tligne $next_line_ref->[TEXT]\n";
+        }
+        #print "Avant retour de verify_if_cursor_is_visible_horizontally\n";
         return screen_move( $edit_ref, 0,
             $edit_ref->[SCREEN][HEIGHT] - $next_line_ref->[ORD] );
     }
@@ -1617,7 +1719,7 @@ sub verify_if_cursor_is_visible_vertically {
         $edit_ref->[CURSOR][VIRTUAL_ABS] -= $decalage;
         $edit_ref->[SCREEN][VERTICAL_OFFSET] += $decalage;
         #$edit_ref->[GRAPHIC]->move_tag( 'text', -$decalage, 0 );
-		$edit_ref->[GRAPHIC]->move_tag( 'all', -$decalage, 0 );
+        $edit_ref->[GRAPHIC]->move_tag( 'all', -$decalage, 0 );
     }
     if ( $edit_ref->[CURSOR][ABS] < $edit_ref->[GRAPHIC]->margin ) {
         my $decalage = 10 - $edit_ref->[CURSOR][ABS];
@@ -1625,7 +1727,7 @@ sub verify_if_cursor_is_visible_vertically {
         $edit_ref->[CURSOR][VIRTUAL_ABS] += $decalage;
         $edit_ref->[SCREEN][VERTICAL_OFFSET] -= $decalage;
         #$edit_ref->[GRAPHIC]->move_tag( 'text', $decalage, 0 );
-		$edit_ref->[GRAPHIC]->move_tag( 'all', $decalage, 0 );
+        $edit_ref->[GRAPHIC]->move_tag( 'all', $decalage, 0 );
     }
 }
 
@@ -1790,8 +1892,9 @@ sub wrap {
 sub change_title {
     my ( $edit_ref, $title ) = @_;
 
-    print "Dans change title : $title\n";
+    #rint "Dans change title : $title\n";
     $edit_ref->[GRAPHIC]->change_title($title);
+    #rint "Après change title\n";
 }
 
 sub inser {
@@ -1825,87 +1928,87 @@ sub editor_set_replace {
 
 sub editor_visual_search {
     my ( $edit_ref, $exp, $ref, $end, $not_first_call_ref ) = @_;
-	# Maybe a useless complicated sub that will be suppressed
-	# Could be replaced by a search call with good options followed by a line->select
-	# Just a try to realise a long task in the graphic thread that can be stopped
-	# (recursive asynchronous call with $last_graphic_event tested)
-	
-	#print "Dans visual_search : \$exp = $exp, \$ref = $ref, \$end = $end\n";
+    # Maybe a useless complicated sub that will be suppressed
+    # Could be replaced by a search call with good options followed by a line->select
+    # Just a try to realise a long task in the graphic thread that can be stopped
+    # (recursive asynchronous call with $last_graphic_event tested)
+    
+    #print "Dans visual_search : \$exp = $exp, \$ref = $ref, \$end = $end\n";
 
     my ( $start_ref, $stop_pos );
-	if ( $not_first_call_ref ) {
-		if ( defined $last_graphic_event ) {
-		    #print "Fin de editor_visual_search \$last_graphic_event = $last_graphic_event, sub_sub = $sub_sub_origin\n";
-		    return;
-	    }
-		$start_ref = $not_first_call_ref->{'start_ref'};
-		$stop_pos = $not_first_call_ref->{'stop_pos'};
+    if ( $not_first_call_ref ) {
+        if ( defined $last_graphic_event ) {
+            #print "Fin de editor_visual_search \$last_graphic_event = $last_graphic_event, sub_sub = $sub_sub_origin\n";
+            return;
+        }
+        $start_ref = $not_first_call_ref->{'start_ref'};
+        $stop_pos = $not_first_call_ref->{'stop_pos'};
     }
-	else {
-		( $start_ref, $stop_pos ) = cursor_get ( $edit_ref );
-		$not_first_call_ref->{'start_ref'} = $start_ref;
-		$not_first_call_ref->{'stop_pos'} = $stop_pos;
-		$not_first_call_ref->{'can_restart'} = 1;
+    else {
+        ( $start_ref, $stop_pos ) = cursor_get ( $edit_ref );
+        $not_first_call_ref->{'start_ref'} = $start_ref;
+        $not_first_call_ref->{'stop_pos'} = $stop_pos;
+        $not_first_call_ref->{'can_restart'} = 1;
     }
 
     #print "Mise à undef de \$last_graphic_event = $last_graphic_event, sub_sub = $sub_sub_origin\n";
 
-	$last_graphic_event = undef;
+    $last_graphic_event = undef;
     $sub_origin = undef; # devrait être inutile...
-	my $line_ref = get_line_ref_from_ref ( $edit_ref, $ref );
-	my $can_restart = $not_first_call_ref->{'can_restart'};
-	if ( ! $line_ref ) {
-		$line_ref = $edit_ref->[SCREEN][FIRST];
-		$end = 0;
-		$can_restart = 0;
+    my $line_ref = get_line_ref_from_ref ( $edit_ref, $ref );
+    my $can_restart = $not_first_call_ref->{'can_restart'};
+    if ( ! $line_ref ) {
+        $line_ref = $edit_ref->[SCREEN][FIRST];
+        $end = 0;
+        $can_restart = 0;
     }
-	$not_first_call_ref->{'can_restart'} = $can_restart;
-	#print "2 : \$start_ref = $start_ref, \$stop_pos = $stop_pos, \$can_restart = $can_restart\n";
+    $not_first_call_ref->{'can_restart'} = $can_restart;
+    #print "2 : \$start_ref = $start_ref, \$stop_pos = $stop_pos, \$can_restart = $can_restart\n";
 
-	my $text = $line_ref->[TEXT];
-	while ( $line_ref->[NEXT_SAME] ) {
-		$line_ref = $line_ref->[NEXT];
-		$text .= $line_ref->[TEXT];
+    my $text = $line_ref->[TEXT];
+    while ( $line_ref->[NEXT_SAME] ) {
+        $line_ref = $line_ref->[NEXT];
+        $text .= $line_ref->[TEXT];
     }
     pos($text) = $end;
     if ( $text =~ m/($exp)/g ) {
-		my $length    = length($1);
+        my $length    = length($1);
         my $end_pos   = pos($text);
         my $start_pos = $end_pos - $length;
-		if ( $line_ref->[REF] == $start_ref and $start_pos > $stop_pos ) {
-		    return;
-	    }
-		line_select ( $edit_ref, $ref, $start_pos, $end_pos, 'white' );
-		$edit_ref->[PARENT]->async->editor_visual_search($exp, $ref, $end_pos, $not_first_call_ref );
-		return;
+        if ( $line_ref->[REF] == $start_ref and $start_pos > $stop_pos ) {
+            return;
+        }
+        line_select ( $edit_ref, $ref, $start_pos, $end_pos, 'white' );
+        $edit_ref->[PARENT]->async->editor_visual_search($exp, $ref, $end_pos, $not_first_call_ref );
+        return;
     }
-	return if ( $line_ref->[REF] == $start_ref and ! $can_restart);
-	# Ligne suivante
-	$line_ref = $line_ref->[NEXT];
-	while ( $line_ref and $line_ref->[REF] != $start_ref ) {
-	    $text = $line_ref->[TEXT];
-	    while ( $line_ref->[NEXT_SAME] ) {
-	    	$line_ref = $line_ref->[NEXT];
-		    $text .= $line_ref->[TEXT];
+    return if ( $line_ref->[REF] == $start_ref and ! $can_restart);
+    # Ligne suivante
+    $line_ref = $line_ref->[NEXT];
+    while ( $line_ref and $line_ref->[REF] != $start_ref ) {
+        $text = $line_ref->[TEXT];
+        while ( $line_ref->[NEXT_SAME] ) {
+            $line_ref = $line_ref->[NEXT];
+            $text .= $line_ref->[TEXT];
         }
         pos($text) = 0;
         if ( $text =~ m/($exp)/g ) {
-		    my $length    = length($1);
+            my $length    = length($1);
             my $end_pos   = pos($text);
             my $start_pos = $end_pos - $length;
-		    line_select ( $edit_ref, $line_ref->[REF], $start_pos, $end_pos, 'white' );
-		    $edit_ref->[PARENT]->async->editor_visual_search($exp, $line_ref->[REF], $end_pos, $not_first_call_ref );
-		    return;
+            line_select ( $edit_ref, $line_ref->[REF], $start_pos, $end_pos, 'white' );
+            $edit_ref->[PARENT]->async->editor_visual_search($exp, $line_ref->[REF], $end_pos, $not_first_call_ref );
+            return;
         }
-		$line_ref = $line_ref->[NEXT];
-		if ( ! $line_ref and $can_restart ) {
-		    $line_ref = $edit_ref->[SCREEN][FIRST];
-			$can_restart = 0;
-			$not_first_call_ref->{'can_restart'} = 0;
-	    }
+        $line_ref = $line_ref->[NEXT];
+        if ( ! $line_ref and $can_restart ) {
+            $line_ref = $edit_ref->[SCREEN][FIRST];
+            $can_restart = 0;
+            $not_first_call_ref->{'can_restart'} = 0;
+        }
     }
-	if ( $line_ref and $line_ref->[REF] == $start_ref ) {
-		$edit_ref->[PARENT]->async->editor_visual_search($exp, $start_ref, 0, $not_first_call_ref );
+    if ( $line_ref and $line_ref->[REF] == $start_ref ) {
+        $edit_ref->[PARENT]->async->editor_visual_search($exp, $start_ref, 0, $not_first_call_ref );
     }
 }
 
@@ -2114,7 +2217,7 @@ sub insert {
                 'initial'    => $initial_text,
                 'origin'     => $origin,
                 'sub_origin' => $sub_origin,
-				'sub_sub_origin' => $sub_sub_origin,
+                'sub_sub_origin' => $sub_sub_origin,
             }
         );
     }
@@ -2128,7 +2231,7 @@ sub insert {
             {
                 'origin'     => $origin,
                 'sub_origin' => $sub_origin,
-				'sub_sub_origin' => $sub_sub_origin,
+                'sub_sub_origin' => $sub_sub_origin,
             }
         );
     }
@@ -2238,7 +2341,7 @@ sub enter {                                 # <=> insert("\n")
             {
                 'origin'     => $origin,
                 'sub_origin' => $sub_origin,
-				'sub_sub_origin' => $sub_sub_origin,
+                'sub_sub_origin' => $sub_sub_origin,
             }
         );
     }
@@ -2347,20 +2450,20 @@ sub erase {
                 $number = 0;
             }
         }
-			if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
+            if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
 
-				# Redirection vers une fonction utilisateur
-				#$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-				$edit_ref->[PARENT]->redirect(
-					$sub_ref,
-					$edit_ref,
-					{
-						'origin'     => $origin,
-						'sub_origin' => $sub_origin,
-						'sub_sub_origin' => $sub_sub_origin,
-					}
-				);
-			}		
+                # Redirection vers une fonction utilisateur
+                #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
+                $edit_ref->[PARENT]->redirect(
+                    $sub_ref,
+                    $edit_ref,
+                    {
+                        'origin'     => $origin,
+                        'sub_origin' => $sub_origin,
+                        'sub_sub_origin' => $sub_sub_origin,
+                    }
+                );
+            }        
         return;
     }
 
@@ -2395,7 +2498,7 @@ sub erase {
             {
                 'origin'     => $origin,
                 'sub_origin' => $sub_origin,
-				'sub_sub_origin' => $sub_sub_origin,
+                'sub_sub_origin' => $sub_sub_origin,
             }
         );
     }
@@ -2414,7 +2517,7 @@ sub display {
     my $at = $options_ref->{'at'};
     my $ord;
     if ( defined $at and $at =~ /^ord_(\d+)/ ) {
-		print "Dans display , ord précisée : $1\n";
+        #print "Dans display , ord précisée : $1\n";
         $ord = $1;
     }
     elsif ( defined $at ) {
@@ -2453,12 +2556,11 @@ sub display {
     display_reference( $edit_ref, $ref, $ord, $options_ref->{'from'} );
 
     if ( defined $at and $at =~ /^ord_(\d+)/ ) {
-		print "\nDans display 1: liste des lignes \n";
-		my $line_ref = $edit_ref->[SCREEN][FIRST];
-		while ( defined $line_ref ) {
-		    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
-			$line_ref = $line_ref->[NEXT];
-	    }
+        my $line_ref = $edit_ref->[SCREEN][FIRST];
+        while ( defined $line_ref ) {
+        #    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+            $line_ref = $line_ref->[NEXT];
+        }
     }
 
     #Appel en boucle pour affichage de toutes les lignes
@@ -2467,34 +2569,34 @@ sub display {
 
 # On a fini l'affichage du bas, mais il reste peut-être des lignes à afficher en haut de $top_line_ref
     display_top_of_the_screen($edit_ref);
-	
-	screen_check_borders ( $edit_ref ) unless ( $options_ref->{'no_check'} );
+    
+    screen_check_borders ( $edit_ref ) unless ( $options_ref->{'no_check'} );
 
     if ( defined $at and $at =~ /^ord_(\d+)/ ) {
-		print "\nDans display 2 : liste des lignes \n";
-		my $line_ref = $edit_ref->[SCREEN][FIRST];
-		while ( defined $line_ref ) {
-		    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
-			$line_ref = $line_ref->[NEXT];
-	    }
+        my $line_ref = $edit_ref->[SCREEN][FIRST];
+        while ( defined $line_ref ) {
+        #    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+            $line_ref = $line_ref->[NEXT];
+        }
     }
 
     return update_vertical_scrollbar($edit_ref);
 }
 
 sub screen_check_borders {
-		my ( $edit_ref ) = @_;
+        my ( $edit_ref ) = @_;
 
-		my $line_ref = $edit_ref->[SCREEN][LAST];
-		my $bottom = $edit_ref->[SCREEN][HEIGHT];
-		if ( $line_ref->[ORD] < $bottom - 5 ) {
-		    screen_move ( $edit_ref, 0, $bottom - $line_ref->[ORD] - 5 );
-	    }
-		$line_ref = $edit_ref->[SCREEN][FIRST];
-		my $top = $line_ref->[ORD] - $line_ref->[HEIGHT];
-		if ( $top > 2 ) { # A variabiliser
-		    screen_move ( $edit_ref, 0, 2 - $top );
-	    }
+
+        my $line_ref = $edit_ref->[SCREEN][LAST];
+        my $bottom = $edit_ref->[SCREEN][HEIGHT];
+        if ( $line_ref->[ORD] < $bottom - 5 ) {
+            screen_move ( $edit_ref, 0, $bottom - $line_ref->[ORD] - 5 );
+        }
+        $line_ref = $edit_ref->[SCREEN][FIRST];
+        my $top = $line_ref->[ORD] - $line_ref->[HEIGHT];
+        if ( $top > 2 ) { # A variabiliser
+            screen_move ( $edit_ref, 0, 2 - $top );
+        }
 }
 
 sub display_reference {
@@ -2510,7 +2612,7 @@ sub display_reference {
         }
         my $y;
         if ( !$from or $from eq 'top' ) {
-		    # Par défaut, on affiche à partir du haut
+            # Par défaut, on affiche à partir du haut
             $y = $ord - $line_ref->[ORD] + $line_ref->[HEIGHT];
         }
         elsif ( $from eq 'middle' ) {
@@ -2530,7 +2632,7 @@ sub display_reference {
         screen_move( $edit_ref, 0, $y );
     }
     my ( $top_ord, $bottom_ord ) =  get_line_ords( $edit_ref->[SCREEN][LAST] );
-	print "Display reference : top_ord = $top_ord, bottom_ord = $bottom_ord\n";
+    #print "Display reference : top_ord = $top_ord, bottom_ord = $bottom_ord\n";
 
 }
 
@@ -2606,7 +2708,7 @@ sub cursor_set {
     if ( !defined($ref) and !ref $options_ref ) {
         position_cursor_in_line( $edit_ref,
             $edit_ref->[CURSOR][LINE_REF], $options_ref );
-		return cursor_get ( $edit_ref );
+        return cursor_get ( $edit_ref );
     }
 
     # Recherche du positionnement vertical (ligne fichier ou ligne écran)
@@ -2659,14 +2761,16 @@ sub cursor_set {
         position_cursor_in_line( $edit_ref, $line_ref, $position,
             $keep_virtual );
     }
+    #print "Avant cursor_make_visible\n";
     cursor_make_visible ( $edit_ref ) unless ( ref $options_ref and $options_ref->{'do_not_make_visible'} );
+
     return cursor_get ($edit_ref);
 }
 
 sub cursor_set_shape {
     my ( $edit_ref, $shape ) = @_;
-	
-	$edit_ref->[GRAPHIC]->cursor_set_shape($shape);
+    
+    $edit_ref->[GRAPHIC]->cursor_set_shape($shape);
 }
 
 sub search_line_ref_and_type {
@@ -2731,9 +2835,9 @@ sub get_line_ref_from_ord {
         }
         $line_ref = $line_ref->[NEXT];
     }
-	# Vérifier que c'est toujours ce que l'on souhaite
-	return $self->[SCREEN][LAST];
-	
+    # Vérifier que c'est toujours ce que l'on souhaite
+    return $self->[SCREEN][LAST];
+    
     return;    # Pas trouvé
 }
 
@@ -2814,6 +2918,7 @@ sub position_cursor_in_display {
 
     select_text_element( $edit_ref, $text_ref, $position );
 
+
     my $increment =
       $edit_ref->[GRAPHIC]->length_text(
         substr( $text_ref->[TEXT], 0, $cursor_ref->[POSITION_IN_TEXT] ),
@@ -2827,15 +2932,23 @@ sub position_cursor_in_display {
 
     # Positionnement correct du tag "bottom'
     # ==>  Couteux : à ne faire que si la "hauteur" du curseur à changé
-    if ( $line_ref != $previous_line_ref ) {
+    if ( $line_ref != $previous_line_ref ) { # zzzzz
 
 #print "Tag BOTTOM de $cursor_ref->[LINE_REF][ORD] à $edit_ref->[SCREEN][LAST][ORD]\n";
+
+        if ( ! defined $cursor_ref->[LINE_REF][ORD] ) {
+           print STDERR "Abstract : problème à venir :\n",
+           "\t\$cursor_ref = $cursor_ref\n",
+           "\t\$cursor_ref->[LINE_REF] = $cursor_ref->[LINE_REF]\n",
+           "\t\$cursor_ref->[LINE_REF][TEXT] = $cursor_ref->[LINE_REF][TEXT]\n";
+       }
+           
         $edit_ref->[GRAPHIC]->position_bottom_tag_for_text_lower_than(
             $cursor_ref->[LINE_REF][ORD],
             $edit_ref->[SCREEN][LAST][ORD],
         );
     }
-
+    
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'cursor_set_last'} ) {
 
         # Redirection vers une fonction utilisateur
@@ -2874,19 +2987,19 @@ sub cursor_get {
     while ( $line_ref->[PREVIOUS_SAME] ) {
         $line_ref = $line_ref->[PREVIOUS];
         $position += length( $line_ref->[TEXT] );
-		$count += 1;
+        $count += 1;
     }
     my $ref = $cursor_ref->[LINE_REF][REF];
     if (wantarray) {
         return (
             $ref, 
-			$position,
+            $position,
             $ref . '_' . $count, 
-			$cursor_ref->[POSITION_IN_DISPLAY],
+            $cursor_ref->[POSITION_IN_DISPLAY],
             $cursor_ref->[ABS],
-		    $cursor_ref->[VIRTUAL_ABS],
-			$cursor_ref->[POSITION_IN_TEXT],
-			$cursor_ref->[LINE_REF][ORD],
+            $cursor_ref->[VIRTUAL_ABS],
+            $cursor_ref->[POSITION_IN_TEXT],
+            $cursor_ref->[LINE_REF][ORD],
         );
     }
     else {
@@ -3059,37 +3172,37 @@ sub line_deselect {
 
     #print "Dans line_deselect : $ref\n";
     $self->[GRAPHIC]->delete_whose_tag( 'L' . $ref );
-	
+    
 }
 
 sub line_set {
     my ( $edit_ref, $ref, $text ) = @_;
 
-    print "Dans line_set : $ref, $text\n";
+    #print "Dans line_set : $ref, $text\n";
     return if ( !defined $ref );
 
-	$edit_ref->[PARENT]->modify_line( $ref, $text );
-	my $line_ref = get_line_ref_from_ref ( $edit_ref, $ref );
-	if ( defined $line_ref ) {
-			#print "La ligne est à l'écran, il faut la réafficher\n";
-			my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
-			suppress_from_screen_line( $edit_ref, $line_ref );
+    $edit_ref->[PARENT]->modify_line( $ref, $text );
+    my $line_ref = get_line_ref_from_ref ( $edit_ref, $ref );
+    if ( defined $line_ref ) {
+            #print "La ligne est à l'écran, il faut la réafficher\n";
+            my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
+            suppress_from_screen_line( $edit_ref, $line_ref );
 
-			$line_ref = delete_text_in_line( $edit_ref, $line_ref );
-			$line_ref->[TEXT] = $text;
-			create_text_in_line( $edit_ref, $line_ref );
+            $line_ref = delete_text_in_line( $edit_ref, $line_ref );
+            $line_ref->[TEXT] = $text;
+            create_text_in_line( $edit_ref, $line_ref );
 
-			my $bottom_line_ref =
-			  display_line_from_top( $edit_ref, $line_ref, $top_ord );
-			my ( $new_top_ord, $new_bottom_ord ) = get_line_ords($bottom_line_ref);
+            my $bottom_line_ref =
+              display_line_from_top( $edit_ref, $line_ref, $top_ord );
+            my ( $new_top_ord, $new_bottom_ord ) = get_line_ords($bottom_line_ref);
 
-			if ( $bottom_line_ref->[ORD] != $bottom_ord ) {
+            if ( $bottom_line_ref->[ORD] != $bottom_ord ) {
 
-				#print "Move de ", $bottom_line_ref->[ORD] - $bottom_ord, "\n";
-				move_bottom( $edit_ref, $bottom_line_ref->[ORD] - $bottom_ord,
-					$bottom_line_ref );
-			}
-	}
+                #print "Move de ", $bottom_line_ref->[ORD] - $bottom_ord, "\n";
+                move_bottom( $edit_ref, $bottom_line_ref->[ORD] - $bottom_ord,
+                    $bottom_line_ref );
+            }
+    }
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
 
         # Redirection vers une fonction utilisateur
@@ -3100,10 +3213,10 @@ sub line_set {
             {
                 'origin'     => $origin,
                 'sub_origin' => $sub_origin,
-				'sub_sub_origin' => $sub_sub_origin,
+                'sub_sub_origin' => $sub_sub_origin,
             }
         );
-    }	
+    }    
 }
 
 sub line_select {
@@ -3113,26 +3226,26 @@ sub line_select {
 
     my ( $force, $color );
     if ( defined $options_ref ) {
-		if ( ref $options_ref ) {
-		    $force = $options_ref->{'force'};
-	    }
-		else {
-		    $color = $options_ref;
-		}
+        if ( ref $options_ref ) {
+            $force = $options_ref->{'force'};
+        }
+        else {
+            $color = $options_ref;
+        }
     }
     #print "In  line_select : $self|$ref|$first|$last|\n";
     my $line_ref = get_line_ref_from_ref( $self, $ref );
 
     if ( !$line_ref )
     {    # La ligne fichier n'est pas à l'écran, on ne peut pas la sélectionner
-		if ( ! $force ) {
+        if ( ! $force ) {
             print STDERR "Sélection impossible, ligne non à l'écran\n";
             return;
-	    }
-		else {
-		    display( $self, $ref, { 'at' => $force } );
-			return line_select ( $self, $ref, $first, $last, $options_ref );
-	    }
+        }
+        else {
+            display( $self, $ref, { 'at' => $force } );
+            return line_select ( $self, $ref, $first, $last, $options_ref );
+        }
     }
     if ( !defined $first ) {
         $first = 0;
@@ -3149,7 +3262,7 @@ sub line_select {
     if ( $first < 0 ) {
         if ( my $previous_ref = $line_ref->[PREVIOUS] ) {
             my $new_ref     = $previous_ref->[REF];
-		    # Le +1 correspond au retour chariot
+            # Le +1 correspond au retour chariot
             my $length_text =
               length( $self->[PARENT]->get_text_from_ref($new_ref) ) + 1;
             my $new_first = $length_text + $first;
@@ -3168,7 +3281,7 @@ sub line_select {
         }
         if ($next_ref) {
             my $new_ref = $next_ref->[REF];
-			# Le -1 correspond au retour chariot
+            # Le -1 correspond au retour chariot
             return $self->line_select(
                 $new_ref,
                 $first - $length - 1,
@@ -3223,8 +3336,8 @@ sub line_select {
                 $return_value .=
                   substr( $text, $first, $length - $first ) . "\n";
             }
-			# mises à jour pour display suivante (éventuellement)
-		    $first = 0;
+            # mises à jour pour display suivante (éventuellement)
+            $first = 0;
             $last -= $length + 1;
         }
         $self->[GRAPHIC]
@@ -3242,10 +3355,10 @@ sub line_top_ord {
     return if ( !defined $ref );
 
     my $line_ref = get_line_ref_from_ref( $self, $ref );
-	
-	return if ( ! $line_ref );
-	
-	return $line_ref->[ORD] - $line_ref->[HEIGHT];
+    
+    return if ( ! $line_ref );
+    
+    return $line_ref->[ORD] - $line_ref->[HEIGHT];
 }
 
 sub line_bottom_ord {
@@ -3254,13 +3367,13 @@ sub line_bottom_ord {
     return if ( !defined $ref );
 
     my $line_ref = get_line_ref_from_ref( $self, $ref );
-	return if ( ! $line_ref );
-	
-	while ( $line_ref->[NEXT_SAME] ) {
-		$line_ref = $line_ref->[NEXT];
+    return if ( ! $line_ref );
+    
+    while ( $line_ref->[NEXT_SAME] ) {
+        $line_ref = $line_ref->[NEXT];
     }
-	
-	return $line_ref->[ORD];
+    
+    return $line_ref->[ORD];
 }
 
 
@@ -3318,7 +3431,7 @@ sub bind_key_global {
     $key{$key} = eval $string;
 
     #$key{$key} = eval "\\&$package::$sub";
-    print "key_code =$key{$key}\n";
+    #print "key_code =$key{$key}\n";
     return;
 }
 
@@ -3600,13 +3713,13 @@ sub display_bottom_of_the_screen
         #print "Lu :$line_ref->[TEXT]\n";
 
         if ($line_ref) {
-		   #print "Dans display_bottom_of_the_screen : avant display_line_from_top...\n";
+           #print "Dans display_bottom_of_the_screen : avant display_line_from_top...\n";
             $last_ref =
               display_line_from_top( $edit_ref, $line_ref, $last_ref->[ORD] );
             $screen_ref->[LAST] = $last_ref;
 
            #print "Dans display_bottom_of_the_screen : avant add_tag_complete...", $last_ref->[REF], "\n";
-		   #Pbm sur la ref 10
+           #Pbm sur la ref 10
             # Ajout du tag 'bottom'
             add_tag_complete( $edit_ref, $last_ref, 'bottom' );
         }
@@ -3650,6 +3763,7 @@ sub display_line_from_top {
       display_with_tag( $edit_ref, $line_ref, $ord, ['just_created'] );
     while ( defined $still_to_display_ref ) {
         $graphic->move_tag( 'just_created', 0, $overwrite_ref->[HEIGHT] );
+        
         $graphic->delete_tag('just_created');
         $ord += $overwrite_ref->[HEIGHT];
         $overwrite_ref->[ORD] = $ord;
@@ -3658,15 +3772,18 @@ sub display_line_from_top {
           display_with_tag( $edit_ref, $still_to_display_ref, $ord,
             ['just_created'] );
     }
+    #print "Avant move \$overwrite_ref->[HEIGHT] = $overwrite_ref->[HEIGHT]\n";
     $graphic->move_tag( 'just_created', 0, $overwrite_ref->[HEIGHT] );
+    #print "Après move \$overwrite_ref->[HEIGHT] = $overwrite_ref->[HEIGHT]\n";
     $graphic->delete_tag('just_created');
     $overwrite_ref->[ORD] = $ord + $overwrite_ref->[HEIGHT];
 
-    #		print "D|", $overwrite_ref->[ORD] - $overwrite_ref->[HEIGHT], "|",
-    #		    $overwrite_ref->[HEIGHT], "|", $overwrite_ref->[ORD], "|",
-    #			$overwrite_ref->[TEXT], "\n";
-
+    #        print "D|", $overwrite_ref->[ORD] - $overwrite_ref->[HEIGHT], "|",
+    #            $overwrite_ref->[HEIGHT], "|", $overwrite_ref->[ORD], "|",
+    #            $overwrite_ref->[TEXT], "\n";
+    #print "Fin display_line_from_top \$line_ref : $line_ref\n\t\$line_ref->[ORD] = $line_ref->[ORD]\n";
     check_cursor( $edit_ref, $line_ref );
+    #print "Fin display_line_from_top \$overwrite_ref : $overwrite_ref\n\t\$overwrite_ref->[ORD] = $overwrite_ref->[ORD]\n";
     return $overwrite_ref;
 }
 
@@ -3708,9 +3825,9 @@ sub add_tag {
 
     my $text_ref = $line_ref->[FIRST];
     while ($text_ref) {
-#		if ( $debug ) {
-#		    print "TAG |$tag|, \$text_ref->[ID]", $text_ref->[ID], "\n";
-#	    }
+#        if ( $debug ) {
+#            print "TAG |$tag|, \$text_ref->[ID]", $text_ref->[ID], "\n";
+#        }
         $self->[GRAPHIC]->add_tag( $tag, $text_ref->[ID], $debug );
         $text_ref = $text_ref->[NEXT];
     }
@@ -3761,6 +3878,7 @@ sub display_with_tag {
         }
         $text_ref = $text_ref->[NEXT];
     }
+    $line_ref->[ORD] = $ord; # zzzz
     return $line_ref;
 }
 
@@ -3806,13 +3924,17 @@ sub focus {
 
 sub on_top_ref_editor {
     my ( $self, $zone ) = @_;
-	
-	if ( ref $zone ) {
-		$zone = $zone->{'name'};
+    
+    if ( ref $zone ) {
+        $zone = $zone->{'name'};
     }
-	print "Dans on_top_ref_editor : tid = ", threads->tid, "\n";
+    #print "Dans on_top_ref_editor : tid = ", threads->tid, "\n";
     my $edit_ref = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
-	return $edit_ref->[UNIQUE];
+    if ( ! defined $edit_ref ) {
+        print STDERR "No editor found on top of zone $zone\n";
+        return;
+    }
+    return $edit_ref->[UNIQUE];
 }
 
 sub on_top {
@@ -3822,42 +3944,42 @@ sub on_top {
     #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
 
     my ( $graphic, $old_editor ) = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
-	my $conf_ref;
+    my $conf_ref;
     if ( defined $graphic and ref $graphic eq 'Text::Editor::Easy::Graphic' ) {
         #return if ( $graphic == $self->[GRAPHIC] );
         if ( defined $old_editor ) {
-		    #$call_id = on_focus_lost ( $old_editor );
-			$conf_ref = on_focus_lost ( $old_editor );
-		    $old_editor = $old_editor->[PARENT];
-	    }
-		if ( $graphic != $self->[GRAPHIC] ) {
+            #$call_id = on_focus_lost ( $old_editor );
+            $conf_ref = on_focus_lost ( $old_editor );
+            $old_editor = $old_editor->[PARENT];
+        }
+        if ( $graphic != $self->[GRAPHIC] ) {
 
         #print "Réel changement de on_top...$graphic|", $self->[GRAPHIC], "|\n";
             $graphic->forget;
-	    }
+        }
     }
     $self->[GRAPHIC]->on_top;
 
 # Recherche de tous les éditeurs qui ont "on_top" comme évènements : à revoir (un peu long)
 # Appel en asynchrone (modification pour pourvoir partager des variables compliquées dans Tab.pm)
 #for my $abstract_ref ( values %abstract ) {
-#		if ( my $sub_ref = $abstract_ref->[REDIRECT]{'on_top_last'} ) {
-#				$abstract_ref->[PARENT]->redirect( $sub_ref, $abstract_ref, {
-#						'editor' => $self->[UNIQUE],
-#						'zone' => $zone,
-#						}
-#				);
-#		}
+#        if ( my $sub_ref = $abstract_ref->[REDIRECT]{'on_top_last'} ) {
+#                $abstract_ref->[PARENT]->redirect( $sub_ref, $abstract_ref, {
+#                        'editor' => $self->[UNIQUE],
+#                        'zone' => $zone,
+#                        }
+#                );
+#        }
 #}
 
-    print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
+    #print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
     return if ( !defined $zone );
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref
         and my $data_ref = $event_ref->{'on_top_editor_change'} )
     {
         #$data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $call_id );
-		$data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
+        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
     }
 }
 
@@ -3939,11 +4061,11 @@ sub decrease_line_space {
 }
 
 sub paste {
-		my ( $edit_ref ) = @_;
-	     		
-		my $string = $edit_ref->[GRAPHIC]->clipboard_get;
-		insert($edit_ref, $string);
-}		
+        my ( $edit_ref ) = @_;
+                 
+        my $string = $edit_ref->[GRAPHIC]->clipboard_get;
+        insert($edit_ref, $string);
+}        
 
 sub resize_all {
 
@@ -4001,34 +4123,25 @@ sub exit {
 
 sub on_focus_lost {
     my ( $edit_ref, $sync ) = @_;
-	
-	#print "Dans focus_lost : FIRST =\n\t", $edit_ref->[SCREEN][FIRST][TEXT], "\n";
-	# Il faut : la première ligne à l'écran, sa position (ord et abs car décalage possible)
-	# Il faut la position du curseur (ligne + position dans la ligne)
-	# Il faut le mode wrap
-	# La taille de la zone et la zone elle-même sont connues pas ailleurs
-	my $screen_ref = $edit_ref->[SCREEN];
-	my $first_line_ref = $screen_ref->[FIRST];
-	my ( $cursor_line_ref, $cursor_pos ) = cursor_get ($edit_ref );
-	
-	my $caller = $edit_ref->[PARENT];
-	#if ( ! defined $sync ) {
-	#	$caller = $caller->async;
-    #}
-	#return $caller->calc_conf( {
-	return {
+    
+    # Il faut : la première ligne à l'écran, sa position (ord et abs car décalage possible)
+    # Il faut la position du curseur (ligne + position dans la ligne)
+    # Il faut le mode wrap
+    # La taille de la zone et la zone elle-même sont connues pas ailleurs
+    my $screen_ref = $edit_ref->[SCREEN];
+    my $first_line_ref = $screen_ref->[FIRST];
+    my ( $cursor_line_ref, $cursor_pos ) = cursor_get ($edit_ref );
+    
+    my $caller = $edit_ref->[PARENT];
+
+    return {
         'first_line_ref' => $first_line_ref->[REF],
-		'first_line_ord' => $first_line_ref->[ORD],
-		'offset' => $screen_ref->[VERTICAL_OFFSET],
-		'cursor_line_ref' => $cursor_line_ref,
-		'cursor_pos' => $cursor_pos,
-		'wrap' => $screen_ref->[WRAP],
-    #}, $sync );
-	};
-	
-	# Le file manager, après avoir fini le calcul des 2 lignes, renvoie à son tour ses informations au thread Data
-	# On dispose alors de toute la configuration de tous les éditeurs dans Data en minimisant les traitements dans
-	# le thread graphic
+        'first_line_ord' => $first_line_ref->[ORD],
+        'offset' => $screen_ref->[VERTICAL_OFFSET],
+        'cursor_line_ref' => $cursor_line_ref,
+        'cursor_pos' => $cursor_pos,
+        'wrap' => $screen_ref->[WRAP],
+    };
 }
 
 sub debug_display_lines {
@@ -4036,39 +4149,60 @@ sub debug_display_lines {
 
     print "Dans debug_display_lines\n";
     my $line_ref = $edit_ref->[SCREEN][FIRST];
-	while ( defined $line_ref ) {
-		print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
-		$line_ref = $line_ref->[NEXT];
-	}
+    while ( defined $line_ref ) {
+        print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
+        $line_ref = $line_ref->[NEXT];
+    }
 }
 
 sub graphic_kill {
     my ( $self ) = @_;
-	
-	print "Dans graphic_kill\n";
-	$self->[GRAPHIC]->kill;	
-	# Suppression des fontes, structures...
-	
-	# Evènement de Tab : on_editor_destroy
-	my $zone = $self->[GRAPHIC]->get_zone;
+    
+    print "Dans graphic_kill\n";
+    $self->[GRAPHIC]->kill;    
+    # Suppression des fontes, structures...
+    
+    # Evènement de Tab : on_editor_destroy
+    my $zone = $self->[GRAPHIC]->get_zone;
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
         $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, {
-				'name' => $self->[PARENT]->name ,
-		    } );
+                'name' => $self->[PARENT]->name ,
+            } );
     }
 }
 
 sub on_editor_destroy { # zone event called on a Zone object
     my ( $self, $zone, $name ) = @_;
-	
-	#print "Dans on_editor_destroy $zone|$name\n";
-	return if ( ! defined $zone );
+    
+    #print "Dans on_editor_destroy $zone|$name\n";
+    return if ( ! defined $zone );
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
         $data_ref->{'sub_ref'}->( undef, $data_ref->{'tab_ref'}, {'name' => $name} );
     }
 }
+
+sub growing_check {
+    my ( $self, $size_increment, $end ) = @_;
+    
+    #print "Dans growing_check $self, $size_increment, $end\n";
+    Text::Editor::Easy::Abstract::Key::end_file( $self, 0 );
+}
+
+sub set_at_end {
+    my ( $self ) = @_;
+    
+    $self->[AT_END] = 1;
+}
+
+
+sub unset_at_end {
+    my ( $self ) = @_;
+    
+    $self->[AT_END] = 0;
+}
+
 
 =head1 FUNCTIONS
 
@@ -4412,8 +4546,6 @@ Prevent space to appear at the bottom (after the last line) or at the top (befor
 Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
 
 =cut
 

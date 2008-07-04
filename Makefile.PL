@@ -21,6 +21,7 @@ WriteMakefile(
 	'Syntax::Highlight::Perl' => 0,
 	'Fcntl' => 0,
 	'SDBM_File' => 0,
+    'File::Spec' => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Text-Editor-Easy-*' },

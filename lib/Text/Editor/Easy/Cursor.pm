@@ -9,11 +9,11 @@ Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed b
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode

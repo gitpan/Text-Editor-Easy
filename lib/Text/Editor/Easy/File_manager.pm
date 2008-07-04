@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 =head1 SYNOPSIS
 
@@ -47,11 +47,13 @@ cheap hard drives, most people don't know any more what can contain 1 Go of text
 
 =cut
 
-#use Text::Editor::Easy::Comm; Interruptible task not yet done, so Comm is still useless
+use Text::Editor::Easy::Comm;
 
 use Scalar::Util qw(refaddr);
 use Data::Dump qw(dump);
 use Devel::Size qw(size total_size);
+
+my $one_more_line;
 
 use constant {
     FILE_DESC    => 0, # Descripteur de fichier, rattaché à un segment container
@@ -60,7 +62,7 @@ use constant {
     MODIFIED     => 3, # A supprimer
     WHO          => 4,
     REF          => 5, # Garde le numéro de la dernière référence donnée
-    HASH_REF     => 6
+    PARENT => 6,
     , # Associe un simple entier à une référence de tableau correspondant à la ligne
     ROOT        => 7,
     NO_CREATION => 8,    # Si true, pas de création de lignes
@@ -72,8 +74,9 @@ use constant {
     GROWING     => 12,
     TO_DELETE   => 13,
     SAVED_INFO  => 14,
-	UNIQUE_REF => 15,
-
+    UNIQUE_REF => 15,
+    HASH_REF     => 16,
+    
     UNTIL => 0, # Mémorisation de l'appel initial à until (procédure read_until)
                 # On mémorise ici la référence  ne pas dépasser
 
@@ -84,7 +87,7 @@ use constant {
     PREVIOUS   => 4,
 
     # REF => 5,
-    PARENT      => 6,
+    #PARENT      => 6,
     TYPE        => 7,    # "container","empty", "line"
     FIRST       => 8,
     LAST        => 9,
@@ -92,6 +95,7 @@ use constant {
     DIRTY       => 11,
     FILE_NAME   => 12,
     LINE_NUMBER => 13,
+
 
     # Gestion de LINE_NUMBER
     LAST_COMPUTE => 0,
@@ -107,6 +111,8 @@ sub init_file_manager {
     #print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$unique_ref|$file_name\n";
 
     $file_manager_ref->[UNIQUE_REF]  = $unique_ref;
+    $file_manager_ref->[PARENT] = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
+    Text::Editor::Easy::Comm::set_ref ($file_manager_ref->[PARENT], $unique_ref);
 
     my $file_desc;
 
@@ -138,19 +144,43 @@ sub init_file_manager {
     $file_manager_ref->[ROOT] = $segment_ref;
     if ( defined $save_info ) {
 
-        #	print "Save info = " dump ($save_info), "\n";
+        #    print "Save info = " dump ($save_info), "\n";
         $file_manager_ref->[SAVED_INFO] = $save_info;
     }
 
     $file_manager_ref->[LAST_UPDATE] = 1;
     if ( defined $growing_file ) {
         $file_manager_ref->[GROWING] = $growing_file;
+        $file_manager_ref->[PARENT]->async->repeat_instance_method(1, "growing_update");
     }
     else {    #Avoid warnings
         $file_manager_ref->[GROWING] = 0;
     }
 
     return $file_manager_ref;
+}
+
+sub growing_update {
+    my ( $self ) = @_;
+    
+    return if ( ! $self->[GROWING] );
+
+    my $segment_ref = $self->[ROOT];
+    my $file_name = $segment_ref->[FILE_NAME];
+    my $old_size = $segment_ref->[SEEK_END];
+    
+    my $actual_size =   ( stat ($file_name ) )[7] || ( stat ($segment_ref->[FILE_DESC] ) )[7];
+
+    #print "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
+    
+    if ( $actual_size != $old_size ) {
+        CORE::close $segment_ref->[FILE_DESC];
+        open( $segment_ref->[FILE_DESC], $file_name );
+        $self->[FILE_DESC] = $segment_ref->[FILE_DESC];
+
+        $segment_ref->[SEEK_END] = $actual_size;
+        $self->[PARENT]->async->growing_check( $actual_size - $old_size, $actual_size );
+    }
 }
 
 sub display {
@@ -281,16 +311,16 @@ sub read_until2 {
             $line_ref = read_line_ref( $self, $who );
         }
     }
-	else {
-		$line_ref = read_line_ref( $self, $who );
+    else {
+        $line_ref = read_line_ref( $self, $who );
     }
     if ( !$line_ref ) {    # On est à la fin du fichier
         $line_ref = read_line_ref( $self, $who );
     }
     if ( !$line_ref ) {
-			return; #A la fin du fichier
-	}
-	my $stop_ref = $options_ref->{'line_stop'};
+            return; #A la fin du fichier
+    }
+    my $stop_ref = $options_ref->{'line_stop'};
     if ( $line_ref->[REF] and $stop_ref and $line_ref->[REF] == $stop_ref ) {
 
         # "Démémorisation"
@@ -719,20 +749,53 @@ sub next_ {
             if ( !$segment_ref->[PREVIOUS][REF] ) {
 
 # Normalement impossible car les segments sans référence ne sont pas pointés par les segments référencés
-                print "2 segments sans réf se suivent\n";
+                print STDERR "2 segments sans réf se suivent\n";
 
             }
         }
         $line_ref->[NEXT] = $segment_ref->[NEXT];   # Peut être affectation vide
         $line_ref->[SEEK_START] = $segment_ref->[SEEK_END];
         $line_ref->[PARENT]     = $segment_ref->[PARENT];
-        return ( read_($line_ref) );
+        my $new_line_ref = read_($line_ref);
+        return $new_line_ref if ( defined $new_line_ref );
+
+        print STDERR "Bidouille à virer... forçage de la taille du segement PARENT à celle du segment fils\n";
+        $segment_ref->[PARENT][SEEK_END] = $segment_ref->[SEEK_END];
+        return;
     }
     if ( $segment_ref->[PARENT] ) {
         return ( next_( $segment_ref->[PARENT] ) );
     }
+    
+    # Pas de ligne suivante dans le fichier mais elle a peut-être était lue avec la précédente (fichier terminé par un retour chariot)
+    #if (   (  $segment_ref->[PARENT]
+    #            and $segment_ref->[PARENT][SEEK_END] == $segment_ref->[SEEK_END]  ) 
+    #    or ! $segment_ref->[PARENT] ) {
+    if ( ! $segment_ref->[PARENT] ) {
+        return if ( ! $one_more_line );
+        
+        $one_more_line = 0;
+        my $line_ref;
+        if ( $segment_ref->[REF] ) {
+            $line_ref->[PREVIOUS] = $segment_ref;
+        }
+        elsif ( $segment_ref->[PREVIOUS] ) {
+            $line_ref->[PREVIOUS] = $segment_ref->[PREVIOUS];
+            if ( !$segment_ref->[PREVIOUS][REF] ) {
 
-    # Pas de ligne suivante
+# Normalement impossible car les segments sans référence ne sont pas pointés par les segments référencés
+                print STDERR "2 segments sans réf se suivent\n";
+
+            }
+        }
+        $line_ref->[NEXT] = $segment_ref->[NEXT];   # Peut être affectation vide
+        $line_ref->[SEEK_START] = $segment_ref->[SEEK_END];
+        $line_ref->[PARENT]     = $segment_ref->[PARENT];
+        $line_ref->[TEXT] = "";
+        $line_ref->[SEEK_END] = $segment_ref->[SEEK_END];
+        return $line_ref;
+    }
+        
     return;                                         # Renvoie undef
 }
 
@@ -807,7 +870,13 @@ sub read_ {
     my $file_desc = $line_ref->[PARENT][FILE_DESC];
     seek $file_desc, $line_ref->[SEEK_START], 0;
     $line_ref->[TEXT] = readline $file_desc;
-    chomp $line_ref->[TEXT];
+    
+    if ( ! defined $line_ref->[TEXT] ) {
+        print STDERR "Problème de cohérence : appel à read_ après la fin de fichier, thread ", threads->tid, "\n";
+        return;
+    }
+    
+    $one_more_line = chomp $line_ref->[TEXT];
 
     # Suppression des retours chariots
     $line_ref->[TEXT] =~ s/\r//g;
@@ -1101,9 +1170,9 @@ sub save_info {
     my ( $self, $info, $key ) = @_;
 
     if ( defined $key ) {
-		$self->[SAVED_INFO]{$key} = $info;
+        $self->[SAVED_INFO]{$key} = $info;
     }
-	else {
+    else {
         $self->[SAVED_INFO] = $info;
     }
 }
@@ -1112,177 +1181,175 @@ sub load_info {
     my ( $self, $key ) = @_;
 
     if ( defined $key ) {
-		if ( ref ($self->[SAVED_INFO] ) eq 'HASH' ) {
-		    return $self->[SAVED_INFO]{$key};
-	    }
-		else {
-		    print STDERR "Saved_info in File_manager is not a hash\n";
-			return;
-	    }
+        if ( ref ($self->[SAVED_INFO] ) eq 'HASH' ) {
+            return $self->[SAVED_INFO]{$key};
+        }
+        else {
+            print STDERR "Saved_info in File_manager is not a hash\n";
+            return;
+        }
     }
     return $self->[SAVED_INFO];
 }
 
 sub editor_number {
     my ( $self, $number, $options_ref ) = @_;
-	
-	print "Dans editor_number, reçu : NUMBER $number\n";
+    
+    #print "Dans editor_number, reçu : NUMBER $number\n";
 
     my $check_every = 20;
-	my $lazy;
-	if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+    my $lazy;
+    if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
         $check_every = $options_ref->{'check_every'} || 20;
-	    $lazy = $options_ref->{'lazy'};
+        $lazy = $options_ref->{'lazy'};
     }
 
-	my $indice = 0;
-	# 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
+    my $indice = 0;
+    # 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
     my $who = 'I' . $indice;
     while  ( defined $self->[DESC]{$who} ) {
-		$indice += 1;
-		$who = 'I' . $indice;
+        $indice += 1;
+        $who = 'I' . $indice;
     }
     $self->[DESC]{$who} = ();
-	
+    
     my $text = read_next($self, $who);
 
     $indice = 0;
     my $current;
     while ( defined($text) ) {
         $current += 1;
-		$indice += 1;
+        $indice += 1;
         if ( $current == $number ) {
             my $new_ref = create_ref_current($self, $who);
-			print "Texte de la ligne : |$text|\n";
+            #print "Texte de la ligne : |$text|\n";
             save_line_number( $self, $who, $new_ref, $number );
-			# Désinit
-			$self->[DESC]{$who} = undef;
+            # Désinit
+            $self->[DESC]{$who} = undef;
             return $new_ref;
         }
-		if ( $indice == $check_every ) {
-		    $indice = 0;
-			if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
-				return;
-		    }
+        if ( $indice == $check_every ) {
+            $indice = 0;
+            if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
+                return;
+            }
             if ( Text::Editor::Easy::Comm::anything_for_me() ) {
-				#return if ( Text::Editor::Easy::Comm::have_task_done() );
-				Text::Editor::Easy::Comm::have_task_done()
-		    }
-	    }
+                #return if ( Text::Editor::Easy::Comm::have_task_done() );
+                Text::Editor::Easy::Comm::have_task_done()
+            }
+        }
         $text = read_next($self, $who);
     }
 }
 
 sub editor_search {
     my ( $self, $regexp, $options_ref ) = @_;
-	
+    
     my $check_every = 20;
-	my ( $lazy, $who, $start_line, $start_pos, $stop_line, $stop_pos );
-	if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+    my ( $lazy, $who, $start_line, $start_pos, $stop_line, $stop_pos );
+    if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
         $check_every = $options_ref->{'check_every'} || 20;
-	    $lazy = $options_ref->{'lazy'};
-		$who = $options_ref->{'thread'};
-		$start_line = $options_ref->{'start_line'};
-		$start_pos = $options_ref->{'start_pos'};
-		$stop_line = $options_ref->{'stop_line'};
-		$stop_pos = $options_ref->{'stop_pos'};
+        $lazy = $options_ref->{'lazy'};
+        $who = $options_ref->{'thread'};
+        $start_line = $options_ref->{'start_line'};
+        $start_pos = $options_ref->{'start_pos'};
+        $stop_line = $options_ref->{'stop_line'};
+        $stop_pos = $options_ref->{'stop_pos'};
     }
-	if ( ! defined $stop_line ) {
-		$stop_line = $start_line;
+    if ( ! defined $stop_line ) {
+        $stop_line = $start_line;
     }
 
      if ( ! defined $who ) {
-	    my $indice = 0;
-	    # 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
+        my $indice = 0;
+        # 'I' pour ne pas empiéter sur une autre utilisation directe par init_read, 'I' pour 'internal'
         $who = 'I' . $indice;
         while  ( defined $self->[DESC]{$who} ) {
-		    $indice += 1;
-		    $who = 'I' . $indice;
+            $indice += 1;
+            $who = 'I' . $indice;
         }
     }
     $self->[DESC]{$who} = ();
-	
+    
     #my $text = read_next($self, $who, $start_line);
-	my $line_ref = $self->[HASH_REF]{$start_line};
-	return if ( ! defined $line_ref ); # Mauvaise référence
-	$self->[DESC]{$who}[REF] = $line_ref;
-	my $text = $line_ref->[TEXT];
-	if ( ! defined $stop_pos ) {
-		$stop_pos = length ( $text );
+    my $line_ref = $self->[HASH_REF]{$start_line};
+    return if ( ! defined $line_ref ); # Mauvaise référence
+    $self->[DESC]{$who}[REF] = $line_ref;
+    my $text = $line_ref->[TEXT];
+    if ( ! defined $stop_pos ) {
+        $stop_pos = length ( $text );
     }
 
     my $indice = 0;
     while ( defined($text) ) {
-		$indice += 1;
-		#print "Ligne lue : |$text|\n";
+        $indice += 1;
+        #print "Ligne lue : |$text|\n";
         while ( $text =~ m/($regexp)/g ) {
             my $length    = length($1);
             my $end_pos   = pos($text);
             my $start_pos = $end_pos - $length;
             my $new_ref = create_ref_current($self, $who);
-			#print "Texte de la ligne : |$text|\n";
-			if ( $new_ref != $start_line ) {
+            #print "Texte de la ligne : |$text|\n";
+            if ( $new_ref != $start_line ) {
                 save_line_number( $self, $who, $new_ref );
-		    }
-			if ( $new_ref != $start_line or $start_pos  > $options_ref->{'start_pos'} ) {
-				$self->[DESC]{$who} = undef;
+            }
+            if ( $new_ref != $start_line or $start_pos  > $options_ref->{'start_pos'} ) {
+                $self->[DESC]{$who} = undef;
                 return ( $new_ref, $start_pos, $end_pos);
-		    }
+            }
         }
-		if ( $indice == $check_every ) {
-		    $indice = 0;
-			if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
-				return;
-		    }
+        if ( $indice == $check_every ) {
+            $indice = 0;
+            if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
+                return;
+            }
             if ( Text::Editor::Easy::Comm::anything_for_me() ) {
-				#return if ( Text::Editor::Easy::Comm::have_task_done() );
-				Text::Editor::Easy::Comm::have_task_done()
-		    }
-	    }
+                #return if ( Text::Editor::Easy::Comm::have_task_done() );
+                Text::Editor::Easy::Comm::have_task_done()
+            }
+        }
         #$text = read_next($self, $who);
-		$text = read_until2( $self, $who, { 'line_stop' => $stop_line } );
+        $text = read_until2( $self, $who, { 'line_stop' => $stop_line } );
     }
-	return;
+    return;
 }
 
 sub get_line_number_from_ref {
     my ( $self, $ref, $options_ref ) = @_;
-	
-	#print "Dans get_line_number_from_ref, reçu : REF $ref\n";
+    
+    #print "Dans get_line_number_from_ref, reçu : REF $ref\n";
 
     my $check_every = 20;
-	my $lazy;
-	if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+    my $lazy;
+    if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
         $check_every = $options_ref->{'check_every'} || 20;
-	    $lazy = $options_ref->{'lazy'};
+        $lazy = $options_ref->{'lazy'};
     }
 
     my $number = 1;
-	my $indice = 0;
+    my $indice = 0;
     my $line_ref = first_ ($self->[ROOT]);
-	while ( defined $line_ref and ( ! defined $line_ref->[REF] or $line_ref->[REF] != $ref ) ) {
-		$number += 1;
-		$indice += 1;
-		$line_ref = next_ ($line_ref);
-		if ( $indice == $check_every ) {
-		    $indice = 0;
-			if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
-				return;
-		    }
+    while ( defined $line_ref and ( ! defined $line_ref->[REF] or $line_ref->[REF] != $ref ) ) {
+        $number += 1;
+        $indice += 1;
+        $line_ref = next_ ($line_ref);
+        if ( $indice == $check_every ) {
+            $indice = 0;
+            if ( defined $lazy and Text::Editor::Easy::Comm::anything_for( $lazy ) ) {
+                return;
+            }
             if ( Text::Editor::Easy::Comm::anything_for_me() ) {
-				#return if ( Text::Editor::Easy::Comm::have_task_done() );
-				Text::Editor::Easy::Comm::have_task_done()
-		    }
-	    }
+                #return if ( Text::Editor::Easy::Comm::have_task_done() );
+                Text::Editor::Easy::Comm::have_task_done()
+            }
+        }
     }
-	return if ( ! defined $line_ref );
+    return if ( ! defined $line_ref );
     return $number;
 }
 
 
 =head1 FUNCTIONS
-
-=head2 calc_conf
 
 =head2 clean
 

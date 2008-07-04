@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Data::Dump qw(dump);
 use threads;
@@ -45,8 +45,8 @@ use constant {
     INSTANCE       => 12,
     FULL_TRACE     => 13,
     ZONE           => 14,
-	CURRENT => 15,
-	SEARCH => 16,
+    CURRENT => 15,
+    SEARCH => 16,
 
     #------------------------------------
     # LEVEL 2 : $self->[TOTAL][???]
@@ -83,27 +83,27 @@ sub reference_editor {
     my ( $self, $ref, $options_ref ) = @_;
 
     my $zone_ref = $options_ref->{'zone'};
-	
-	my $file = $options_ref->{'file'};
-	my ($file_name, $absolute_path, $relative_path );
-	if ( defined $file ) {
-			my $file_path;
-			($file_name, $file_path ) = fileparse($options_ref->{'file'});
-			my $is_absolute = File::Spec->file_name_is_absolute( $file_path );
-			
-			if ( $is_absolute ) {
-				$absolute_path = $file_path;
-				$relative_path = File::Spec->abs2rel( $file_path ) ;
-			}
-			else {
-				$relative_path = $file_path;
-				$absolute_path = File::Spec->rel2abs( $file_path ) ;
-			}
-	}
+    
+    my $file = $options_ref->{'file'};
+    my ($file_name, $absolute_path, $relative_path );
+    if ( defined $file ) {
+            my $file_path;
+            ($file_name, $file_path ) = fileparse($options_ref->{'file'});
+            my $is_absolute = File::Spec->file_name_is_absolute( $file_path );
+            
+            if ( $is_absolute ) {
+                $absolute_path = $file_path;
+                $relative_path = File::Spec->abs2rel( $file_path ) ;
+            }
+            else {
+                $relative_path = $file_path;
+                $absolute_path = File::Spec->rel2abs( $file_path ) ;
+            }
+    }
 
-	my $name = $options_ref->{'name'};
-	
-    print DBG "Dans reference_editor de Data : $self |$ref|$zone_ref|$file_name|$name|\n";
+    my $name = $options_ref->{'name'};
+    
+    #print DBG "Dans reference_editor de Data : $self |$ref|$zone_ref|$file_name|$name|\n";
     my $zone;
     if ( defined $zone_ref ) {
         if (   ref $zone_ref eq 'HASH'
@@ -134,39 +134,48 @@ sub reference_editor {
     $self->[NAME]{$name} = 1;
     $self->[INSTANCE]{$ref}{'name'}        = $name;
     $self->[INSTANCE]{$ref}{'file_name'}   = $file_name;
-	$self->[INSTANCE]{$ref}{'absolute_path'}   = $absolute_path;
-	$self->[INSTANCE]{$ref}{'relative_path'}   = $relative_path;
-	my ( $volume, $directory ) = File::Spec->splitpath( $absolute_path, 'no_file' );
-	my $full_absolute = File::Spec->catpath( $volume, $directory, $file_name );
-	$self->[INSTANCE]{$ref}{'full_absolute'} = $full_absolute;
-	my $full_relative = File::Spec->abs2rel( $full_absolute ) ;
-	if ( $full_relative ne $full_absolute ) {
-		$self->[INSTANCE]{$ref}{'full_relative'} = $full_relative;
+    $self->[INSTANCE]{$ref}{'absolute_path'}   = $absolute_path;
+    $self->[INSTANCE]{$ref}{'relative_path'}   = $relative_path;
+    my ( $volume, $directory );
+    if ( defined $absolute_path ) {
+        ( $volume, $directory ) = File::Spec->splitpath( $absolute_path, 'no_file' );
+    }
+    my $full_absolute = File::Spec->catpath( $volume, $directory, $file_name );
+    $self->[INSTANCE]{$ref}{'full_absolute'} = $full_absolute;
+    my $full_relative = File::Spec->abs2rel( $full_absolute ) ;
+    if ( $full_relative ne $full_absolute ) {
+        $self->[INSTANCE]{$ref}{'full_relative'} = $full_relative;
     }
  
     $self->[ZONE_ORDER]{$zone} += 1;    # Valeur de retour, ordre dans la zone
-	#return data_file_name ( $self, $ref );
+    #return data_file_name ( $self, $ref );
 }
 
 sub data_file_name {
-    my ( $self, $ref ) = @_;
+    my ( $self, $ref, $key ) = @_;
 
     #print DBG "Dans data_file_name $self|$ref|";
     my $instance_ref = $self->[INSTANCE]{$ref};
     #print DBG "$file_name" if ( defined $file_name );
     #print DBG "|\n";
-	if ( wantarray ) {
-		return (
-		    $instance_ref->{'absolute_path'},
-		    $instance_ref->{'file_name'},
-			$instance_ref->{'relative_path'},
-			$instance_ref->{'full_absolute'},
-			$instance_ref->{'full_relative'},
-			$instance_ref->{'name'},
-		)
-	}
-	else {
-		return $instance_ref->{'file_name'};
+    if ( wantarray ) {
+        return (
+            $instance_ref->{'absolute_path'},
+            $instance_ref->{'file_name'},
+            $instance_ref->{'relative_path'},
+            $instance_ref->{'full_absolute'},
+            $instance_ref->{'full_relative'},
+            $instance_ref->{'name'},
+        )
+    }
+    else {
+        if ( defined $key ) {
+           print "Dans data_file_name : demande pour ref = $ref, key = $key\n";
+           return $instance_ref->{$key};
+        }
+        else {
+           return $instance_ref->{'file_name'};
+        }
     }
 }
 
@@ -182,10 +191,10 @@ sub data_get_editor_from_name {
     my $instance_ref = $self->[INSTANCE];
 
     print DBG "Dans data_get...$self|$wanted_name|$instance_ref\n";
-	#return if ( ref $instance_ref ne 'HASH');
+    #return if ( ref $instance_ref ne 'HASH');
     for my $key_ref ( keys %{$instance_ref} ) {
-		print DBG "Dans boucle data...$key_ref|$instance_ref->{$key_ref}|\n";
-		#return if ( ref $instance_ref->{$key_ref} ne 'HASH' );
+        print DBG "Dans boucle data...$key_ref|$instance_ref->{$key_ref}|\n";
+        #return if ( ref $instance_ref->{$key_ref} ne 'HASH' );
         my $name = $instance_ref->{$key_ref}{'name'};
         if ( defined $name and $name eq $wanted_name ) {
 
@@ -272,7 +281,7 @@ my %function = (
 sub trace {
     my ( $self, $function, @data ) = @_;
     
-	print DBG "Dans sub trace pour fonction $function\n";
+    print DBG "Dans sub trace pour fonction $function\n";
     $function{$function}->( $self, @data );
 }
 
@@ -387,9 +396,9 @@ sub trace_print {
 # de traçage de la méthode (trace_call, trace_start puis trace_response) au thread Data qui ne peut
 # par conséquent pas attendre ici (sans quoi, il ne répondrait plus aux requêtes de traçage et tout se bloque...)
 
-				# La seule façon d'être synchrone, ne plus activer la trace pour l'appel et ses successeurs et ne jamais
-				# rien demander au thread 2 en synchrone jusqu'à la fin...
-				# ==> paramètre supplémentaire à l'appel à passer à toute la chaîne d'appel (possible ? sans Data)
+                # La seule façon d'être synchrone, ne plus activer la trace pour l'appel et ses successeurs et ne jamais
+                # rien demander au thread 2 en synchrone jusqu'à la fin...
+                # ==> paramètre supplémentaire à l'appel à passer à toute la chaîne d'appel (possible ? sans Data)
             }
 
            #print DBG "redirect_ref method = ", $redirect_ref->{'method'}, "\n";
@@ -463,10 +472,10 @@ sub trace_call {
 
         #print DBG "$call_id synchrone ($context)\n";
         if ( my $previous_call_id_ref = $thread_ref->[CALL_ID_REF] ) {
-			#if ( ref $previous_call_id_ref->[THREAD_LIST] ne 'HASH' ) {
-			#	print DBG "PAs une référence de hachage pour thread client $client, call_id en cours $call_id\n" .
-			#	 "\t|$previous_call_id_ref|$previous_call_id_ref->[THREAD_LIST]|, tid", threads->tid, "\n";
-		    #}
+            #if ( ref $previous_call_id_ref->[THREAD_LIST] ne 'HASH' ) {
+            #    print DBG "PAs une référence de hachage pour thread client $client, call_id en cours $call_id\n" .
+            #     "\t|$previous_call_id_ref|$previous_call_id_ref->[THREAD_LIST]|, tid", threads->tid, "\n";
+            #}
             %{ $call_id_ref->[THREAD_LIST] } =
               %{ $previous_call_id_ref->[THREAD_LIST] };
             %{ $call_id_ref->[METHOD_LIST] } =
@@ -529,12 +538,12 @@ sub trace_response {
       ;    # Cela arrive pour les méthodes d'initialisation de thread
      # ==> tant qu'elles ne sont pas appelées de façon standard (avec traçage du call)
 
-	#print DBG "trace_response : début d'actions sur \$call_id_ref |$call_id_ref|, méthod $method call_id $call_id, tid", threads->tid, "\n";
-	#if ( ! defined $method ) {
-	#	print DBG "La méthode est non définie , tid", threads->tid, "\n";
+    #print DBG "trace_response : début d'actions sur \$call_id_ref |$call_id_ref|, méthod $method call_id $call_id, tid", threads->tid, "\n";
+    #if ( ! defined $method ) {
+    #    print DBG "La méthode est non définie , tid", threads->tid, "\n";
     #}
-	#else {
-	#	print DBG "La méthode vaut $method, tid", threads->tid, "\n";
+    #else {
+    #    print DBG "La méthode vaut $method, tid", threads->tid, "\n";
     #} 
 
     $self->[TOTAL][RESPONSES] += 1;
@@ -573,8 +582,8 @@ sub trace_response {
     #undef $self->[THREAD][$from][CALL_ID];
 
     my $call_id_client_ref = $self->[THREAD][$client][CALL_ID_REF];
-	#if ( defined $call_id_client_ref ) {
-	#    print DBG "Chargement de \$call_id_client_ref |$call_id_client_ref|, tid", threads->tid, "\n";
+    #if ( defined $call_id_client_ref ) {
+    #    print DBG "Chargement de \$call_id_client_ref |$call_id_client_ref|, tid", threads->tid, "\n";
     #}
 
 #if ( defined $call_id_client_ref ) {
@@ -588,7 +597,7 @@ sub trace_response {
 
  # Ménage de CALL et RESPONSE (sauf si asynchrone avec récupération identifiant)
     if ( $call_id_ref->[SYNC] or $call_id_ref->[CONTEXT] eq 'AV' ) {    # Asynchronous Void
-		#print DBG "trace_response : suppressions des listes pour \$call_id_ref |$call_id_ref| call_id $call_id, tid", threads->tid, "\n";
+        #print DBG "trace_response : suppressions des listes pour \$call_id_ref |$call_id_ref| call_id $call_id, tid", threads->tid, "\n";
         %{ $call_id_ref->[THREAD_LIST] }   = ();
         %{ $call_id_ref->[METHOD_LIST] }   = ();
         %{ $call_id_ref->[INSTANCE_LIST] } = ();
@@ -612,7 +621,7 @@ sub trace_response {
 #    print DBG "Status de call_id $call_id : ", $call_id_ref->[STATUS], "\n";
 #}
 #else {
-#	print DBG "$call_id plus défini...\n";
+#    print DBG "$call_id plus défini...\n";
 #}
 
 
@@ -642,8 +651,8 @@ sub trace_start {
 
     my $call_id_ref = $self->[CALL]{$call_id};
     return if ( !defined $call_id_ref );
-	
-	#print DBG "Dans trace_start \$call_id_ref |$call_id_ref|, call_id $call_id, tid", threads->tid, "\n";
+    
+    #print DBG "Dans trace_start \$call_id_ref |$call_id_ref|, call_id $call_id, tid", threads->tid, "\n";
 
     $self->[TOTAL][STARTS] += 1;
 
@@ -825,26 +834,26 @@ sub zone_list {
 
 sub save_current {
     my ( $self, $ref ) = @_;
-	
-    $self->[CURRENT] = $ref;	
+    
+    $self->[CURRENT] = $ref;    
 }
 
 sub data_last_current {
     my ( $self ) = @_;
-	
+    
     return $self->[CURRENT];
 }
 
 sub data_get_search_options {
-		my ( $self, $ref ) = @_;
-		
-		return $self->[SEARCH]{$ref};
+        my ( $self, $ref ) = @_;
+        
+        return $self->[SEARCH]{$ref};
 }
 
 sub data_set_search_options {
-		my ( $self, $ref, $options_ref ) = @_;
-		
-		$self->[SEARCH]{$ref} = $options_ref;
+        my ( $self, $ref, $options_ref ) = @_;
+        
+        $self->[SEARCH]{$ref} = $options_ref;
 }
 
 my %tab_editor;

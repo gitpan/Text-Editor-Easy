@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Text::Editor::Easy::Comm;
 
@@ -24,7 +24,7 @@ my $eval_print;
 
 sub init_eval {
     my ( $self, $reference, $other_ref, $unique_ref ) = @_;
-    print "============>INIT de Search .. $self, $unique_ref\n";
+    #print "============>INIT de Search .. $self, $unique_ref\n";
     $out = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref( $out, $unique_ref);
 
@@ -54,7 +54,7 @@ sub init_eval {
             ],
         }
     );
-    print "FIN DE INIT EVAL = $eval_thread\n";
+    #print "FIN DE INIT EVAL = $eval_thread\n";
 
     # Référencer dans Data le thread $eval_thread en arborescence...
     my $redirect_id = Text::Editor::Easy->reference_print_redirection(

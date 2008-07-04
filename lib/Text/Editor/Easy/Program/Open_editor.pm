@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.31
+Version 0.32
 
 =cut
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 
