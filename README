@@ -1,6 +1,6 @@
 Text-Editor-Easy
 
-Version 0.2.
+Version 0.33.
 Pure perl editor module and program. 10 demos in the program,
 but still not usable.
 
@@ -21,17 +21,18 @@ Uncompress, untar...
 
 Now install the following modules from where you should, according to
 your system (you shoud already have most of them) :
-		- Tk
-		- Syntax::Highlight::Perl
-		- Data::Dump
-		- Time::HiRes
-		- IO::File
-		- File::Basename
-		- Scalar::Util
-		- Devel::Size
-		- SDBM_File
-		- Fcntl
-		- File::Copy
+        - Tk
+        - Syntax::Highlight::Perl
+        - Data::Dump
+        - Time::HiRes
+        - IO::File
+        - File::Basename
+        - Scalar::Util
+        - Devel::Size
+        - SDBM_File
+        - Fcntl
+        - File::Copy
+        - File::Spec
 
 Once finished, execute the "Editor.pl" program in the root directory.
 
@@ -48,4 +49,3 @@ Copyright (C) 2008 Sebastien Grommier
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-

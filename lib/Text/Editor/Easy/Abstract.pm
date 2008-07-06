@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 =head1 SYNOPSIS
 
@@ -243,8 +243,11 @@ my %key = (
 );
 
 my %color;
-my %abstract
-  ;   # A une référence d'éditeur unique, on fait correspondre un objet Abstract
+my @window; # For now, only one window managed (the main window)
+my $window_destroyed;
+
+# A une référence d'éditeur unique, on fait correspondre un objet Abstract
+my %abstract;
 
 # Redirection
 my %redirect = do "Text/Editor/Easy/Data/Events.pm";
@@ -260,6 +263,10 @@ sub new {
     # Début construction
     my $edit_ref = bless [], $classe;
     $edit_ref->[UNIQUE] = $unique_ref;
+
+    if ( ! %abstract ) {
+        $hash_ref->{'destroy'} = \&window_destroy;
+    }
 
     $abstract{$unique_ref} = $edit_ref;
 
@@ -349,18 +356,18 @@ sub new {
         $edit_ref->[SUB_REF] = eval "\\&${package}::$sub";
     }
     my ( $width, $height, $x_offset, $y_offset ) =
-      ( 1272, 740, 0, 0 );    # for my screen
+      ( 1140, 774, 0, 0 );    # for my screen
     if ( defined $hash_ref->{'width'} ) {
         $width = $hash_ref->{'width'};
     }
     if ( defined $hash_ref->{'height'} ) {
         $height = $hash_ref->{'height'};
     }
-    if ( defined $hash_ref->{'x_offset'} ) {
-        $x_offset = $hash_ref->{'x_offset'};
+    if ( defined $hash_ref->{'x'} ) {
+        $x_offset = $hash_ref->{'x'};
     }
-    if ( defined $hash_ref->{'y_offset'} ) {
-        $y_offset = $hash_ref->{'y_offset'};
+    if ( defined $hash_ref->{'y'} ) {
+        $y_offset = $hash_ref->{'y'};
     }
     $edit_ref->[GRAPHIC] = Text::Editor::Easy::Graphic->new(
         {
@@ -1282,6 +1289,8 @@ sub resize {
         $sub_origin = 'resize';
     }
 
+    @window = $edit_ref->[GRAPHIC]->get_geometry;
+
     my $old_width = $edit_ref->[SCREEN][WIDTH];
     my $old_height = $edit_ref->[SCREEN][HEIGHT];
 
@@ -1413,9 +1422,11 @@ sub init {
     my $ref_cursor;
     if ( my $cursor_number = $edit_ref->[INIT_TAB]{'cursor_line_number'} ) {
         my $line = $edit_ref->[PARENT]->number( $cursor_number );
-        $ref_cursor = $line->ref;
+	if ( defined $line ) {
+            $ref_cursor = $line->ref;
+        }
     }
-    else {
+    if ( ! defined $ref_cursor ) {
         $ref_cursor = $line_ref->[REF];
         $edit_ref->[INIT_TAB]{'cursor_pos'} = 0;
     }
@@ -3093,6 +3104,61 @@ sub screen_set_y_corner {
     $self->[GRAPHIC]->set_geometry( $width, $height, $x, $y );
 }
 
+sub window_get {
+    my ( $self ) = @_;
+
+    print "Dans window_get\n";
+
+   my @geometry;
+
+   if ( $window_destroyed ) {
+        @geometry = @window;
+    }
+    else {
+        @geometry = $self->[GRAPHIC]->get_geometry;
+    }
+
+    if ( wantarray ) {
+        return @geometry;
+    }
+    else {
+        my ( $width, $height, $x, $y ) = @geometry;
+        return {
+            'width' => $width,
+            'height' => $height,
+            'x' => $x,
+            'y' => $y,
+        }
+    }
+}
+
+sub window_set {
+    my ( $self, $width, $height, $x, $y ) = @_;
+
+    my ( $old_width, $old_height, $old_x, $old_y ) = $self->[GRAPHIC]->get_geometry;
+    
+    if ( ref $width ) {
+        $height = $width->{'height'};
+        $x = $width->{'x'};
+        $y = $width->{'y'};
+        $width = $width->{'width'};
+    }
+    $width = $old_width if ( ! defined $width );
+    $height = $old_height if ( ! defined $height );
+    $x = $old_x if ( ! defined $x );
+    $y = $old_y if ( ! defined $y );
+    
+    $self->[GRAPHIC]->set_geometry( $width, $height, $x, $y );
+    @window = ( $width, $height, $x, $y );
+}
+
+sub window_destroy {
+    @window = @_;
+    $window_destroyed = 1;
+    print "Dans Window Destroy : @window\n";
+}
+
+
 sub screen_number {
     my ( $self, $number ) = @_;
 
@@ -4202,7 +4268,6 @@ sub unset_at_end {
     
     $self->[AT_END] = 0;
 }
-
 
 =head1 FUNCTIONS
 

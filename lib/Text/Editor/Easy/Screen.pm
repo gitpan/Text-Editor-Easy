@@ -5,17 +5,17 @@ use strict;
 
 =head1 NAME
 
-Text::Editor::Easy::Cursor - Object oriented interface to screen data (managed by "Text::Editor::Easy::Abstract").
+Text::Editor::Easy::Screen - Object oriented interface to screen data (managed by "Text::Editor::Easy::Abstract").
 
 This module shoud disappear. Screen will be separated into "Window" and "Zone".
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "screen_" puis reprennent
 # le nom de la méthode

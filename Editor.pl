@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
@@ -18,6 +18,7 @@ use Text::Editor::Easy;
 use Text::Editor::Easy::Comm;
 
 use IO::File;
+use Data::Dump qw(dump);
 
 if ( ! -d "tmp" ) {
     print "Pas de tmp : arrêt\n";
@@ -64,35 +65,44 @@ for my $demo ( 1 .. 10 ) {
 }
 
 # Main tab
-my $main_tab_name = 'main_tab';
-my $save_info = {
+my $main_tab_info_ref = {
             'file_list' => \@files_session,
             'color'     => 'yellow',
             'selected' => 0,
         };
-if ( -f "editor.session_$main_tab_name" ) {
-    $save_info = do "editor.session_$main_tab_name";
-    @files_session = @{$save_info->{'file_list'}};
+my $session_ref;
+if ( -f "editor.session" ) {
+    $session_ref = do "editor.session";
+    $main_tab_info_ref = $session_ref->{'main_tab'};
+    @files_session = @{$main_tab_info_ref->{'file_list'}};
+}
+my @window_size;
+while ( my ($key, $value) = each %{$session_ref->{'window'}}) {
+    print "Valeur $key / $value\n";
+    push @window_size, $key, $value;
 }
 Text::Editor::Easy->new(
     {
         'zone'        => $zone4,
         'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
-        'name'        => $main_tab_name,
+        'name'        => 'main_tab',
         'motion_last' => {
             'use'     => 'Text::Editor::Easy::Program::Tab',
             'package' => 'Text::Editor::Easy::Program::Tab',
             'sub'     => 'motion_over_tab',
             'mode'    => 'async',
         },
-        'save_info' => $save_info,
+        'save_info' => $main_tab_info_ref,
         'font_size' => 11,
+		@window_size,
     }
 );
 
-# In thread 0, the graphical MainLoop is over
+print "Taille de l'écran : ", join ( ' | ', Text::Editor::Easy->window->get) ,"\n";
 
-Text::Editor::Easy->save_conf_thread_0("editor.session_main_tab");
+save_session();
+
+
 
 # End of launching perl process (F5 key management)
 print EXEC "quit\n";
@@ -182,7 +192,7 @@ sub main {
             }
         }
     );
-    my $new_ref = $files_session[$save_info->{'selected'}];
+    my $new_ref = $files_session[$main_tab_info_ref->{'selected'}];
     $new_ref->{'focus'} = 'yes';
     Text::Editor::Easy->new( $new_ref );
 
@@ -451,9 +461,7 @@ sub new_search {
 sub restart {
     print "\nDans restart...\n\n";
 
-    # Sauvegarde de la configuration
-    Text::Editor::Easy->save_conf_thread_0("editor.session_main_tab");
-    
+    save_session ();
     #my $call_id = Text::Editor::Easy::Async->save_conf("editor.session_main_tab");
     #while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
     #    if ( anything_for_me )  {
@@ -468,6 +476,15 @@ sub restart {
     Text::Editor::Easy->exit;
 }
 
+sub save_session {
+    # In thread 0, the graphical MainLoop is over
+    $session_ref->{'main_tab'} = Text::Editor::Easy->save_conf_thread_0;
+    $session_ref->{'window'} = scalar Text::Editor::Easy->window->get;
+
+    open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
+    print INFO dump $session_ref;
+    close INFO;
+}
 
 =head1 COPYRIGHT & LICENSE
 

@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Text::Editor::Easy::Comm;
 
@@ -416,14 +416,10 @@ sub save_conf {
 sub save_conf_thread_0 {
     my ( $self, $file ) = @_;
     
-    print "Dans save_conf_thread_0 : file = $file\n";
+    #print "Dans save_conf_thread_0 : file = $file\n";
     my $old_editor = Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor;
     my $conf_ref = $old_editor->on_focus_lost();
-    my $info_ref = Text::Editor::Easy->update_conf( $old_editor->get_ref, $conf_ref, $old_editor->name );
-
-    open (INFO, ">$file" ) or die "Impossible d'ouvrir $file : $!\n";
-    print INFO dump $info_ref;
-    close INFO;
+    return Text::Editor::Easy->update_conf( $old_editor->get_ref, $conf_ref, $old_editor->name );
 }
 
 sub get_conf_for_absolute_file_name {

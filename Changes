@@ -1,22 +1,29 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
+0.33  : 06 July 2008   !
+-----------------------+
+        - main window size and position are now saved in the editor session
+        - should skip tests on machins with no support of ithreads or Tk (not so
+        obvious to leave with return code 0 of a ".t file" checking Tk that fails)
+
+-----------------------+
 0.32  : 04 July 2008   !
 -----------------------+
         - save mecanism (for personal use) with Text::Editor::Easy::Program::Save module
-	- I expect better reports (Text::Editor::Easy uses ithreads and graphical environnement)
+        - I expect better reports (Text::Editor::Easy uses ithreads and graphical environnement)
 
 -----------------------+
 0.31  : 29 June 2008   !
 -----------------------+
         - sub implementation of Key functions with "Text::Editor::Easy::Abstract::Key.pm" (faster than 
         "Text::Editor::Easy::Key.pm" that used the object interface) : for debug reasons, lots of things are
-		traced and tend to slow down the program.
+        traced and tend to slow down the program.
         - suppression of selected text, "cut key" (ctrl-x)
         - start of graphical open implementation : specific "Text::Editor::Easy" instance to open files (ctrl-o),
         code in "Text::Editor::Easy::Program::Open_editor.pm"
         - better encapsulation of tab and session management (specific to the program, not to be known by the module)
-		
+        
 -----------------------+
 0.3  : 1st June 2008   !
 -----------------------+
@@ -27,13 +34,13 @@ Revision history for Text-Editor-Easy
 -----------------------+
         Meta.yml file created by hand, I hope the tests will be all right this time... 
         Lots of little things (and bugs) added : 
-				- start to implement the selection (just with keys, for the moment), copy (ctrl-c) and paste (ctrl-v)
-				- start to implement the search (ctrl-F and F3 short-cuts) + demo10
-				- key-function can be specific to a Text::Editor::Easy instance (see "up" and "down" in demo10)
-				- faster line search (mouse move on Editor log is now usable)
-				- "change_last" event (to replace "insert_last" event for the macro instructions) : macro panel is now sensitive to delete modifications too
-				- lazy call tests ("anything_for" sub called in "editor_number" or "editor_search" and recursive asynchronous call test with "editor_visual_search" for the graphic thread)
-		Still not usable. I planned to deliver this date, the content doesn't matter.
+                - start to implement the selection (just with keys, for the moment), copy (ctrl-c) and paste (ctrl-v)
+                - start to implement the search (ctrl-F and F3 short-cuts) + demo10
+                - key-function can be specific to a Text::Editor::Easy instance (see "up" and "down" in demo10)
+                - faster line search (mouse move on Editor log is now usable)
+                - "change_last" event (to replace "insert_last" event for the macro instructions) : macro panel is now sensitive to delete modifications too
+                - lazy call tests ("anything_for" sub called in "editor_number" or "editor_search" and recursive asynchronous call test with "editor_visual_search" for the graphic thread)
+        Still not usable. I planned to deliver this date, the content doesn't matter.
 
 -----------------------+
 0.1 : 16 March 2008    !

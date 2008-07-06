@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 =head1 SYNOPSIS
 
@@ -74,6 +74,7 @@ our %Trace; # Hash to tell modules if they have to make displays or to be silent
 
 use Text::Editor::Easy::Cursor;
 use Text::Editor::Easy::Screen;
+use Text::Editor::Easy::Window;
 
 my $main_loop_launched;
 
@@ -598,7 +599,7 @@ sub cursor {
     return $cursor;
 }
 
-my %screen;    # Référence au "sous-objet" cursor
+my %screen;    # Référence au "sous-objet" window
 # Objet screen à migrer vers zone et window
 
 sub screen {
@@ -613,6 +614,23 @@ sub screen {
     $screen{$ref} = $screen;
     return $screen;
 }
+
+my %window;    # Référence au "sous-objet" window
+
+sub window {
+    my ($self) = @_;
+
+    my $ref    = refaddr $self;
+	$ref = '' if ( ! defined $ref );
+    my $window = $window{$ref};
+    return $window if ($window);
+
+    $window = Text::Editor::Easy::Window->new($self);
+
+    $window{$ref} = $window;
+    return $window;
+}
+
 
 # Méthode insert : renvoi d'objets "Line" au lieu de références numériques (cas du wantarray)
 sub insert {

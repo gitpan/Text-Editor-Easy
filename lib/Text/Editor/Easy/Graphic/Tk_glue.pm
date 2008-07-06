@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -82,9 +82,10 @@ sub initialize {
     }
     else {
         $mw = create_main_window(
-            $hash_ref->{width},    $hash_ref->{height},
-            $hash_ref->{x_offset}, $hash_ref->{y_offset},
-            $hash_ref->{title},
+            $hash_ref->{'width'},    $hash_ref->{'height'},
+            $hash_ref->{'x_offset'}, $hash_ref->{'y_offset'},
+            $hash_ref->{'title'},
+            $hash_ref->{'destroy'},
         );
     }
     $self->[TOP_LEVEL] = $mw;
@@ -192,18 +193,38 @@ sub key_press {
 }
 
 sub create_main_window {
-    my ( $width, $height, $x, $y, $title ) = @_;
+    my ( $width, $height, $x, $y, $title, $sub_ref_destroy ) = @_;
     my $mw = MainWindow->new( -title => $title );
+    
+    if ( ref $sub_ref_destroy ) {
+        print "subref_destroy : $sub_ref_destroy, ", ref $sub_ref_destroy, "\n";
+        #$mw->bind( '<Destroy>', [ \&destroy, $mw ] );
+        $mw->bind( 'MainWindow', '<Destroy>', [ \&destroy, $sub_ref_destroy ] );
+    #$canva->CanvasBind( '<Configure>', [ \&resize, $hash_ref->{resize}, Ev('w'), Ev('h') ] );
+
+    }
+    
     $mw->geometry("${width}x$height+$x+$y");
     return $mw;
+}
+
+sub destroy {
+    my ( $mw, $sub_ref ) = @_;
+
+    print "MW = $mw ", ref $mw, ", sub_ref = $sub_ref\n";
+    my $geometry = $mw->geometry;
+    my ( $width, $height, $x, $y ) = $geometry =~ /((?:-|)\d+)x((?:-|)\d+)\+((?:-|)\d+)\+((?:-|)\d+)/;
+    print "Geométrie : ", $mw->geometry, "\n";
+    print "Dans destroy\n";
+    $sub_ref->( $width, $height, $x, $y );
 }
 
 sub get_geometry {
     my ($self) = @_;
 
     my $geometry = $self->[TOP_LEVEL]->geometry;
-    my ( $width, $height, $x, $y ) = $geometry =~ /(\d+)x(\d+)\+(\d+)\+(\d+)/;
-    return ( $width, $height, $x, $y );
+    my ( $width, $height, $x, $y ) = $geometry =~ /((?:-|)\d+)x((?:-|)\d+)\+((?:-|)\d+)\+((?:-|)\d+)/;
+    return ( $width, $height, $x, $y, $geometry );
 }
 
 sub set_geometry {

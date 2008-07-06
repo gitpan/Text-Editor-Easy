@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.32
+Version 0.33
 
 =cut
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 =head1 SYNOPSIS
 
@@ -1242,6 +1242,8 @@ sub verify_graphic {
                         'on_editor_destroy', 
                         'repeat',
                         'repeat_class_method',
+					    'window_set',
+					    'window_get',
                     ]
             }
         );
