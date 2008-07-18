@@ -46,6 +46,7 @@
 #
 # This log is "interactive" : moving
 # your mouse over one display
+# WITH THE SHIFT KEY PRESSED
 # will send you to the line of the file
 # that generated it.
 #

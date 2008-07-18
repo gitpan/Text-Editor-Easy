@@ -10,11 +10,11 @@ wrap mode, you can have several displays for a single line on a file.
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
 # pas dans les hachages gérés par AUTOLOAD de Text::Editor::Easy) car susceptibles de changer

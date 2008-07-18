@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
@@ -128,6 +128,8 @@ sub move_over_out_editor {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
 
     return if (anything_for_me);
+	
+	$editor->async->unset_at_end;
 
     #print "DANS MOVE_OVER_OUT_FILE $editor, $hash_ref\n";
 

@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use Data::Dump qw(dump);
 
 sub left {
@@ -802,7 +802,7 @@ sub end_file {
     my ( $self, $pos ) = @_;
 
     my ( $ref_last, $text ) = $self->[PARENT]->previous_line;
-
+	
     Text::Editor::Easy::Abstract::display( $self, $ref_last, { 'at' => 'bottom', 'from' => 'bottom' } );
 
     if ( ! defined $pos ) {

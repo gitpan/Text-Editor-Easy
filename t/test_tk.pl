@@ -4,14 +4,13 @@ use IO::File;
 autoflush STDOUT;
 
 open STDERR, ">&STDOUT" or die "cannot dup STDERR to STDOUT: $!\n";
-
 autoflush STDERR;
 
 use Tk;
 
 my $mw = MainWindow->new();
 
-$mw->after( 1000, \&write_and_exit );
+$mw->after( 200, \&write_and_exit );
 
 MainLoop;
 

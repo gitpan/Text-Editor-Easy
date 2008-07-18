@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
@@ -94,7 +94,7 @@ Text::Editor::Easy->new(
         },
         'save_info' => $main_tab_info_ref,
         'font_size' => 11,
-		@window_size,
+        @window_size,
     }
 );
 
@@ -199,6 +199,10 @@ sub main {
     Text::Editor::Easy->bind_key(
         { 'package' => 'main', 'sub' => 'launch', 'key' => 'F5' } );
 
+    Text::Editor::Easy->bind_key(
+        { 'package' => 'main', 'sub' => 'toto', 'key' => 'alt_shift_t' } );
+
+
     # Zone des display
     my $zone2 = Text::Editor::Easy::Zone->new(
         {
@@ -249,7 +253,7 @@ sub main {
             'file'         => "tmp/${name}_trace.trc",
             'name'         => 'Editor_out',
             'growing_file' => 1,
-            'motion_last'  => {
+            'shift_motion_last'  => {
                 'use'     => 'Text::Editor::Easy::Motion',
                 'package' => 'Text::Editor::Easy::Motion',
                 'sub'     => 'move_over_out_editor',
@@ -484,6 +488,10 @@ sub save_session {
     open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
     print INFO dump $session_ref;
     close INFO;
+}
+
+sub toto {
+    print "TOTO\n";
 }
 
 =head1 COPYRIGHT & LICENSE

@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 =head1 SYNOPSIS
 
@@ -380,7 +380,7 @@ sub new {
             'vertical_scrollbar_position' => 'right',
             'background'                  => 'light grey',
             'clic'                        => \&clic,
-            'mouse_move'                  => \&motion,
+            'motion'                  => \&motion,
             'resize'                      => \&resize,
             'key_press'                   => \&key_press,
             'mouse_wheel_event'           => \&mouse_wheel_event,
@@ -1160,7 +1160,7 @@ sub clic {
 }
 
 sub motion {
-    my ( $edit_ref, $x, $y ) = @_;
+    my ( $edit_ref, $x, $y, $key ) = @_;
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'motion';
@@ -1183,8 +1183,14 @@ sub motion {
 
 # La redirection n'est pas forcément référencée dans le thread Motion
 # Cela aura pour effet d'arrêter l'exécution d'une procédure que l'utilisateur souhaite abandonner (effet souhaité)
+    my $event = 'motion_last';
+    if ( defined $key ) {
+        $event = $key . '_motion_last' ;
+        print "Génération de l'évènement $event\n";
+    }
+    
     $edit_ref->[PARENT]->redirect(
-        'motion_last',
+        $event,
         $edit_ref,
         {
             'line'        => $ref_under_cursor,
@@ -1193,7 +1199,10 @@ sub motion {
             'line_pos'    => $line_pos,
         }
     );
+}
 
+sub shift_motion {
+    print "Dans shift motion de Abstract\n";
 }
 
 sub deselect {
@@ -1422,7 +1431,7 @@ sub init {
     my $ref_cursor;
     if ( my $cursor_number = $edit_ref->[INIT_TAB]{'cursor_line_number'} ) {
         my $line = $edit_ref->[PARENT]->number( $cursor_number );
-	if ( defined $line ) {
+    if ( defined $line ) {
             $ref_cursor = $line->ref;
         }
     }
@@ -1503,6 +1512,7 @@ sub key_press {
         $sub_origin = 'key_press';
     }
 
+    my $special;
     #clear_screen ( $edit_ref );
     #$edit_ref->[GRAPHIC]->clear_screen;
     #print "KEY |$key| ASCII |", ord($ascii), "| CTRL |";
@@ -1510,6 +1520,7 @@ sub key_press {
     if ( $options_ref->{'ctrl'} ) {
 
         #print "OUI";
+        $special = 1;
         $key_code = 'ctrl';
     }
     else {
@@ -1521,6 +1532,7 @@ sub key_press {
     if ( $options_ref->{'alt'} ) {
 
         #print "OUI";
+        $special = 1;
         $key_code .= '_' if ($key_code);
         $key_code .= 'alt';
     }
@@ -1543,7 +1555,7 @@ sub key_press {
     $key_code .= '_' if ($key_code);
     $key_code .= $key;
 
-    #print "$key_code\n";
+    print "KEY CODE : $key_code\n";
     #return;
     $sub_sub_origin = $key_code;
 
@@ -1578,12 +1590,15 @@ sub key_press {
 
         return;
     }
+    else {
+        print "Aucune action associée à $key_code\n";
+    }
 
     #print "|$key|$ascii|" if ( $alt_key );
     #print "|$key|$ascii|";
     return if ( length($ascii) != 1 );
 
-
+    return if ( $special );
     
     if ( defined $edit_ref->[SELECTION] ) {
         Text::Editor::Easy::Abstract::Key::delete_selection($edit_ref);
@@ -4253,7 +4268,9 @@ sub growing_check {
     my ( $self, $size_increment, $end ) = @_;
     
     #print "Dans growing_check $self, $size_increment, $end\n";
-    Text::Editor::Easy::Abstract::Key::end_file( $self, 0 );
+    if ( $self->[AT_END] ) {
+        Text::Editor::Easy::Abstract::Key::end_file( $self, 0 );
+    }
 }
 
 sub set_at_end {

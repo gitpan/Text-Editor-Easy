@@ -1,3 +1,16 @@
+package Text::Editor::Easy::Graphic::Tk_glue::Canva;
+
+use base qw/Tk::Canvas/;
+Construct Tk::Widget 'EditorCanva';
+
+sub ClassInit {
+    my ($class, $mw) = @_;
+    
+    # Don't look for default bindings
+    #$class->SUPER::ClassInit($mw);
+    $mw->bind($class, '<Enter>', sub{print "Entered a MyButton\n"});
+}
+
 package Text::Editor::Easy::Graphic;
 
 use warnings;
@@ -9,11 +22,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.33
+Version 0.34
 
 =cut
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -30,9 +43,6 @@ my %graphic;    # Liste des objets graphiques créés
 my $repeat_id;
 
 my %zone;
-my $ctrl;
-my $shift;
-my $alt;
 
 use constant {
     TOP_LEVEL => 0,
@@ -116,22 +126,99 @@ sub initialize {
         $editor{ refaddr $canva} = $hash_ref->{editor_ref};
     }
     $self->[CANVA] = $canva;
+
+    print "CANVA est un objet de type ", ref $canva, "\n";
+
+    #$canva->bindtags(undef);
+    #$canva->bind('text', <KeyPress>, sub {}) ;
+    #$mw->bind('Tk::text', <KeyPress>, sub {}) ;
+
     $canva->CanvasBind( '<Button-1>',
         [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y') ] );
     $canva->CanvasBind( '<Configure>',
         [ \&resize, $hash_ref->{resize}, Ev('w'), Ev('h') ] );
+    $canva->CanvasBind( '<Alt-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 0,
+                'alt'   => 1,
+                'shift' => 0,
+            }
+        ]
+    );
+    $canva->CanvasBind( '<Control-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 1,
+                'alt'   => 0,
+                'shift' => 0,
+            }
+        ]
+    );
+    $canva->CanvasBind( '<Shift-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 0,
+                'alt'   => 0,
+                'shift' => 1,
+            }
+        ]
+    );
+    $canva->CanvasBind( '<Control-Shift-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 1,
+                'alt'   => 0,
+                'shift' => 1,
+            }
+        ]
+    );
+    $canva->CanvasBind( '<Control-Alt-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 1,
+                'alt'   => 1,
+                'shift' => 0,
+            }
+        ]
+    );
+
+    $canva->CanvasBind( '<Shift-Alt-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
+            {
+                'ctrl'  => 0,
+                'alt'   => 1,
+                'shift' => 1,
+            }
+        ]
+    );
+
+
+ #   $canva->CanvasBind( '<Control-KeyPress>' =>
+ #         [ \&key_ctrl, $self, $hash_ref->{key_press}, Ev('K'), Ev('A') ] );
     $canva->CanvasBind( '<KeyPress>' =>
           [ \&key_press, $self, $hash_ref->{key_press}, Ev('K'), Ev('A') ] );
+
     $canva->CanvasBind( '<4>',
         [ \&redirect, $hash_ref->{mouse_wheel_event}, Ev('D') ] );
     $canva->CanvasBind( '<5>',
         [ \&redirect, $hash_ref->{mouse_wheel_event}, Ev('D') ] );
     $canva->CanvasBind( '<KeyRelease>' => [ \&key_release, $self, Ev('K') ] );
 
-    if ( $hash_ref->{mouse_move} ) {
+    if ( $hash_ref->{motion} ) {
         $canva->CanvasBind( '<Motion>',
-            [ \&redirect, $hash_ref->{mouse_move}, Ev('x'), Ev('y') ] );
+            [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y') ] );
+            
+        $canva->CanvasBind( '<Shift-Motion>',
+            [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y'), 'shift' ] );
+            
+        $canva->CanvasBind( '<Control-Motion>',
+            [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y'), 'ctrl' ] );
+            
+        $canva->CanvasBind( '<Alt-Motion>',
+            [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y'), 'alt' ] );
     }
+
 
     $canva->xviewMoveto(0);
     $canva->yviewMoveto(0);
@@ -157,6 +244,20 @@ sub redirect {
 
     my $editor_ref = $editor{ refaddr $canva};
     $sub_ref->( $editor_ref, @data );
+    $canva->break;
+}
+
+sub key_ctrl {
+    my ( $canva, $self, $sub_ref, $key, $ascii ) = @_;
+    my $editor_ref = $editor{ refaddr $canva};
+    $sub_ref->(
+        $editor_ref,
+        $key, $ascii,
+        {
+            'ctrl'  => 1,
+            'alt'   => 0,
+            'shift' => 0,
+        } );
 }
 
 sub key_press {
@@ -164,15 +265,12 @@ sub key_press {
     my $editor_ref = $editor{ refaddr $canva};
 
     if ( $key eq "Control_L" or $key eq "Control_R" ) {
-        $ctrl = 1;
         return;
     }
     if ( $key eq "Alt_L" ) {
-        $alt = 1;
         return;
     }
     if ( $key eq "Shift_L" or $key eq "Shift_R" ) {
-        $shift = 1;
         return;
     }
 
@@ -180,9 +278,9 @@ sub key_press {
         $editor_ref,
         $key, $ascii,
         {
-            'ctrl'  => $ctrl,
-            'alt'   => $alt,
-            'shift' => $shift,
+            'ctrl'  => 0,
+            'alt'   => 0,
+            'shift' => 0,
         }
     );
 
@@ -271,10 +369,17 @@ sub create_canva {
     delete $zone_local{'on_editor_destroy'};
     delete $zone_local{'on_new_editor'};
 
-    my $canva = $mw->Canvas(
+    #my $canva = $mw->Canvas(
+    
+    my $canva = $mw->EditorCanva(
         -background => $color,
         #)->pack( -expand => 1, -fill => 'both' );
     )->place( -in => $mw, %zone_local );
+    
+    print "\n\nDump des évènement gérés :\n";
+    Tk::Widget::bindDump( $mw );
+    print "Fin du dump :\n\n";
+    
     return ( $canva, $zone_ref );
 }
 
@@ -375,6 +480,9 @@ sub create_text_and_mark_it {
     );
     my ( $x1, $y1, $x2, $y2 ) = $self->[CANVA]->bbox($id);
 
+#    $self->[CANVA]->bind('text', <KeyPress>, sub {}) ;
+#    $self->[TOP_LEVEL]->bind('Tk::text', <KeyPress>, sub {}) ;
+
     #return ( $id, $x2 - $x1 - 2, $y2 - $y1 - 2);
     return ( $id, $x2 - $x1 - 2, $y2 - $y1 + $line_offset );
 
@@ -410,6 +518,10 @@ sub create_text {
         -fill   => $hash_ref->{color},
     );
     my ( $x1, $y1, $x2, $y2 ) = $self->[CANVA]->bbox($id);
+
+    #$self->[CANVA]->bind('text', <KeyPress>, sub {}) ;
+    #$self->[TOP_LEVEL]->bind('Tk::text', <KeyPress>, sub {}) ;
+
     return ( $id, $x2 - $x1 - 2, $y2 - $y1 - 2 );
 
 }
@@ -598,15 +710,12 @@ sub key_release {
     my ( undef, $self, $key ) = @_;
 
     if ( $key eq "Control_L" or $key eq "Control_R" ) {
-        $ctrl = 0;
         return;
     }
     if ( $key eq "Alt_L" ) {
-        $alt = 0;
         return;
     }
     if ( $key eq "Shift_L" or $key eq "Shift_R" ) {
-        $shift = 0;
         return;
     }
 }

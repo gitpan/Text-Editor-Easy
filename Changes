@@ -1,6 +1,12 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
+0.34  : 18 July 2008   !
+-----------------------+
+        - better key management (alt, ctrl, ...)
+        - should skip tests on machins that can't do them without failing everywhere...
+
+-----------------------+
 0.33  : 06 July 2008   !
 -----------------------+
         - main window size and position are now saved in the editor session
