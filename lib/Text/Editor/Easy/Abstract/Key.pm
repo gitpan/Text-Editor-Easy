@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 use Data::Dump qw(dump);
 
 sub left {
@@ -107,7 +107,7 @@ sub end {
 }
 
 sub delete_start_selection_point {
-    my ( $self, $mode ) = @_;
+    my ( $self ) = @_;
         
     $self->[SELECTION] = undef;
     Text::Editor::Easy::Abstract::deselect( $self );
@@ -802,7 +802,7 @@ sub end_file {
     my ( $self, $pos ) = @_;
 
     my ( $ref_last, $text ) = $self->[PARENT]->previous_line;
-	
+    
     Text::Editor::Easy::Abstract::display( $self, $ref_last, { 'at' => 'bottom', 'from' => 'bottom' } );
 
     if ( ! defined $pos ) {
@@ -810,6 +810,83 @@ sub end_file {
         Text::Editor::Easy::Abstract::set_at_end( $self );
     }
     return Text::Editor::Easy::Abstract::cursor_set( $self, $pos, $ref_last );
+}
+
+sub motion_select {
+    my ( $self, $options_ref ) = @_;
+    
+    my $select_ref = $self->[SELECTION];
+    if ( ! defined $select_ref ) {
+        $select_ref = set_start_selection_point ( $self, '=' );
+        $self->[SELECTION] = $select_ref;
+    }
+    $select_ref->{'stop_line'} = $options_ref->{'line'};
+    $select_ref->{'stop_pos'} = $options_ref->{'line_pos'};
+    #print "START LINE $select_ref->{'start_line'}\n";
+    #print "OPTIO LINE $options_ref->{'line'}\n";
+    #print "LINE   POS $options_ref->{'line_pos'}\n";
+    if ( $select_ref->{'start_line'} eq $options_ref->{'line'} ) {
+        if ( $select_ref->{'stop_pos'} > $select_ref->{'start_pos'} ) {
+            $select_ref->{'mode'} = '+';
+        }
+        else {
+            $select_ref->{'mode'} = '-';
+        }
+        Text::Editor::Easy::Abstract::area_select (
+            $self,
+            [ $select_ref->{'start_line'}, $select_ref->{'start_pos'} ],
+            [ $select_ref->{'start_line'}, $options_ref->{'line_pos'} ]
+        );
+        Text::Editor::Easy::Abstract::cursor_set ( 
+            $self,
+            $select_ref->{'stop_pos'},
+            $select_ref->{'stop_line'}
+        );
+        return;
+    }
+    my ( $first, $last ) = Text::Editor::Easy::Abstract::tell_order (
+        $self,
+        $select_ref->{'start_line'},
+        $options_ref->{'line'},
+    );
+    my ( $first_ref, $last_ref );
+    if ( ! defined $last ) {
+        if ( $select_ref->{'mode'} eq '+' ) {
+            $first_ref = 'top';
+            $last_ref = [ $options_ref->{'line'}, $options_ref->{'line_pos'} ];
+        }
+        else {
+            $first_ref = [ $options_ref->{'line'}, $options_ref->{'line_pos'} ];
+            $last_ref = [ 'bottom' ];
+        }
+    }
+    else {
+        my $area_ref;
+        $area_ref->{ $select_ref->{'start_line'} } = $select_ref->{'start_pos'};
+        $area_ref->{ $options_ref->{'line'} } = $options_ref->{'line_pos'};
+
+        $first_ref = [ $first, $area_ref->{$first} ];
+        $last_ref = [ $last, $area_ref->{$last} ];
+
+        if ( $first == $select_ref->{'start_line'} ) {
+            $select_ref->{'mode'} = '+';
+        }
+        else {
+            $select_ref->{'mode'} = '-';
+        }
+    }    
+    #print "FIRST : $first\n";
+    #print "LAST : $last\n";
+    Text::Editor::Easy::Abstract::area_select (
+        $self,
+        $first_ref,
+        $last_ref,
+    );
+    Text::Editor::Easy::Abstract::cursor_set ( 
+        $self,
+        $select_ref->{'stop_pos'},
+        $select_ref->{'stop_line'}
+    );
 }
 
 

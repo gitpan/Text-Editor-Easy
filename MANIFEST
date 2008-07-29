@@ -2,6 +2,7 @@
 Changes
 Editor.pl
 Makefile.PL
+README
 account.hst
 demo1.pl
 demo10.pl
@@ -45,11 +46,12 @@ lib/Text/Editor/Easy/Test/Test1.pm
 lib/Text/Editor/Easy/Test/Test3.pm
 lib/Text/Editor/Easy/Trace/Print.pm
 lib/Text/Editor/Easy/Window.pm
+lib/Text/Editor/Easy/Zone.pm
 manifest
 meta.yml
 prove.bat
 prove.sh
-README
+return_saved.txt
 t/00-check_Tk.t
 t/00-load.t
 t/boilerplate.t
@@ -65,3 +67,4 @@ t/multiplexed_without_thread_creation.t
 t/pod.t
 t/return.t
 t/test_tk.pl
+tk_is_ok

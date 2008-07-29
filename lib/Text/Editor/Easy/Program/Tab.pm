@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Text::Editor::Easy::Comm;
 
@@ -76,6 +76,10 @@ sub motion_over_tab {
   # Vérification que l'on est bien sur la première ligne
     return if ( anything_for_me() );
 
+    $editor->async->make_visible;
+
+    return if ( anything_for_me() );
+    
     my $first_line = $editor->first;
     my $pointed_line = $hash_ref->{'line'};
     return if ( $first_line != $pointed_line );

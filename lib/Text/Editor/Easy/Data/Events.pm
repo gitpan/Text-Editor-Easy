@@ -6,6 +6,7 @@ return (
     'shift_motion_last'     => 'Text::Editor::Easy',
     'alt_motion_last'     => 'Text::Editor::Easy',
     'ctrl_motion_last'     => 'Text::Editor::Easy',
+    'b1_motion_last'     => 'Text::Editor::Easy',
     'on_top_last'     => 'Text::Editor::Easy',
     'insert_last'     => 'Text::Editor::Easy',
     'change_last'     => 'Text::Editor::Easy',

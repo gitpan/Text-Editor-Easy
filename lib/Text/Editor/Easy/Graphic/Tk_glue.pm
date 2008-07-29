@@ -8,7 +8,10 @@ sub ClassInit {
     
     # Don't look for default bindings
     #$class->SUPER::ClassInit($mw);
-    $mw->bind($class, '<Enter>', sub{print "Entered a MyButton\n"});
+    
+    # Adding "CanvasRaise" method, which enables to modify
+    # stack order of Canvas objects between them
+    *CanvasRaise = \&Tk::raise;
 }
 
 package Text::Editor::Easy::Graphic;
@@ -22,11 +25,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -43,6 +46,7 @@ my %graphic;    # Liste des objets graphiques créés
 my $repeat_id;
 
 my %zone;
+my %global_zone;
 
 use constant {
     TOP_LEVEL => 0,
@@ -121,13 +125,16 @@ sub initialize {
             -yscrollincrement => 0,
         );
     }
-    $self->[ZONE] = $zone_ref;
+    my $zone_name = $zone_ref->{'name'};
+    #print "Affectation du nom de zone $zone_name à l'objet graphique $self\n";
+    $self->[ZONE] = $zone_name;
+    $global_zone{$zone_name} = $zone_ref;
     if ( $hash_ref->{editor_ref} ) {
         $editor{ refaddr $canva} = $hash_ref->{editor_ref};
     }
     $self->[CANVA] = $canva;
 
-    print "CANVA est un objet de type ", ref $canva, "\n";
+    #print "CANVA est un objet de type ", ref $canva, "\n";
 
     #$canva->bindtags(undef);
     #$canva->bind('text', <KeyPress>, sub {}) ;
@@ -135,6 +142,23 @@ sub initialize {
 
     $canva->CanvasBind( '<Button-1>',
         [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y') ] );
+    $canva->CanvasBind( '<Shift-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 0,
+                'alt'   => 0,
+                'shift' => 1,
+            }
+         ] );
+    $canva->CanvasBind( '<Shift-Control-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 1,
+                'alt'   => 0,
+                'shift' => 1,
+            }
+         ] );
+
     $canva->CanvasBind( '<Configure>',
         [ \&resize, $hash_ref->{resize}, Ev('w'), Ev('h') ] );
     $canva->CanvasBind( '<Alt-KeyPress>' => 
@@ -217,6 +241,8 @@ sub initialize {
             
         $canva->CanvasBind( '<Alt-Motion>',
             [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y'), 'alt' ] );
+        $canva->CanvasBind( '<B1-Motion>',
+            [ \&redirect, $hash_ref->{motion}, Ev('x'), Ev('y'), 'b1' ] );
     }
 
 
@@ -244,7 +270,7 @@ sub redirect {
 
     my $editor_ref = $editor{ refaddr $canva};
     $sub_ref->( $editor_ref, @data );
-    $canva->break;
+    #$canva->break;
 }
 
 sub key_ctrl {
@@ -351,12 +377,15 @@ sub create_canva {
     my %zone_local;
     if ( !defined $zone_ref ) {
         %zone_local = (
-            -x         => 0,
-            -y         => 0,
-            -relwidth  => 1,
-            -relheight => 1,
+            'size' => {
+                -x         => 0,
+                -y         => 0,
+                -relwidth  => 1,
+                -relheight => 1,
+            },
             'name'     => 'none'
         );
+        Text::Editor::Easy->reference_zone( \%zone_local );
         $zone_ref = \%zone_local;
     }
     else {
@@ -364,21 +393,22 @@ sub create_canva {
     }
 
     #print "DAns create canva : ", $zone_ref->{'name'}, "\n";
-    delete $zone_local{'name'};
-    delete $zone_local{'on_top_editor_change'};
-    delete $zone_local{'on_editor_destroy'};
-    delete $zone_local{'on_new_editor'};
+    my $size_ref = $zone_local{'size'};
+    #delete $zone_local{'name'};
+    #delete $zone_local{'on_top_editor_change'};
+    #delete $zone_local{'on_editor_destroy'};
+    #delete $zone_local{'on_new_editor'};
 
     #my $canva = $mw->Canvas(
     
     my $canva = $mw->EditorCanva(
         -background => $color,
         #)->pack( -expand => 1, -fill => 'both' );
-    )->place( -in => $mw, %zone_local );
+    )->place( -in => $mw, %{ $size_ref } );
     
-    print "\n\nDump des évènement gérés :\n";
-    Tk::Widget::bindDump( $mw );
-    print "Fin du dump :\n\n";
+    #print "\n\nDump des évènement gérés :\n";
+    #Tk::Widget::bindDump( $mw );
+    #print "Fin du dump :\n\n";
     
     return ( $canva, $zone_ref );
 }
@@ -414,14 +444,14 @@ sub clipboard_get {
 }
 
 sub clipboard_set {
-        my ( $self, $string ) = @_;
+    my ( $self, $string ) = @_;
         
-        print "Dans clipboard_set de Tk_glue |$self|$string|\n";
-        # usefull ?
-        $self->[TOP_LEVEL]->clipboardClear;
-        
-        $self->[TOP_LEVEL]->clipboardAppend('--', $string);
-        return 1; # OK
+    #print "Dans clipboard_set de Tk_glue |$self|$string|\n";
+    # usefull ?
+    $self->[TOP_LEVEL]->clipboardClear;
+
+    $self->[TOP_LEVEL]->clipboardAppend('--', $string);
+    return 1; # OK
 }
 
 sub manage_event {
@@ -567,18 +597,22 @@ sub canva_focus {
 sub on_top {
     my ($self) = @_;
 
-    my %local_zone = %{ $self->[ZONE] };
-    
-    return if ( ! defined $local_zone{'name'} );
+    #my %local_zone = %{ $self->[ZONE] };
+    my $zone_name = $self->[ZONE];
 
-    $zone{ $local_zone{'name'} } = $self;
+    #print "Appel de on_top pour l'objet graphique $self, nom de zone : $zone_name\n";
 
-    delete $local_zone{'name'};
-    delete $local_zone{'on_top_editor_change'};
-    delete $local_zone{'on_editor_destroy'};
-    delete $local_zone{'on_new_editor'};
+    return if ( ! defined $zone_name );
+
+    $zone{ $zone_name } = $self;
+
+    my %local_zone = %{ $global_zone{$zone_name} };
+    #delete $local_zone{'name'};
+    #delete $local_zone{'on_top_editor_change'};
+    #delete $local_zone{'on_editor_destroy'};
+    #delete $local_zone{'on_new_editor'};
     
-    $self->[CANVA]->place( -in => $self->[TOP_LEVEL], %local_zone );
+    $self->[CANVA]->place( -in => $self->[TOP_LEVEL], %{ $local_zone{'size'} } );
 
     #$self->[CANVA]->CanvasFocus;
 }
@@ -588,12 +622,13 @@ sub focus {
 
     on_top($self);
     $self->[CANVA]->CanvasFocus;
+    $self->[CANVA]->CanvasRaise;
 }
 
 sub get_zone {
     my ($self) = @_;
 
-    return $self->[ZONE]->{'name'};
+    return $self->[ZONE];
 }
 
 sub get_graphic_focused_in_zone {
@@ -727,7 +762,7 @@ sub position_bottom_tag_for_text_lower_than {
     $self->[CANVA]->dtag( 'bottom', 'bottom' );
     return if ( $bottom <= $top );
 
-    #print "Tag bottom à positionner entre $top et $bottom\n"; zzzzz
+    #print "Tag bottom à positionner entre $top et $bottom\n"; 
     #print "Dans position_bottom tk_glue : \$top = $top, bottom = $bottom\n";
     $self->[CANVA]->addtag( 'bottom', 'enclosed', 0, $top - 4, 1000, $bottom + 17 );
 }
@@ -798,7 +833,16 @@ sub get_mw {
 sub cursor_set_shape {
         my ( $self, $type ) = @_;
         
-        $self->[CANVA]->configure(-cursor => 'hand2');
+        #$self->[CANVA]->configure(-cursor => 'sb_h_double_arrow');
+        $self->[CANVA]->configure(-cursor => $type);
+        #$self->[CANVA]->configure(-cursor => 'top_left_arrow');
+}
+
+sub cursor_get_shape {
+    my ( $self ) = @_;
+        
+        #$self->[CANVA]->configure(-cursor => 'sb_h_double_arrow');
+    return $self->[CANVA]->cget('-cursor');
 }
 
 sub kill {
@@ -809,6 +853,27 @@ sub kill {
     delete $editor{ refaddr($self->[CANVA]) };
     undef $self->[CANVA];
     delete $graphic{ refaddr $self};
+}
+
+sub zone_update {
+    my ( $self, $name, $hash_ref ) = @_;
+    
+    print "Dans Tk_glue zone_update : name = $name\n";
+    $self = get_graphic_focused_in_zone ( $self, $name );
+    $global_zone{$name} = $hash_ref;
+    
+    if ( ! defined $self ) {
+        print STDERR "No 'Text::Editor::Easy::Graphic' instance found on top of zone named $name\n";
+        return;
+    }
+    $self->forget;
+    $self->on_top;
+}
+
+sub put_on_top {
+    my ( $self ) = @_;
+    
+    $self->[CANVA]->CanvasRaise;
 }
 
 =head1 COPYRIGHT & LICENSE

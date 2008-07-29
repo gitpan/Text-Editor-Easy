@@ -1,6 +1,17 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
+0.35  : 29 July 2008   !
+-----------------------+
+        - text selection with mouse.
+        - start of zone resizing : in an individual way and in absolute coordinates.
+        
+        ... by the way, believe it or not, this sub-version was created and edited almost
+        exclusively with my perl program "Editor.pl". Well, to tell the truth, there are
+        still lots of (sometimes 'very') annoying bugs that make these program and module
+        not yet usable for a standard use.
+
+-----------------------+
 0.34  : 18 July 2008   !
 -----------------------+
         - better key management (alt, ctrl, ...)

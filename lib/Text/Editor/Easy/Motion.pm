@@ -9,12 +9,13 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
+use threads;
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
 
@@ -110,7 +111,7 @@ sub init_move {
     $show_calls_editor = bless \do { my $anonymous_scalar },
       "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref( $show_calls_editor, $ref_editor);
-    $display_zone = $zone;
+    $display_zone = $zone->{'name'};
 }
 
 my $info;      # Descripteur de fichier du fichier info
@@ -128,8 +129,8 @@ sub move_over_out_editor {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
 
     return if (anything_for_me);
-	
-	$editor->async->unset_at_end;
+    
+    $editor->async->unset_at_end;
 
     #print "DANS MOVE_OVER_OUT_FILE $editor, $hash_ref\n";
 
@@ -339,7 +340,7 @@ sub init_set {
     my ( $self, $reference, $unique_ref, $zone ) = @_;
 
     #print "Dans init_set $self, $zone\n";
-    $display_zone = $zone;
+    $display_zone = $zone->{'name'};
 }
 
 sub cursor_set_on_who_file {
@@ -354,6 +355,9 @@ sub cursor_set_on_who_file {
 
     #}
 
+    return if (anything_for_me);
+    $editor->async->make_visible;
+    return if (anything_for_me);
 # Pris en charge par "move_over_out_file" dans le cas "cursor_set" pour des questions de rapidité
     my $hash_ref_line = $hash_ref->{'line'};
     return if ( !$hash_ref_line );
@@ -412,8 +416,29 @@ sub cursor_set_on_who_file {
     }
 }
 
+sub zone_resize {
+    my ( $self, $zone_name, $where, $options_ref ) = @_;
+    
+    print "Dans zone resize de $zone_name, tid = ", threads->tid, " - where = $where|$options_ref\n";
+    my $zone = Text::Editor::Easy::Zone->whose_name( $zone_name );
+    return if ( anything_for_me );
+    print "Objet zone ? : $zone\n";
+    my @zone_coord = $zone->coordinates;
+    return if ( anything_for_me );
+#    print "Appel de zone resize...\n";
+    $zone->resize( 
+        $where,
+        $options_ref,
+        @zone_coord
+    );
+}
+
 sub nop {
-   # Just to stop other potential useless processing
+    # Just to stop other potential useless processing
+    return if ( anything_for_me );
+    
+    my ( $unique_ref, $editor ) = @_;
+    $editor->make_visible;
 }
 
 =head1 FUNCTIONS

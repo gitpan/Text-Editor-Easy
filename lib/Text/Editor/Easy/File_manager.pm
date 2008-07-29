@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 =head1 SYNOPSIS
 
@@ -151,6 +151,7 @@ sub init_file_manager {
     $file_manager_ref->[LAST_UPDATE] = 1;
     if ( defined $growing_file ) {
         $file_manager_ref->[GROWING] = $growing_file;
+        $file_manager_ref->[PARENT]->async->set_at_end;
         $file_manager_ref->[PARENT]->async->repeat_instance_method(1, "growing_update");
     }
     else {    #Avoid warnings

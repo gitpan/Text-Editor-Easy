@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions 
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Text::Editor::Easy::Comm;
 use threads;    # Pour debug

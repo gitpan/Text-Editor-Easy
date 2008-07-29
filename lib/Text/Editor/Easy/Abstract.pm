@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 =head1 SYNOPSIS
 
@@ -75,10 +75,10 @@ use constant {
     # LINE_REF : Lignes de texte
     #------------------------------------
     TEXT => 0,             # Texte de la ligne
-    NEXT => 1
-    , # Element texte qui suit cet element (juste à droite ou premier de la ligne suivante)
-    PREVIOUS => 2
-    , # Element texte qui precède cet element (juste à gauche ou dernier element de la ligne precedente)
+    # Element texte qui suit cet element (juste à droite ou premier de la ligne suivante)
+    NEXT => 1, 
+     # Element texte qui precède cet element (juste à gauche ou dernier element de la ligne precedente)
+    PREVIOUS => 2,
     FIRST => 3,   # Premier element texte de la ligne, première ligne du segment
                   #LINE_NUMBER => 4,  # A supprimer
     SIZE  => 5,   # Absisse maximum de la ligne
@@ -87,8 +87,8 @@ use constant {
     HEIGHT    => 7,
     NEXT_SAME => 10,           # booléen : la ligne suivante est "la même" : mode "wrap"
     DISPLAYED => 8,    # booléen : la ligne est affichée à l'écran
-    REF       => 9
-    , # Référence à stoker pour communiquer avec le thread gestionnaire du fichier et des mises à jour
+    # Référence à stoker pour communiquer avec le thread gestionnaire du fichier et des mises à jour
+    REF       => 9,
     ORD => 11,
 
     LAST =>
@@ -105,6 +105,8 @@ use constant {
 
     #ABS => 4,
     POSITION_IN_LINE => 5,
+    RESIZE => 6,
+    # LINE_REF => 7,
 
 #------------------------------------
 # TEXT_REF
@@ -117,14 +119,15 @@ use constant {
       3, # Identifiant affecté par Tk à l'element texte du canevas correspondant
     ABS   => 4,
     FONT  => 5,
-    WIDTH => 6
-    , # Indique la largeur de l'element (compte-tenu de la fonte), équivalent à :
-    LINE_REF =>
-      7, # Reference à l'element ligne (c'est-à-dire à une reference de tableau)
+    # Indique la largeur de l'element (compte-tenu de la fonte), équivalent à :
+    WIDTH => 6,
+    # Reference à l'element ligne (c'est-à-dire à une reference de tableau)
+    LINE_REF => 7,
+
     COLOR           => 8,    # Couleur d'affichage
-                             #------------------------------------
-                             # SCREEN_REF
-                             #------------------------------------
+    #------------------------------------
+    # SCREEN
+    #------------------------------------
     MARGIN          => 0,
     VERTICAL_OFFSET => 1,
 
@@ -240,6 +243,7 @@ my %key = (
     'shift_Prior'  => [ \&Text::Editor::Easy::Abstract::Key::shift_page_up, 'Abstract' ],
     'shift_Next'   => [ \&Text::Editor::Easy::Abstract::Key::shift_page_down, 'Abstract' ],
 
+    'alt_F4' => \&Text::Editor::Easy::Abstract::exit,
 );
 
 my %color;
@@ -326,6 +330,12 @@ sub new {
                             'mode'    => 'async',
                         },
                 $edit_ref->[REDIRECT]{$redirect} = $redirect;
+                Text::Editor::Easy::Async->reference_event( 
+                    'motion_last', 
+                    $unique_ref,
+                    $hash_ref->{'motion_last'}
+                );
+
         }
     }
     reference_event_conditions( $unique_ref, $hash_ref );
@@ -1113,10 +1123,31 @@ sub suppress_text {
 }
 
 sub clic {
-    my ( $edit_ref, $x, $y ) = @_;
+    my ( $edit_ref, $x, $y, $key ) = @_;
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'clic';
+    }
+
+    my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;    
+    if ( $shape =~ /^sb/ ) {
+        if ( $shape eq 'sb_h_double_arrow' ) {
+            if ( $x < 5 ) {
+                $edit_ref->[CURSOR][RESIZE] = [ 'left', $key ];
+            }
+            else {
+                $edit_ref->[CURSOR][RESIZE] = [ 'right', $key ];
+            }
+        }
+        else {
+            if ( $y < 5 ) {
+                $edit_ref->[CURSOR][RESIZE] = [ 'top', $key ];
+            }
+            else {
+                $edit_ref->[CURSOR][RESIZE] = [ 'bottom', $key ];
+            }
+        }
+        return;
     }
 
     my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
@@ -1140,7 +1171,7 @@ sub clic {
     else {
         cursor_set( $edit_ref, { 'x' => $x, 'y' => $y } );
         $edit_ref->[GRAPHIC]->canva_focus;
-        $edit_ref->deselect;
+        Text::Editor::Easy::Abstract::Key::delete_start_selection_point ( $edit_ref );
         cursor_make_visible($edit_ref);
     }
     
@@ -1186,26 +1217,69 @@ sub motion {
     my $event = 'motion_last';
     if ( defined $key ) {
         $event = $key . '_motion_last' ;
-        print "Génération de l'évènement $event\n";
+        #print "Génération de l'évènement $event\n";
+    }
+    else {
+        if ( $x < 5 or $x > ( $edit_ref->[SCREEN][WIDTH] - 5 ) ) {
+            #print "Il faut changer le curseur\n";
+            cursor_set_shape ( $edit_ref, 'sb_h_double_arrow' );
+        }
+        elsif ( $y < 5 or $y > ( $edit_ref->[SCREEN][HEIGHT] - 5 ) ) {
+            cursor_set_shape ( $edit_ref, 'sb_v_double_arrow' );
+        }
+        else {
+            cursor_set_shape ( $edit_ref, 'arrow' );
+        }
     }
     
-    $edit_ref->[PARENT]->redirect(
-        $event,
-        $edit_ref,
-        {
-            'line'        => $ref_under_cursor,
-            'display'     => $display_ref,
+    if ( $event eq 'b1_motion_last' ) {
+        b1_motion ( $edit_ref, {
+            'x' => $x,
+            'y' => $y,
+            'line_ref' => $line_ref,
             'display_pos' => $display_pos,
-            'line_pos'    => $line_pos,
-        }
+            'line_pos' => $line_pos,
+            'line' => $ref_under_cursor,
+        } );
+    }
+
+    if ( $edit_ref->[REDIRECT]{$event} ) {
+        #print "Motion $event\n";
+        $edit_ref->[PARENT]->redirect(
+            $event,
+            $edit_ref,
+            {
+                'line'        => $ref_under_cursor,
+                'display'     => $display_ref,
+                'display_pos' => $display_pos,
+                'line_pos'    => $line_pos,
+            }
+        );
+    }
+}
+
+sub b1_motion {
+    my ( $edit_ref, $options_ref ) = @_;
+
+    my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;
+    
+    if ( $shape !~ /^sb/ ) {
+        # Sélection de texte (curseur standard)
+        Text::Editor::Easy::Abstract::Key::motion_select( $edit_ref, $options_ref );
+        return;
+    }
+    # Redimensionnement de zone (curseur double flèche)
+    Text::Editor::Easy::Async->ask_named_thread (
+        'Text::Editor::Easy::Motion::zone_resize',
+        'Motion',
+        $edit_ref->[GRAPHIC]->get_zone,
+        $edit_ref->[CURSOR][RESIZE][0],
+        $options_ref,
     );
 }
 
-sub shift_motion {
-    print "Dans shift motion de Abstract\n";
-}
-
 sub deselect {
+
     my ($self) = @_;
 
     $self->[GRAPHIC]->delete_select;
@@ -1555,7 +1629,7 @@ sub key_press {
     $key_code .= '_' if ($key_code);
     $key_code .= $key;
 
-    print "KEY CODE : $key_code\n";
+    #print "KEY CODE : $key_code\n";
     #return;
     $sub_sub_origin = $key_code;
 
@@ -1590,9 +1664,9 @@ sub key_press {
 
         return;
     }
-    else {
-        print "Aucune action associée à $key_code\n";
-    }
+    #else {
+    #    print "Aucune action associée à $key_code\n";
+    #}
 
     #print "|$key|$ascii|" if ( $alt_key );
     #print "|$key|$ascii|";
@@ -4286,6 +4360,142 @@ sub unset_at_end {
     $self->[AT_END] = 0;
 }
 
+sub tell_order {
+    my ( $self, $ref_a, $ref_b ) = @_;
+    
+    my ( $first, $last );
+    my $line_ref = $self->[SCREEN][FIRST];
+    while ( $line_ref ) {
+        my $ref = $line_ref->[REF];
+        if ( $ref == $ref_a ) {
+            if ( $first ) {
+                $last = $ref_a;
+                return ( $first, $last );
+            }
+            $first = $ref_a;
+        }
+        if ( $ref == $ref_b ) {
+            if ( $first ) {
+                $last = $ref_b;
+                return ( $first, $last );
+            }
+            $first = $ref_b;
+        }
+        
+        while ( $line_ref->[NEXT_SAME] ) {
+            $line_ref = $line_ref->[NEXT];
+        }
+        $line_ref = $line_ref->[NEXT];
+    }
+    return ( $first, $last );
+}
+
+sub area_select {
+    my ( $self, $first_ref, $last_ref ) = @_;
+    
+    #print "Dans area_select je dois sélectionner de $first_ref->[0] position $first_ref->[1]\n";
+    #print "   jusqu'à $last_ref->[0] position $last_ref->[1]\n";
+    
+    # Positionnement sur la première ligne avec déselection
+    my $line_ref = $self->[SCREEN][FIRST];
+    my $ref = $line_ref->[REF];
+    if ( $first_ref ne 'top' ) {
+        while ( $ref != $first_ref->[0] ) {
+            line_deselect ( $self, $ref );
+            $line_ref = $line_ref->[NEXT];
+            my $new_ref = $line_ref->[REF];
+            while ( $new_ref == $ref ) {
+                $line_ref = $line_ref->[NEXT];
+                $new_ref = $line_ref->[REF];
+            }
+            $ref = $new_ref;
+        }
+    }
+    
+    # Sélection de la première ligne
+    line_deselect ( $self, $ref );
+    if ( $first_ref eq 'top' ) {
+        if ( $last_ref->[0] != $ref ) {
+            line_select ( $self, $ref );
+        }
+        else {
+            line_select ( $self, $ref, 0, $last_ref->[1] );
+            area_deselect_bottom ( $self, $ref, $line_ref );
+            return;
+        }
+    }
+    else {
+        if ( $last_ref->[0] != $ref ) {
+            line_select ( $self, $ref, $first_ref->[1] );
+        }
+        else {
+            #print "Sélection d'une seule ligne de $first_ref->[1] à $last_ref->[1]\n";
+            line_select ( $self, $ref, $first_ref->[1], $last_ref->[1] );
+            area_deselect_bottom ( $self, $ref, $line_ref );
+            return;
+        }
+    }
+    
+    # Sélection des lignes suivantes (entièrement) jusqu'à la dernière
+    $line_ref = $line_ref->[NEXT];
+    return if ( ! defined $line_ref );
+    my $new_ref = $line_ref->[REF];
+    while ( $new_ref == $ref ) {
+        $line_ref = $line_ref->[NEXT];
+        $new_ref = $line_ref->[REF];
+    }
+    $ref = $new_ref;
+    while ( $ref != $last_ref->[0] ) {
+        line_select( $self, $ref );
+        $line_ref = $line_ref->[NEXT];
+        return if ( ! defined $line_ref );
+        my $new_ref = $line_ref->[REF];
+        while ( $new_ref == $ref ) {
+            $line_ref = $line_ref->[NEXT];
+            return if ( ! defined $line_ref );
+            $new_ref = $line_ref->[REF];
+        }
+        $ref = $new_ref;
+    }
+    return if ( $last_ref->[0] eq 'bottom' );
+    line_deselect ( $self, $ref );
+    line_select ( $self, $ref, 0, $last_ref->[1]);
+
+    # Désélection des lignes du bas
+    area_deselect_bottom ( $self, $ref, $line_ref );
+}
+
+sub area_deselect_bottom {
+    my ( $self, $ref, $line_ref ) = @_;
+    
+    while ( 1 ) {
+        $line_ref = $line_ref->[NEXT];
+        return if ( ! defined $line_ref );
+        my $new_ref = $line_ref->[REF];
+        while ( $new_ref == $ref ) {
+            $line_ref = $line_ref->[NEXT];
+            return if ( ! defined $line_ref );
+            $new_ref = $line_ref->[REF];
+        }
+        $ref = $new_ref;
+        line_deselect ( $self, $ref );
+    }
+}
+
+sub graphic_zone_update {
+    my ( $self, $name, $hash_ref ) = @_;
+    
+    $self->[GRAPHIC]->zone_update($name, $hash_ref);
+}
+
+sub editor_make_visible {
+    my ( $self ) = @_;
+    
+    $self->[GRAPHIC]->put_on_top;
+}
+
+1;
+
 =head1 FUNCTIONS
 
 =head2 abstract_eval
@@ -4619,16 +4829,7 @@ Prevent space to appear at the bottom (after the last line) or at the top (befor
 
 =head2 verify_if_cursor_is_visible_horizontally
 
-=head2 verify_if_cursor_is_visible_vertically
-
-=head2 wrap
 
 =head1 COPYRIGHT & LICENSE
 
 Copyright 2008 Sebastien Grommier, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-
-=cut
-
-1;

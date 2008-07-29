@@ -1,31 +1,8 @@
 Text-Editor-Easy
 
-Version 0.34.
+Version 0.35.
 Pure perl editor module and program. 10 demos in the program,
 but still not usable.
-
-Here are the features of the current editor module :
-    - syntax highlighting but without context (each line is considered alone)
-    - multi-thread by simple method calls
-    - graphic user interface not tightly linked to the module (adaptation to console planned)
-    - not sensitive to the size of the edited file
-
-The editor program, 'Editor.pl', that uses the module adds the following features :
-    - macro langage : perl
-    - dynamic placement in the code that displays messages or warnings during execution
-    - start of perl programs currently edited from the editor
-    - session management
-
-What is planned for version 1.0, perhaps for the end of 2008 :
-    - annulation
-    - slides management (vertical and horizontal)
-    - context management in syntax highlighting
-    - ...still a lot of bugs to fix, but a lot of them will remain.
-
-Vital problems to solve in future versions :
-    - memory leaks
-    - object inheritance
-
 
 
 INSTALLATION

@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 =head1 SYNOPSIS
 
@@ -72,6 +72,7 @@ use Text::Editor::Easy::Comm;
 
 our %Trace; # Hash to tell modules if they have to make displays or to be silent
 
+use Text::Editor::Easy::Zone;
 use Text::Editor::Easy::Cursor;
 use Text::Editor::Easy::Screen;
 use Text::Editor::Easy::Window;
@@ -158,27 +159,8 @@ sub new {
 
     # Référencement de l'éditeur
     Text::Editor::Easy->reference_editor( $ref, $hash_ref );
-
-    my $new_editor;
-
-    if ( $hash_ref->{sub} ) {
-
-            # On demande la création d'un thread supplémentaire
-        my $thread = $editor->create_client_thread( $hash_ref->{sub} );
-        $editor->set_synchronize();
-        if ( threads->tid == 0 and ! $main_loop_launched) {
-            $main_loop_launched = 1;
-            #print "Appel de la main loop (méthode new)\n";
-            Text::Editor::Easy->manage_event;
-            #print "Fin de la main loop (méthode new)\n";
-            Text::Editor::Easy::Comm::untie_print;
-            return $editor;
-        }
-    }
-    else {
-        $editor->set_synchronize();
-    }
-
+    
+    $editor->set_synchronize();
     my $focus = $hash_ref->{'focus'};
     if ( !defined $focus ) {
         #print "Création de l'éditeur $editor : mise au premier plan (appel on_top)\n";
@@ -188,6 +170,22 @@ sub new {
     elsif ( $focus eq 'yes' ) {
         $editor->focus($hash_ref);
     }
+
+    if ( $hash_ref->{sub} ) {
+
+        # On demande la création d'un thread supplémentaire
+        my $thread = $editor->create_client_thread( $hash_ref->{sub} );
+        #$editor->set_synchronize();
+        if ( threads->tid == 0 and ! $main_loop_launched) {
+            $main_loop_launched = 1;
+            #print "Appel de la main loop (méthode new)\n";
+            Text::Editor::Easy->manage_event;
+            #print "Fin de la main loop (méthode new)\n";
+            Text::Editor::Easy::Comm::untie_print;
+            return $editor;
+        }
+    }
+
     return $editor;
  }
 
@@ -621,7 +619,7 @@ sub window {
     my ($self) = @_;
 
     my $ref    = refaddr $self;
-	$ref = '' if ( ! defined $ref );
+    $ref = '' if ( ! defined $ref );
     my $window = $window{$ref};
     return $window if ($window);
 
@@ -786,70 +784,6 @@ sub substitute_eval_with_file {
         #print "NUMBER = $number\n";
     }
     Text::Editor::Easy->data_substitute_eval_with_file( $file, $number + 1 );
-}
-
-package Text::Editor::Easy::Zone;
-use Scalar::Util qw(refaddr);
-
-# A modifier en un référence de scalaire...
-sub new {
-    my ( $classe, $hash_ref ) = @_;
-    
-        if ( my $trace_ref = $hash_ref->{'trace'} ) {
-
-# Hash "%Trace" must be seen by all future created threads but needn't be  a shared hash
-# ===> will be duplicated by perl thread creation mecanism
-            %Text::Editor::Easy::Trace = %{$trace_ref};
-            delete $hash_ref->{'trace'};
-        }
-    #Text::Editor::Easy::trace_test();
-
-    Text::Editor::Easy::Comm::verify_model_thread();
-    my $zone = bless $hash_ref, $classe;
-    my $name = $hash_ref->{'name'};
-    if ( defined $name ) {
-
-        # le thread Data n'est peut être pas opérationnel
-        #Text::Editor::Easy::Async->reference_zone($hash_ref);
-        Text::Editor::Easy->reference_zone($hash_ref);
-    }
-    if ( my $new_hash_ref = $hash_ref->{'on_top_editor_change'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_top_editor_change',
-            $new_hash_ref, undef );
-    }
-    if ( my $new_hash_ref = $hash_ref->{'on_editor_destroy'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_editor_destroy',
-            $new_hash_ref, undef );
-    }
-    if ( my $new_hash_ref = $hash_ref->{'on_new_editor'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_new_editor',
-            $new_hash_ref, undef );
-    }
-    return $zone;
-}
-
-sub whose_name {
-    my ( $self, $name ) = @_;
-
-    return if ( !defined $name );
-    return Text::Editor::Easy->zone_named($name);
-}
-
-sub on_top_editor {
-    my ( $self ) = @_;
-    
-    print "Dans on_top_editor de Zone ", $self->{'name'}, "\n";
-    my $ref = Text::Editor::Easy->on_top_ref_editor($self);
-    print "Dans on_top_editor de Zone ", $self->{'name'}, ", ref = $ref\n";
-    my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
-    Text::Editor::Easy::Comm::set_ref($editor, $ref);
-    return $editor;
-}
-
-sub list {
-    my ($self) = @_;
-
-    return Text::Editor::Easy->zone_list;
 }
 
 package Text::Editor::Easy::Async;

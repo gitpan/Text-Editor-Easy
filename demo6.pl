@@ -43,10 +43,12 @@ use Text::Editor::Easy;
 use Text::Editor::Easy;
 my $zone1 = Text::Editor::Easy::Zone->new(
     {
-        '-x'         => 0,
-        '-rely'      => 0,
-        '-relwidth'  => 0.5,
-        '-relheight' => 1,
+        'size' => {
+            '-x'         => 0,
+            '-rely'      => 0,
+            '-relwidth'  => 0.5,
+            '-relheight' => 1,
+        },
         'name'       => 'input_left',
     }
 );
@@ -101,10 +103,12 @@ Text::Editor::Easy->new(
 sub main {
     my $zone2 = Text::Editor::Easy::Zone->new(
         {
-            '-relx'      => 0.5,
-            '-rely'      => 0,
-            '-relwidth'  => 0.5,
-            '-relheight' => 1,
+            'size' => {
+                '-relx'      => 0.5,
+                '-rely'      => 0,
+                '-relwidth'  => 0.5,
+                '-relheight' => 1,
+            },
             'name'       => 'output_right',
         }
     );

@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 =head1 SYNOPSIS
 
@@ -1223,6 +1223,7 @@ sub verify_graphic {
                     'insert_mode' => 'editor_insert_mode',
                     'set_insert' => 'editor_set_insert',
                     'set_replace' => 'editor_set_replace',
+                    'make_visible' => 'editor_make_visible',
                 },
                 'class' => 'Text::Editor::Easy',
             }
@@ -1244,8 +1245,9 @@ sub verify_graphic {
                         'on_editor_destroy', 
                         'repeat',
                         'repeat_class_method',
-					    'window_set',
-					    'window_get',
+                        'window_set',
+                        'window_get',
+                        'graphic_zone_update',
                     ]
             }
         );
@@ -1460,7 +1462,8 @@ sub verify_motion_thread {
                 'use'     => 'Text::Editor::Easy::Motion',
                 'package' => 'Text::Editor::Easy::Motion',
                 'methods' => [ 'reference_event', 'manage_events' ],
-                'object'  => {}
+                'object'  => {},
+                'name' => 'Motion',
             }
         );
 

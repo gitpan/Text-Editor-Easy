@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
@@ -28,24 +28,6 @@ if ( ! -d "tmp" ) {
 # Start of launching perl process (F5 key management)
 open EXEC, "| perl exec.pl" or die "Fork impossible\n";
 autoflush EXEC;
-
-# Main tab "zone", area of the main window (syntax re-used : 'place' of Tk)
-my $zone4 = Text::Editor::Easy::Zone->new(
-    {
-        '-x'        => 0,
-        '-rely'     => 0,
-        '-relwidth' => 1,
-        '-height'   => 25,
-        'name'      => 'zone4',
-        'trace' => {
-            'all' => 'tmp/',
-
-            #    'Text::Editor::Easy::Data' => undef,
-            #     'Text::Editor::Easy::Data' => 'tmp/',
-            'trace_print' => 'full',
-        },
-    }
-);
 
 # List of main tab files (loading delayed)
 my @files_session;
@@ -81,6 +63,38 @@ while ( my ($key, $value) = each %{$session_ref->{'window'}}) {
     print "Valeur $key / $value\n";
     push @window_size, $key, $value;
 }
+
+my $size_zone4 = {
+            '-x'        => 0,
+            '-rely'     => 0,
+            '-relwidth' => 1,
+            '-height'   => 25,
+        };
+my $zone_list_ref = $session_ref->{'zone_list'};
+if ( defined $zone_list_ref ) {
+    my $zone4_ref = $zone_list_ref->{'zone4'};
+    #print "Zone 4 ref = $zone4_ref | ", dump ( $zone4_ref ), "\n";
+    if ( my $size = $zone4_ref->{'size'} ) {
+        #print "Zone 4 size = $size | ", dump ( $size ), "\n";
+        $size_zone4 = $size;
+    }
+}
+
+# Main tab "zone", area of the main window (syntax re-used : 'place' of Tk)
+my $zone4 = Text::Editor::Easy::Zone->new(
+    {
+        'size' => $size_zone4,
+        'name'      => 'zone4',
+        'trace' => {
+            'all' => 'tmp/',
+
+            #    'Text::Editor::Easy::Data' => undef,
+            #     'Text::Editor::Easy::Data' => 'tmp/',
+            'trace_print' => 'full',
+        },
+    }
+);
+
 Text::Editor::Easy->new(
     {
         'zone'        => $zone4,
@@ -147,16 +161,23 @@ sub main {
         }
     );
     
-
-    my $out_tab_zone = Text::Editor::Easy::Zone->new(
-        {
-            '-relx'     => 0.5,
-            '-y'        => 25,
-            '-relwidth' => 0.5,
-            '-height'   => 25,
-            'name'      => 'out_tab_zone',
+    my $out_tab_zone_size = {
+        '-relx'     => 0.5,
+        '-y'        => 25,
+        '-relwidth' => 0.5,
+        '-height'   => 25,
+    };
+    if ( defined $zone_list_ref ) {
+        my $zone_ref = $zone_list_ref->{'out_tab_zone'};
+        if ( $zone_ref and my $size = $zone_ref->{'size'} ) {
+             $out_tab_zone_size = $size;
         }
-    );
+    };
+
+    my $out_tab_zone = Text::Editor::Easy::Zone->new( {
+        'size' => $out_tab_zone_size,
+        'name'      => 'out_tab_zone',
+    } );
 
     my $out_tab = Text::Editor::Easy->new(
         {
@@ -172,13 +193,24 @@ sub main {
         }
     );
     my $ref_onglet = $onglet->get_ref;
+    
+    my $zone1_size = {
+        '-x'                   => 0,
+        '-y'                   => 25,
+        '-relwidth'            => 0.5,
+        '-relheight'           => 0.7,
+        '-height'              => -25,
+    };
+    if ( defined $zone_list_ref ) {
+        my $zone_ref = $zone_list_ref->{'zone1'};
+        if ( $zone_ref and my $size = $zone_ref->{'size'} ) {
+            $zone1_size = $size;
+        }
+    };
+
     my $zone1 = Text::Editor::Easy::Zone->new(
         {
-            '-x'                   => 0,
-            '-y'                   => 25,
-            '-relwidth'            => 0.5,
-            '-relheight'           => 0.7,
-            '-height'              => -25,
+            'size' => $zone1_size,
             'name'                 => 'zone1',
             'on_top_editor_change' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
@@ -206,11 +238,13 @@ sub main {
     # Zone des display
     my $zone2 = Text::Editor::Easy::Zone->new(
         {
-            '-relx'                => 0.5,
-            '-y'                   => 50,
-            '-relwidth'            => 0.5,
-            '-relheight'           => 0.7,
-            '-height'              => -50,
+            'size' => {
+                '-relx'                => 0.5,
+                '-y'                   => 50,
+                '-relwidth'            => 0.5,
+                '-relheight'           => 0.7,
+                '-height'              => -50,
+            },
             'name'                 => 'zone2',
             'on_top_editor_change' => {
                 'use'     => 'Text::Editor::Easy::Program::Tab',
@@ -223,10 +257,12 @@ sub main {
     # Zone des appels de display, traces
     my $zone3 = Text::Editor::Easy::Zone->new(
         {
-            '-relx'      => 0.5,
-            '-rely'      => 0.7,
-            '-relwidth'  => 0.5,
-            '-relheight' => 0.3,
+            'size' => {
+                '-relx'      => 0.5,
+                '-rely'      => 0.7,
+                '-relwidth'  => 0.5,
+                '-relheight' => 0.3,
+            },
             'name'       => 'zone3',
         }
     );
@@ -271,10 +307,12 @@ sub main {
 
     my $zone5 = Text::Editor::Easy::Zone->new(
         {
-            '-x'         => 0,
-            '-rely'      => 0.7,
-            '-relwidth'  => 0.5,
-            '-relheight' => 0.3,
+            'size' => {
+                '-x'         => 0,
+                '-rely'      => 0.7,
+                '-relwidth'  => 0.5,
+                '-relheight' => 0.3,
+            },
             'name'       => 'zone5',
         }
     );
@@ -466,12 +504,6 @@ sub restart {
     print "\nDans restart...\n\n";
 
     save_session ();
-    #my $call_id = Text::Editor::Easy::Async->save_conf("editor.session_main_tab");
-    #while ( Text::Editor::Easy->async_status($call_id) ne 'ended' ) {
-    #    if ( anything_for_me )  {
-    #        have_task_done;
-    #    }
-    #}
     
     # Lancement d'un nouvel éditeur (qui récupèrera la configuration)
     print EXEC "Editor.pl|start|perl Editor.pl\n";
@@ -484,6 +516,7 @@ sub save_session {
     # In thread 0, the graphical MainLoop is over
     $session_ref->{'main_tab'} = Text::Editor::Easy->save_conf_thread_0;
     $session_ref->{'window'} = scalar Text::Editor::Easy->window->get;
+    $session_ref->{'zone_list'} = Text::Editor::Easy::Zone->list('complete');
 
     open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
     print INFO dump $session_ref;

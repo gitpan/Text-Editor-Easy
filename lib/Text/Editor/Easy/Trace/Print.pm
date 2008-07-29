@@ -10,11 +10,11 @@ The consequence is that a print should be considered as a long operation. The be
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :

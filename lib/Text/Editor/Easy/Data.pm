@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.34
+Version 0.35
 
 =cut
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Data::Dump qw(dump);
 use threads;
@@ -823,13 +823,18 @@ sub reference_zone {
 sub zone_named {
     my ( $self, $name ) = @_;
 
-    return $self->[ZONE]{$name};
+    my $hash = $self->[ZONE]{$name};
+    #print DBG "Nom de la zone cherchée : $name\n";
+    bless $hash, 'Text::Editor::Easy::Zone';
 }
 
 sub zone_list {
-    my ($self) = @_;
+    my ($self, $complete) = @_;
 
-    return keys %{ $self->[ZONE] };
+    if ( ! defined $complete ) {
+        return keys %{ $self->[ZONE] };
+    }
+    return $self->[ZONE];
 }
 
 sub save_current {
@@ -938,7 +943,6 @@ Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 
