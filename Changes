@@ -1,6 +1,13 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
+0.4   : 24 August 2008 !
+-----------------------+
+        - start of inter-thread and eval traces
+        - start to trace some user events
+            ---> pseudo-demo11 explains all that.
+
+-----------------------+
 0.35  : 29 July 2008   !
 -----------------------+
         - text selection with mouse.

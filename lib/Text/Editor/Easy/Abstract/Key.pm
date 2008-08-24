@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 use Data::Dump qw(dump);
 
 sub left {
@@ -653,7 +653,7 @@ sub copy {
     }
     return if ( ! defined $ref_line ); # stop line suppressed
     $buffer .= substr ( $self->[PARENT]->get_text_from_ref( $ref_line ), 0, $stop_pos );
-    print "========Debut buffer\n$buffer\n==========Fin buffer\n";
+    #print "========Debut buffer\n$buffer\n==========Fin buffer\n";
     Text::Editor::Easy->clipboard_set($buffer);
     #$buffer = $self->cursor->line->text . "\n";
 }
@@ -751,7 +751,7 @@ sub backspace {
     my ($self) = @_;
     
     if ( defined $self->[SELECTION] ) {
-        Text::Editor::Easy::Abstract::Key::delete_selection($self);
+        delete_selection($self);
         return; # pour comportement le plus "standard"
     }
     # left_key renvoie undef si on est au début du fichier
@@ -759,17 +759,19 @@ sub backspace {
     
     # Améliorer l'interface de erase en autorisant les nombres négatifs ==>
     #    $self->erase(-1)
-    $self->[PARENT]->erase(1);
+    print "Retour de left\n";
+    Text::Editor::Easy::Abstract::erase($self, 1);
 }
 
 sub delete {
     my ($self) = @_;
     
     if ( defined $self->[SELECTION] ) {
-        Text::Editor::Easy::Abstract::Key::delete_selection($self);
+        delete_selection($self);
         return; # pour comportement le plus "standard"
     }
-    $self->[PARENT]->erase(1);
+    print "Fin de la suppression de la sélection\n";
+    Text::Editor::Easy::Abstract::erase($self, 1);
 }
 
 sub enter {

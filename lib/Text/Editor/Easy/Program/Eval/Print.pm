@@ -9,17 +9,20 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 use threads;    # Pour debug
 
 use Devel::Size qw(size total_size);
 
 Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
+
+# Length of the slash n on a file
+my $length_s_n;
 
 sub init_print_eval {
     my ( $self, $reference, $unique_ref ) = @_;
@@ -31,18 +34,41 @@ sub init_print_eval {
 
     #$self->[0]->insert("Fin de print eval\n");
     $self->[1] = $self->[0]->async;
+    $length_s_n = Text::Editor::Easy->tell_length_slash_n;
 }
 
 sub print_eval {
-    my ( $self, $data ) = @_;
+    my ( $self, $seek_start, $data ) = @_;
 
     #return;
-    print DBG "Dans print_eval : $self|$data\n";
-    $self->[0]->insert($data);
+    print DBG "Dans print_eval : $self|$seek_start|$length_s_n|$data\n";
+    my @lines = $self->[0]->insert($data);
 
+    my $seek_current = $seek_start;
+    my $indice = 0;
+    my @data = split ( /\n/, $data );
+    for my $line ( @lines ) {
+        
+        # Le texte doit être celui contenu dans $data, pas celui de la ligne !
+        my $text = $line->text;
+        my $length;
+        if ( $indice == 0 ) {
+            $length = length ( $data[0] );
+        }
+        else {
+            $length = length ( $text );
+        }
+        $indice += 1;
+        #print DBG "Ligne |$text|\n\tseek_start 1 = ", $line->seek_start, "\n";
+        #if ( length($text) != 0 ) {
+        $line->add_seek_start( "$seek_start,$seek_current,$length" );
+        print "tutu";
+        $seek_current += $length + $length_s_n;
+        print DBG "Ligne |$text| seek_start 2 = ", $line->seek_start, "\n";
+        #}
+        
+    }
     print DBG "Fin de print_eval $data\n";
-
-    #Line->linesize;
 }
 
 sub idle_eval_print {
@@ -62,8 +88,6 @@ sub idle_eval_print {
 Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
 
 =cut
 

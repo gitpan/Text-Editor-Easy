@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
@@ -31,7 +31,7 @@ autoflush EXEC;
 
 # List of main tab files (loading delayed)
 my @files_session;
-for my $demo ( 1 .. 10 ) {
+for my $demo ( 1 .. 11 ) {
     my $file_name = "demo${demo}.pl";
     push @files_session,
       {
@@ -70,6 +70,7 @@ my $size_zone4 = {
             '-relwidth' => 1,
             '-height'   => 25,
         };
+
 my $zone_list_ref = $session_ref->{'zone_list'};
 if ( defined $zone_list_ref ) {
     my $zone4_ref = $zone_list_ref->{'zone4'};
@@ -115,8 +116,6 @@ Text::Editor::Easy->new(
 print "Taille de l'écran : ", join ( ' | ', Text::Editor::Easy->window->get) ,"\n";
 
 save_session();
-
-
 
 # End of launching perl process (F5 key management)
 print EXEC "quit\n";
@@ -302,6 +301,12 @@ sub main {
         {
             'zone' => $zone2,
             'name' => 'Eval_out',
+            'shift_motion_last'  => {
+                'use'     => 'Text::Editor::Easy::Motion',
+                'package' => 'Text::Editor::Easy::Motion',
+                'sub'     => 'move_over_eval_editor',
+                'mode'    => 'async',
+            },
         }
     );
 
@@ -352,21 +357,18 @@ sub main {
     
     # Self designing : no annulation management yet, frequent save for the moment
     if ( -d "../save" ) {
-            Text::Editor::Easy->create_new_server(
-        {
-                'use' => 'Text::Editor::Easy::Program::Save',
-                'package' => 'Text::Editor::Easy::Program::Save',
-                'methods' =>  [ 
-                        'save_arbo',
-                        ],
-                'object' => {},
-                'init'   => [
-                    'Text::Editor::Easy::Program::Save::init',
-                ],
-                'name' => 'Save',
-        }
-    );
-
+        Text::Editor::Easy->create_new_server( {
+            'use' => 'Text::Editor::Easy::Program::Save',
+            'package' => 'Text::Editor::Easy::Program::Save',
+            'methods' =>  [ 
+                'save_arbo',
+            ],
+            'object' => {},
+            'init'   => [
+                'Text::Editor::Easy::Program::Save::init',
+            ],
+            'name' => 'Save',
+        } );
     }
 }
 

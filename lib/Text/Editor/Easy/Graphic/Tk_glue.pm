@@ -12,6 +12,7 @@ sub ClassInit {
     # Adding "CanvasRaise" method, which enables to modify
     # stack order of Canvas objects between them
     *CanvasRaise = \&Tk::raise;
+    *CanvasLower = \&Tk::lower;
 }
 
 package Text::Editor::Easy::Graphic;
@@ -25,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -269,8 +270,9 @@ sub redirect {
     my ( $canva, $sub_ref, @data ) = @_;
 
     my $editor_ref = $editor{ refaddr $canva};
-    $sub_ref->( $editor_ref, @data );
-    #$canva->break;
+    my $return = $sub_ref->( $editor_ref, @data );
+    $return = 'event not yet traced' if ( ! defined $return );
+    Text::Editor::Easy->trace_end_of_user_event( $return );
 }
 
 sub key_ctrl {
@@ -300,7 +302,7 @@ sub key_press {
         return;
     }
 
-    $sub_ref->(
+    my $return = $sub_ref->(
         $editor_ref,
         $key, $ascii,
         {
@@ -314,6 +316,8 @@ sub key_press {
     # touches up, down, right et left
     $canva->xviewMoveto(0);
     $canva->yviewMoveto(0);
+    $return = 'event not yet traced' if ( ! defined $return );
+    Text::Editor::Easy->trace_end_of_user_event ( $return );
 }
 
 sub create_main_window {
@@ -321,7 +325,7 @@ sub create_main_window {
     my $mw = MainWindow->new( -title => $title );
     
     if ( ref $sub_ref_destroy ) {
-        print "subref_destroy : $sub_ref_destroy, ", ref $sub_ref_destroy, "\n";
+        #print "subref_destroy : $sub_ref_destroy, ", ref $sub_ref_destroy, "\n";
         #$mw->bind( '<Destroy>', [ \&destroy, $mw ] );
         $mw->bind( 'MainWindow', '<Destroy>', [ \&destroy, $sub_ref_destroy ] );
     #$canva->CanvasBind( '<Configure>', [ \&resize, $hash_ref->{resize}, Ev('w'), Ev('h') ] );
@@ -410,6 +414,7 @@ sub create_canva {
     #Tk::Widget::bindDump( $mw );
     #print "Fin du dump :\n\n";
     
+    $canva->CanvasLower;
     return ( $canva, $zone_ref );
 }
 

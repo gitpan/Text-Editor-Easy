@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -78,11 +78,6 @@ sub manage_events {
         #print "Evènement $what référencé size ", total_size($self), "\n";
         my ( $ref_editor, $hash_ref, @other ) = @param;
         if ( !defined $referenced{$what}{$ref_editor} ) {
-            if ( $what eq 'motion_last' ) {
-
-             # Pas référencé mais OK : on a voulu interrompre mon fonctionnement
-                return;
-            }
             print STDERR
 "L'évènement $what n'a pas été référencé pour l'éditeur $ref_editor\n";
             return;
@@ -121,9 +116,16 @@ my %editor;    # Editeurs de la zone d'affichage, par nom de fichier
 
 use File::Basename;
 my $name      = fileparse($0);
-my $file_name = "tmp/${name}_trace.trc.info";
+my $file_name = "tmp/${name}_trace.trc.print_info";
 my @selected;       # Ligne sélectionnée de la sortie
 my %line_number;    # Sauvegarde des recherches, fuite mémoire pas important ici
+
+sub move_over_eval_editor {
+    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    
+    $hash_ref->{'eval'} = 1;
+    move_over_out_editor ( $unique_ref, $editor, $hash_ref );
+}
 
 sub move_over_out_editor {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
@@ -141,65 +143,22 @@ sub move_over_out_editor {
     return if (anything_for_me);
 
     #print "Avant appel get_info:  $seek_start\n";
-    my ( $info_seek, $info_size ) =
-      Text::Editor::Easy->get_info_for_display($seek_start);
+    my $pos = $hash_ref->{'line_pos'};
 
-    #print "Après appel get_info:  $info_seek\n";
-    return if ( !defined $info_seek );
-
-    #$saved{'info_seek'} = $info_seek;
-
-    my $pos         = $hash_ref->{'line_pos'};
-    my $seek_search = $seek_start + $pos;
-
-    #print "\n\n\nOVER OUT FILE $line_of_out|$seek_start|$pos\n\n\n";
-    return if (anything_for_me);
-
-    if ( $info and tell $info != $info_size ) {
-        close $info;
-        if ( !open( $info, "$file_name" ) ) {
-            print STDERR "Impossible d'ouvrir $file_name : $!\n";
-            return;
-        }
+    my ( $first, $last, @enreg, $ref_first, $pos_first, $ref_last, $pos_last);
+    if ( $hash_ref->{'eval'} ) {
+        ( $ref_first, $pos_first, $ref_last, $pos_last, @enreg ) 
+            = Text::Editor::Easy->get_info_for_eval_display($editor->get_ref, $line_of_out->ref, $pos);
+        return if ( ! defined $ref_first );
+        print "Dans motion, j'ai bien reçu ref_first = $ref_first\n";
     }
-    elsif ( !defined $info ) {
-
-        #print "INFO pas ouvert\n";
-        if ( !open( $info, "$file_name" ) ) {
-            print STDERR "Impossible d'ouvrir $file_name : $!\n";
-            return;
-        }
+    else {
+        ( $first, $last, @enreg ) = Text::Editor::Easy->get_info_for_display($seek_start, $pos);
+        return if ( !defined $first );
     }
 
-    #print "Seek à chercher dans info $seek_search\n";
-    return if ( !seek $info, $info_seek, 0 );
+    print "Après appel get_info: FIRST\n";
 
-    #print "Positionnement à $info_seek OK\n";
-    my ( $first, $last );
-    my @enreg;
-  INF: while ( my $enreg = readline $info ) {
-
-        #print "LIGNE DE INFO LUE : $enreg";
-        if ( $enreg =~ /^(\d+)\|(\d+)$/ ) {
-            return if (anything_for_me);    # Abandonne si autre chose à faire
-            if ( $seek_search < $2 and $seek_search >= $1 ) {
-
-                #print "Trouvé : $_";
-                $first = $1;
-                $last  = $2;
-
-                #print "Trouvé !!! : $enreg|", $line_of_out->text, "\n";
-                $enreg = readline $info;
-                while ( defined $enreg and $enreg =~ /^\t(.*)$/ ) {
-                    push @enreg, $1;
-
-                    #print $enreg;
-                    $enreg = readline $info;
-                }
-                last INF;
-            }
-        }
-    }
     return if (anything_for_me);    # Abandonne si autre chose à faire
 
     $show_calls_editor->deselect;
@@ -207,14 +166,168 @@ sub move_over_out_editor {
     $show_calls_editor->empty;
     return if (anything_for_me);    # Abandonne si autre chose à faire
 
-    my ( $file, $number, $package ) = split( /\|/, $enreg[1] );
+    print "ENREG 1 = $enreg[1]\n";
+    
+    my ( $info ) = $enreg[1] =~ /^\t(.+)/;
+    
+    my ( $file, $number, $package ) = split( /\|/, $info );
     chomp $package;                 # En principe inutile
 
     return if (anything_for_me);    # Abandonne si autre chose à faire
 
-    my $new_editor = $editor{$file};
-    return if ( !-f $file );        # Eval non géré...
+   my ( $new_editor, $line );
+    if ( ! -f $file ) {
+        # gestion de l'eval...
+        ( $new_editor, $line ) = manage_eval ( $file, $number );
+    }
+    else {
+        ( $new_editor, $line ) = manage_file ( $file, $number );        
+    }
+    return if ( ! defined $new_editor );
 
+    #print "AVA?T DISPLAYED\n";
+    #print "APRES DISPLAYED\n";
+    #return if ( anything_for_me );
+
+    $editor->deselect;
+    
+    print "Avant bidouille motion\n";
+    if ( ! defined $ref_first ) {
+
+    print "Dans bidouille motion\n";
+    my $left;
+    my $right;
+    my $length_text = length( $line_of_out->text );
+
+#if ( $first >= $seek_start  ) { # line_select devra gérer les entrées négatives et supérieures à la longueur
+
+    my $start;
+    my $length_to_select;    # = $last - $first;
+    my $save_seek_start = $seek_start;
+    if ( $first < $seek_start )
+    {   # A gérer à cause de la différence de taille du \n entre Windows et Unix
+        $start = 0;
+        my $previous_line = $line_of_out->previous;
+        $seek_start = $previous_line->seek_start;
+        $start -= length $previous_line->text;
+        $length_to_select += length $previous_line->text;
+        while ( $first < $seek_start ) {
+            $previous_line = $previous_line->previous;
+            $seek_start    = $previous_line->seek_start;
+            $start -= length $previous_line->text;
+            $length_to_select += length $previous_line->text;
+        }
+    }
+    $start += $first - $seek_start;
+
+    $seek_start = $save_seek_start;
+    my $end;
+    my $current_line = $line_of_out;
+    while ( $last > ( $seek_start + $length_text ) ) {
+        $end += $length_text;
+        $current_line = $current_line->next;
+        return if ( !defined $current_line );    # A revoir...
+        $length_text = length( $current_line->text );
+        $seek_start  = $current_line->seek_start;
+    }
+    $end += $last - $seek_start;
+    $line_of_out->select( $start, $end, 'pink' );
+
+    }
+    else {
+        print "Dans motion, je sélectionne $ref_first de $pos_first à $pos_last\n";
+        if ( $ref_first == $ref_last ) {
+            $editor->line_select( $ref_first, $pos_first, $pos_last, 'pink' );
+        }
+        else {
+            $editor->line_select( $ref_first, $pos_first, undef, 'pink' );
+            my ( $new_ref ) = $editor->next_line( $ref_first );
+            while ( $new_ref != $ref_last ) {
+                $editor->line_select( $new_ref, undef, undef, 'pink' );
+                ( $new_ref ) = $editor->next_line ( $new_ref );
+            }
+            $editor->line_select( $ref_last, 0, $pos_last, 'pink' );
+        }
+    }
+
+    print "Dans motion, après else\n";
+    # Reprise
+    $new_editor->deselect;
+    $line->select( undef, undef, 'white' );
+
+
+    #return if (anything_for_me);
+    if ( anything_for_me() ) {
+        my ( $what, @param ) = get_task_to_do();
+        print "Dans motion avant affichage stack_call =>\n\tWHAT = $what\n";
+        execute_this_task( $what, @param );
+        return if ( $what ne 'reference_event' );
+    }
+
+    my $string_to_insert;
+    for my $indice ( 0 .. $#enreg ) {
+
+        #print "ICI:$_\n";
+        if ( $enreg[$indice] =~ /^\t(.+)\|(.+)\|(.+)/ ) {
+            $string_to_insert .= "File $1|Line $2|Package $3\n";
+        }
+        else {
+            $string_to_insert .= $enreg[$indice] . "\n";
+        }
+    }
+    chomp $string_to_insert;
+    $show_calls_editor->insert($string_to_insert);
+
+    #if ( anything_for_me ) {
+    #    my @param = get_task_to_do;
+    #    print "Dans move over out, tâche reçue : @param\nFin de paramêtres\n";
+    #}
+
+    return if (anything_for_me);    # Abandonne si autre chose à faire
+         # Sélection de la ligne que l'on va traiter : la première
+    my $first_line = $show_calls_editor->first;
+    $show_calls_editor->display( $first_line, { 'at' => 'top' } );
+    $first_line->select( undef, undef, 'orange' );
+}
+
+sub manage_eval {
+    my ( $eval, $number ) = @_;
+    
+    return if ( $eval !~ /eval (.+)$/ );
+    
+    my @code = Text::Editor::Easy->get_code_for_eval( $1 );
+    print "Gestion de l'eval dans motion : reçu ", join ("\n", @code), "\n";
+    my $new_editor = $editor{''};
+    if ( ! $new_editor ) {
+            $new_editor = Text::Editor::Easy->new(
+                {
+                    'zone' => $display_zone,
+                    'name' => 'eval*',
+                    'highlight' => {
+                        'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
+                        'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
+                        'sub'     => 'syntax',
+                    },
+                }
+            );
+        $editor{''} = $new_editor;
+    }
+    else {
+        $new_editor->on_top;
+    }
+    $new_editor->empty;
+    for ( @code ) {
+        $new_editor->insert( "$_\n" );
+    }
+    my $line = $new_editor->number($number);
+    return if ( ! defined $line );
+    return ( $new_editor, $line );
+}
+
+sub manage_file {
+    my ( $file, $number ) = @_;
+    
+    my $new_editor = $editor{$file};
     #print "move over out file : AVANT new_editor : $file\n";
     my $line;
     if ( !$new_editor ) {
@@ -260,80 +373,7 @@ sub move_over_out_editor {
         $new_editor->on_top;
         $new_editor->async->display( $line, { 'at' => 'middle' } );
     }
-    #return if (anything_for_me); # Abandonne si autre chose à faire
-
-    #print "AVA?T DISPLAYED\n";
-    #print "APRES DISPLAYED\n";
-    #return if ( anything_for_me );
-
-    $editor->deselect;
-    my $left;
-    my $right;
-    my $length_text = length( $line_of_out->text );
-
-#if ( $first >= $seek_start  ) { # line_select devra gérer les entrées négatives et supérieures à la longueur
-
-    my $start;
-    my $length_to_select;    # = $last - $first;
-    my $save_seek_start = $seek_start;
-    if ( $first < $seek_start )
-    {   # A gérer à cause de la différence de taille du \n entre Windows et Unix
-        $start = 0;
-        my $previous_line = $line_of_out->previous;
-        $seek_start = $previous_line->seek_start;
-        $start -= length $previous_line->text;
-        $length_to_select += length $previous_line->text;
-        while ( $first < $seek_start ) {
-            $previous_line = $previous_line->previous;
-            $seek_start    = $previous_line->seek_start;
-            $start -= length $previous_line->text;
-            $length_to_select += length $previous_line->text;
-        }
-    }
-    $start += $first - $seek_start;
-
-    $seek_start = $save_seek_start;
-    my $end;
-    my $current_line = $line_of_out;
-    while ( $last > ( $seek_start + $length_text ) ) {
-        $end += $length_text;
-        $current_line = $current_line->next;
-        return if ( !defined $current_line );    # A revoir...
-        $length_text = length( $current_line->text );
-        $seek_start  = $current_line->seek_start;
-    }
-    $end += $last - $seek_start;
-
-    # Reprise
-    $new_editor->deselect;
-    $line->select( undef, undef, 'white' );
-    $line_of_out->select( $start, $end, 'pink' );
-
-    return if (anything_for_me);
-
-    my $string_to_insert;
-    for my $indice ( 1 .. $#enreg ) {
-
-        #print "ICI:$_\n";
-        my ( $file, $line, $package ) = split( /\|/, $enreg[$indice] );
-
-      #          return if (anything_for_me); # Abandonne si autre chose à faire
-
-        $string_to_insert .= "File $file|Line $line|Package $package\n";
-    }
-    chomp $string_to_insert;
-    $show_calls_editor->insert($string_to_insert);
-
-    #if ( anything_for_me ) {
-    #    my @param = get_task_to_do;
-    #    print "Dans move over out, tâche reçue : @param\nFin de paramêtres\n";
-    #}
-
-    return if (anything_for_me);    # Abandonne si autre chose à faire
-         # Sélection de la ligne que l'on va traiter : la première
-    my $first_line = $show_calls_editor->first;
-    $show_calls_editor->display( $first_line, { 'at' => 'top' } );
-    $first_line->select( undef, undef, 'orange' );
+    return ( $new_editor, $line );
 }
 
 sub init_set {
@@ -346,15 +386,6 @@ sub init_set {
 sub cursor_set_on_who_file {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
 
-    #if ( $hash_ref->{'origin'} eq 'graphic'
-    #or $hash_ref->{'sub_origin'} eq 'cursor_set' ) {
-    #    $editor->deselect;
-    #    return if (anything_for_me); # Abandonne si autre chose à faire
-    #sleep 1;
-    #     return if (anything_for_me); # Abandonne si autre chose à faire
-
-    #}
-
     return if (anything_for_me);
     $editor->async->make_visible;
     return if (anything_for_me);
@@ -363,57 +394,24 @@ sub cursor_set_on_who_file {
     return if ( !$hash_ref_line );
     my $text = $hash_ref_line->text;
     return if (anything_for_me);    # Abandonne si autre chose à faire
-    if ( my ( $file, $number, $package ) =
-        $text =~ /^File (.+)\|Line (\d+)\|Package (.+)$/ )
-    {
 
-        #print "P $1, $2, $3\n";
+    return if ( $text !~ /^File (.+)\|Line (\d+)\|Package (.+)/ );
+    my ( $file, $number, $package ) = ( $1, $2, $3 );
 
-        #my @ref_editors = Text::Editor::Easy->
-        my $new_editor = $editor{$file};
-        if ( !$new_editor ) {
-            return if (anything_for_me);    # Abandonne si autre chose à faire
-            $new_editor = Text::Editor::Easy->new(
-                {
-                    'file'      => $file,
-                    'zone'      => $display_zone,
-                    'highlight' => {
-                        'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
-                        'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
-                        'sub'     => 'syntax',
-                    },
-                }
-            );
-            $editor{$file} = $new_editor;
-        }
-        else {
-            $new_editor->on_top;
-        }
-        return if (anything_for_me);    # Abandonne si autre chose à faire
-        $new_editor->deselect;
-        $editor->deselect;
-        return if (anything_for_me);    # Abandonne si autre chose à faire
-        my $line = $line_number{$file}{$number};
-        if ( !$line ) {
-            $line = $new_editor->number($number, {
-                'lazy' => threads->tid,
-                'check_every' => 20,
-            });
-        }
-        if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
-            return;
-        }
-        $line_number{$file}{$number} = $line;
-        return if (anything_for_me);    # Abandonne si autre chose à faire
-        if ( !defined $line or ref $line ne 'Text::Editor::Easy::Line' ) {
-            print STDERR "Problème pour la récupération de number\n";
-            return;
-        }
-        $new_editor->display( $line, { 'at' => 'middle', 'from' => 'bottom' } );
-        return if (anything_for_me);    # Abandonne si autre chose à faire
-        $line->select( undef, undef, 'white' );
-        $hash_ref->{'line'}->select( undef, undef, 'orange' );
+    my ( $new_editor, $line );
+    if ( ! -f $file ) {
+        # gestion de l'eval...
+        ( $new_editor, $line ) = manage_eval ( $file, $number );
     }
+    else {
+        ( $new_editor, $line ) = manage_file ( $file, $number );        
+    }
+       
+    return if ( ! defined $new_editor );
+        
+    $line->select( undef, undef, 'white' );
+    $editor->deselect;
+    $hash_ref->{'line'}->select( undef, undef, 'orange' );
 }
 
 sub zone_resize {
@@ -438,7 +436,7 @@ sub nop {
     return if ( anything_for_me );
     
     my ( $unique_ref, $editor ) = @_;
-    $editor->make_visible;
+    $editor->async->make_visible;
 }
 
 =head1 FUNCTIONS
@@ -457,16 +455,7 @@ sub nop {
 
 =head2 reference_event
 
-=head2 return_self
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright 2008 Sebastien Grommier, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
-
 =cut
+
 
 1;

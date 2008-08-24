@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 =head1 SYNOPSIS
 
@@ -101,9 +101,9 @@ sub new {
         $hash_ref->{'zone'} = Text::Editor::Easy::Zone->whose_name($zone);
     }
 
-    Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
-
     Text::Editor::Easy::Comm::verify_motion_thread( $ref, $hash_ref );
+
+    Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
 
     #if ( defined $hash_ref->{'growing_file'} ) {
     #    print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
@@ -144,6 +144,7 @@ sub new {
                 'editor_search',
                 'save_info_on_file',
                 'growing_update',
+                'line_add_seek_start',
             ],
             'object' => [],
             'init'   => [
@@ -537,6 +538,7 @@ sub AUTOLOAD {
     $what =~ s/^Text::Editor::Easy:://;
     $what =~ s/^Async:://;
 
+    # Following call not to be shown in trace
     return Text::Editor::Easy::Comm::ask2( $self, $what, @param );
 }
 

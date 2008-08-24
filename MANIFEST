@@ -2,10 +2,10 @@
 Changes
 Editor.pl
 Makefile.PL
-README
 account.hst
 demo1.pl
 demo10.pl
+demo11.pl
 demo2.pl
 demo3.pl
 demo4.pl
@@ -14,7 +14,6 @@ demo6.pl
 demo7.pl
 demo8.pl
 demo9.pl
-editor.session
 exec.pl
 expenses.cpt
 lib/Text/Editor/Easy.pm
@@ -44,14 +43,14 @@ lib/Text/Editor/Easy/Syntax/Perl_glue.pm
 lib/Text/Editor/Easy/Syntax/perl_assist.pm
 lib/Text/Editor/Easy/Test/Test1.pm
 lib/Text/Editor/Easy/Test/Test3.pm
-lib/Text/Editor/Easy/Trace/Print.pm
+lib/Text/Editor/Easy/Trace/Full.pm
 lib/Text/Editor/Easy/Window.pm
 lib/Text/Editor/Easy/Zone.pm
 manifest
 meta.yml
 prove.bat
 prove.sh
-return_saved.txt
+README
 t/00-check_Tk.t
 t/00-load.t
 t/boilerplate.t
@@ -67,4 +66,3 @@ t/multiplexed_without_thread_creation.t
 t/pod.t
 t/return.t
 t/test_tk.pl
-tk_is_ok

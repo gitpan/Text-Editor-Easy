@@ -9,17 +9,17 @@ Text::Editor::Easy::Key - Key functions using object-oriented interface of "Text
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 use Data::Dump qw(dump);
 
 sub left {
     my ( $self, $shift ) = @_;
-	
-	delete_start_selection_point( $self ) if ( ! $shift );
+    
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor = $self->cursor;
     if ( my $position = $cursor->get ) {
@@ -39,7 +39,7 @@ sub left {
 sub right {
     my ($self, $shift ) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor   = $self->cursor;
     my $position = $cursor->get;
@@ -53,13 +53,13 @@ sub right {
     {    # Test car risque de retour à 0 sur la dernière ligne
         return $cursor->set( 0, $next );
     }
-	return;
+    return;
 }
 
 sub up {
     my ($self, $shift ) = @_;
-	
-	delete_start_selection_point( $self ) if ( ! $shift );
+    
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor = $self->cursor;
     $cursor->make_visible;
@@ -80,8 +80,8 @@ sub up {
 sub down {
     my ($self, $shift ) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
-	
+    delete_start_selection_point( $self ) if ( ! $shift );
+    
     my $cursor = $self->cursor;
     $cursor->make_visible;
     my $display = $cursor->display;
@@ -95,7 +95,7 @@ sub down {
             }
         );
     }
-	return;
+    return;
 }
 
 sub move_down {
@@ -125,7 +125,7 @@ sub backspace {
 sub home {
     my ($self, $shift) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor  = $self->cursor;
     my $display = $cursor->display;
@@ -141,7 +141,7 @@ sub home {
 sub end {
     my ($self, $shift) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor  = $self->cursor;
     my $display = $cursor->display;
@@ -248,60 +248,60 @@ sub jump_down {
 }
 
 # Pour les 2 fonctions suivantes, il manque :
-#		- la gestion du curseur
-#		- le recentrage
+#        - la gestion du curseur
+#        - le recentrage
 sub page_down {
     my ($self, $shift) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor = $self->cursor;
     my $display = $cursor->display;
-	my $y = $display->middle_ord;
+    my $y = $display->middle_ord;
 
     my $screen = $self->screen;
     my $last   = $screen->number( $screen->number );
     print "LAST text :", $last->text, "\n";
     $self->display( $last, {
-			'at' => 'top',
-		    'no_check' => '1',
-		} );
+            'at' => 'top',
+            'no_check' => '1',
+        } );
     my ( @pos ) = $cursor->set(
             {
                 'x'            => $cursor->virtual_abs,
-                'y'      	     => $y,
+                'y'               => $y,
                 'keep_virtual' => 1,
-	        }
+            }
         );
     $screen->check_borders;
-	return @pos;
+    return @pos;
 }
 
 sub page_up {
     my ($self, $shift) = @_;
 
-	delete_start_selection_point( $self ) if ( ! $shift );
+    delete_start_selection_point( $self ) if ( ! $shift );
 
     my $cursor = $self->cursor;
     my $display = $cursor->display;
-	my $y = $display->middle_ord;
-	my $screen = $self->screen;
+    my $y = $display->middle_ord;
+    my $screen = $self->screen;
     my $first = $screen->number(1);
     print "FIRST text :", $first->text, "\n";
     $self->display( $first, {
-			'at' => 'bottom',
-			'from' => 'bottom',
-			'no_check' => '1',
-	    } );
+            'at' => 'bottom',
+            'from' => 'bottom',
+            'no_check' => '1',
+        } );
     my ( @pos ) = $cursor->set(
             {
                 'x'            => $cursor->virtual_abs,
-                'y'      	     => $y,
+                'y'               => $y,
                 'keep_virtual' => 1,
             }
         );
     $screen->check_borders;
-	return @pos;
+    return @pos;
 }
 
 sub new_a {
@@ -352,42 +352,42 @@ sub copy {
     my ($self) = @_;
 
     #Appel au thread manager à faire. Pour l'instant, méthode provisoire et très longue
-	my $select_ref = set_start_selection_point($self, '+');
-	return if ( ! defined $select_ref->{'stop_line'} );
-	my ( $start_line, $start_pos, $stop_line, $stop_pos );
-	if ( $select_ref->{'mode'} eq '+' ) {
-		$start_line = $select_ref->{'start_line'};
-		$start_pos = $select_ref->{'start_pos'};
-		$stop_line = $select_ref->{'stop_line'};
-		$stop_pos = $select_ref->{'stop_pos'};
-    }
-	else {
-		$start_line = $select_ref->{'stop_line'};
-		$start_pos = $select_ref->{'stop_pos'};
-		$stop_line = $select_ref->{'start_line'};
-		$stop_pos = $select_ref->{'start_pos'};
-    }
-	my $buffer;
-    if ( $stop_line != $start_line ) {
-		$buffer = substr ( $start_line->text, $start_pos );
-		$buffer .= "\n";
+    my $select_ref = set_start_selection_point($self, '+');
+    return if ( ! defined $select_ref->{'stop_line'} );
+    my ( $start_line, $start_pos, $stop_line, $stop_pos );
+    if ( $select_ref->{'mode'} eq '+' ) {
+        $start_line = $select_ref->{'start_line'};
+        $start_pos = $select_ref->{'start_pos'};
+        $stop_line = $select_ref->{'stop_line'};
+        $stop_pos = $select_ref->{'stop_pos'};
     }
     else {
-		# A gérer 
-		$buffer = substr ( $start_line->text, $start_pos, $stop_pos - $start_pos );
-		print "========Debut buffer\n$buffer\n==========Fin buffer\n";
-		Text::Editor::Easy->clipboard_set($buffer);
-		return;
+        $start_line = $select_ref->{'stop_line'};
+        $start_pos = $select_ref->{'stop_pos'};
+        $stop_line = $select_ref->{'start_line'};
+        $stop_pos = $select_ref->{'start_pos'};
+    }
+    my $buffer;
+    if ( $stop_line != $start_line ) {
+        $buffer = substr ( $start_line->text, $start_pos );
+        $buffer .= "\n";
+    }
+    else {
+        # A gérer 
+        $buffer = substr ( $start_line->text, $start_pos, $stop_pos - $start_pos );
+        print "========Debut buffer\n$buffer\n==========Fin buffer\n";
+        Text::Editor::Easy->clipboard_set($buffer);
+        return;
     }
     my $line = $start_line->next;
     while ( defined $line and $line != $stop_line ) {
-		$buffer .= $line->text . "\n";
-		$line = $line->next;
+        $buffer .= $line->text . "\n";
+        $line = $line->next;
     }
     return if ( ! defined $line ); # stop line suppressed
     $buffer .= substr ( $line->text, 0, $stop_pos );
     print "========Debut buffer\n$buffer\n==========Fin buffer\n";
-	Text::Editor::Easy->clipboard_set($buffer);
+    Text::Editor::Easy->clipboard_set($buffer);
     #$buffer = $self->cursor->line->text . "\n";
 }
 
@@ -433,434 +433,434 @@ sub inser {
 # SHIFT (sélection)
 
 sub shift_left {
-		my ( $self ) = @_;
-		
-		#print "Dans shift_left de Key\n";
-		my $select_ref = set_start_selection_point($self, '-');
-		
-		my ( $line, $pos ) = left( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $pos, $start_pos);				    
-					$select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $start_pos, $pos );
-					$select_ref->{'mode'} = '+';
-			    }
-		}
-		else {
-		    if ( $line == $select_ref->{'stop_line'} ) {
-				$line->deselect;
-		    }
-			if ( $select_ref->{'mode'} eq '+' ) {
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        #print "Dans shift_left de Key\n";
+        my $select_ref = set_start_selection_point($self, '-');
+        
+        my ( $line, $pos ) = left( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $pos, $start_pos);                    
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '+';
+                }
+        }
+        else {
+            if ( $line == $select_ref->{'stop_line'} ) {
+                $line->deselect;
+            }
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->select(0, $pos);
+            }
+            else {
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_right {
-		my ( $self ) = @_;
-		
-		#print "Dans shift_left de Key\n";
-		my $select_ref = set_start_selection_point($self, '+');
-		
-		my ( $line, $pos ) = right( $self, 'shift' );
-		return if ( ! $line );
-		
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select($start_pos, $pos );
-				    $select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $pos, $start_pos);
-					$select_ref->{'mode'} = '+';
-			    }
-		}
-		else {
-		    if ( $line == $select_ref->{'stop_line'} ) {
-				$line->deselect;
-		    }
-			#print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
-			if ( $select_ref->{'mode'} eq '+' ) {
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        #print "Dans shift_left de Key\n";
+        my $select_ref = set_start_selection_point($self, '+');
+        
+        my ( $line, $pos ) = right( $self, 'shift' );
+        return if ( ! $line );
+        
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select($start_pos, $pos );
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $pos, $start_pos);
+                    $select_ref->{'mode'} = '+';
+                }
+        }
+        else {
+            if ( $line == $select_ref->{'stop_line'} ) {
+                $line->deselect;
+            }
+            #print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->select(0, $pos);
+            }
+            else {
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_up {
-		my ( $self ) = @_;
-		
-		#print "Dans shift_left de Key\n";
-		my $select_ref = set_start_selection_point($self, '-');
-		
-		my ( $line, $pos ) = up( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $start_pos, $pos );
-				    $select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $pos, $start_pos);
-					$select_ref->{'mode'} = '+';
-			    }
-				my $stop_line = $select_ref->{'stop_line'};
-				if ( defined $stop_line and $line != $stop_line ) {
-						$stop_line->deselect;
-				}
-		}
-		else {
-		    #print "shift_up intermédiaire mode = ", $select_ref->{'mode'}, "\n";
-		    my $stop_line = $select_ref->{'stop_line'};
-			if ( ! defined $stop_line or $stop_line == $select_ref->{'start_line'} ) {
-				$select_ref->{'start_line'}->deselect;
-				$select_ref->{'start_line'}->select( 0, $select_ref->{'start_pos'} );
-				$select_ref->{'mode'} = '-';
-		    }
-			if ( defined $stop_line ) {
-		        if ( $line == $stop_line ) {
-				    $line->deselect;
-		        }
-			    elsif ( $stop_line != $select_ref->{'start_line'} ) {
-					$stop_line->deselect;
-					if ( $select_ref->{'mode'} eq '-' ) {
-					    $stop_line->select;
-				    }
-			    }
-		    }
-					
-			#print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
-			if ( $select_ref->{'mode'} eq '+' ) {
-				$line->deselect;
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->deselect;
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        #print "Dans shift_left de Key\n";
+        my $select_ref = set_start_selection_point($self, '-');
+        
+        my ( $line, $pos ) = up( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $pos, $start_pos);
+                    $select_ref->{'mode'} = '+';
+                }
+                my $stop_line = $select_ref->{'stop_line'};
+                if ( defined $stop_line and $line != $stop_line ) {
+                        $stop_line->deselect;
+                }
+        }
+        else {
+            #print "shift_up intermédiaire mode = ", $select_ref->{'mode'}, "\n";
+            my $stop_line = $select_ref->{'stop_line'};
+            if ( ! defined $stop_line or $stop_line == $select_ref->{'start_line'} ) {
+                $select_ref->{'start_line'}->deselect;
+                $select_ref->{'start_line'}->select( 0, $select_ref->{'start_pos'} );
+                $select_ref->{'mode'} = '-';
+            }
+            if ( defined $stop_line ) {
+                if ( $line == $stop_line ) {
+                    $line->deselect;
+                }
+                elsif ( $stop_line != $select_ref->{'start_line'} ) {
+                    $stop_line->deselect;
+                    if ( $select_ref->{'mode'} eq '-' ) {
+                        $stop_line->select;
+                    }
+                }
+            }
+                    
+            #print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->deselect;
+                $line->select(0, $pos);
+            }
+            else {
+                $line->deselect;
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_down {
-		my ( $self ) = @_;
-		
-		#print "Dans shift_left de Key\n";
-		my $select_ref = set_start_selection_point($self, '+');
-		
-		my ( $line, $pos ) = down( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $start_pos, $pos );
-				    $select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $pos, $start_pos);
-					$select_ref->{'mode'} = '+';
-			    }
-				my $stop_line = $select_ref->{'stop_line'};
-				if ( defined $stop_line and $line != $stop_line ) {
-						$stop_line->deselect;
-				}
-		}
-		else {
-		    my $stop_line = $select_ref->{'stop_line'};
-			if ( ! defined $stop_line or $stop_line == $select_ref->{'start_line'} ) {
-				$select_ref->{'start_line'}->deselect;
-				$select_ref->{'start_line'}->select( $select_ref->{'start_pos'} );
-				$select_ref->{'mode'} = '+';
-		    }
-		    if ( defined $stop_line ) {
-				if ( $line == $stop_line ) {
-				    $line->deselect;
-		        }
-			    elsif ( $stop_line != $select_ref->{'start_line'} ) {
-					$stop_line->deselect;
-					if ( $select_ref->{'mode'} eq '+' ) {
-					    $stop_line->select;
-				    }
-			    }
-		    }
-					
-			#print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
-			if ( $select_ref->{'mode'} eq '+' ) {
-				$line->deselect;
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->deselect;
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        #print "Dans shift_left de Key\n";
+        my $select_ref = set_start_selection_point($self, '+');
+        
+        my ( $line, $pos ) = down( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $pos, $start_pos);
+                    $select_ref->{'mode'} = '+';
+                }
+                my $stop_line = $select_ref->{'stop_line'};
+                if ( defined $stop_line and $line != $stop_line ) {
+                        $stop_line->deselect;
+                }
+        }
+        else {
+            my $stop_line = $select_ref->{'stop_line'};
+            if ( ! defined $stop_line or $stop_line == $select_ref->{'start_line'} ) {
+                $select_ref->{'start_line'}->deselect;
+                $select_ref->{'start_line'}->select( $select_ref->{'start_pos'} );
+                $select_ref->{'mode'} = '+';
+            }
+            if ( defined $stop_line ) {
+                if ( $line == $stop_line ) {
+                    $line->deselect;
+                }
+                elsif ( $stop_line != $select_ref->{'start_line'} ) {
+                    $stop_line->deselect;
+                    if ( $select_ref->{'mode'} eq '+' ) {
+                        $stop_line->select;
+                    }
+                }
+            }
+                    
+            #print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->deselect;
+                $line->select(0, $pos);
+            }
+            else {
+                $line->deselect;
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_end {
-		my ( $self ) = @_;
-		
-		my $select_ref = set_start_selection_point($self, '+');
-		
-		my ( $line, $pos ) = end( $self, 'shift' );
-		return if ( ! $line );
-		
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $start_pos, $pos );
-				    $select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $pos, $start_pos);
-					$select_ref->{'mode'} = '+';
-			    }
-		}
-		else {
-			#print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
-			if ( $select_ref->{'mode'} eq '+' ) {
-				$line->deselect;
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->deselect;
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        my $select_ref = set_start_selection_point($self, '+');
+        
+        my ( $line, $pos ) = end( $self, 'shift' );
+        return if ( ! $line );
+        
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $pos, $start_pos);
+                    $select_ref->{'mode'} = '+';
+                }
+        }
+        else {
+            #print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->deselect;
+                $line->select(0, $pos);
+            }
+            else {
+                $line->deselect;
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_home {
-		my ( $self ) = @_;
-		
-		my $select_ref = set_start_selection_point($self, '-');
-		
-		my ( $line, $pos ) = home ( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $start_pos, $pos );
-				    $select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $pos, $start_pos);
-					$select_ref->{'mode'} = '+';
-			    }
-		}
-		else {
-			#print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
-			if ( $select_ref->{'mode'} eq '+' ) {
-				$line->deselect;
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->deselect;
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        my $select_ref = set_start_selection_point($self, '-');
+        
+        my ( $line, $pos ) = home ( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $pos, $start_pos);
+                    $select_ref->{'mode'} = '+';
+                }
+        }
+        else {
+            #print "Dans shift_right, mode = ", $select_ref->{'mode'} , "\n";
+            if ( $select_ref->{'mode'} eq '+' ) {
+                $line->deselect;
+                $line->select(0, $pos);
+            }
+            else {
+                $line->deselect;
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_page_up {
-		my ( $self ) = @_;
-		
-		#print "Dans shift_left de Key\n";
-		my $select_ref = set_start_selection_point($self, '-');
-		
-		my ( $line, $pos ) = page_up( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $pos, $start_pos);				    
-					$select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $start_pos, $pos );
-					$select_ref->{'mode'} = '+';
-			    }
-		}
-		else {
-		    if ( $line == $select_ref->{'stop_line'} ) {
-				$line->deselect;
-		    }
-			if ( $select_ref->{'mode'} eq '+' ) {
-				# Changement possible de sens
-				my $search_line = $line->next;
-				my $start_line = $select_ref->{'start_line'};
-				my $stop_line = $select_ref->{'stop_line'};
-				while ( $search_line 
-				    and $search_line ne  $start_line
-					and $search_line ne  $stop_line ) {
-							#
-							#
-						$search_line = $search_line->next;
-				}
-				if ( $search_line == $start_line ) {
-						# Inversion
-						$select_ref->{'mode'} = '-';
-				}
-			    $line->select(0, $pos);
-		    }
-			else {
-				$line->select($pos);
-		    }
-	    }
-		
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        #print "Dans shift_left de Key\n";
+        my $select_ref = set_start_selection_point($self, '-');
+        
+        my ( $line, $pos ) = page_up( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $pos, $start_pos);                    
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '+';
+                }
+        }
+        else {
+            if ( $line == $select_ref->{'stop_line'} ) {
+                $line->deselect;
+            }
+            if ( $select_ref->{'mode'} eq '+' ) {
+                # Changement possible de sens
+                my $search_line = $line->next;
+                my $start_line = $select_ref->{'start_line'};
+                my $stop_line = $select_ref->{'stop_line'};
+                while ( $search_line 
+                    and $search_line ne  $start_line
+                    and $search_line ne  $stop_line ) {
+                            #
+                            #
+                        $search_line = $search_line->next;
+                }
+                if ( $search_line == $start_line ) {
+                        # Inversion
+                        $select_ref->{'mode'} = '-';
+                }
+                $line->select(0, $pos);
+            }
+            else {
+                $line->select($pos);
+            }
+        }
+        
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub shift_page_down {
-		my ( $self ) = @_;
-		
-		print "Dans shift_page_down de Key\n";
-		my $select_ref = set_start_selection_point($self, '+');
-		
-		my ( $line, $pos ) = page_down( $self, 'shift' );
-		return if ( ! $line );
-		#print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
-		#print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
-		if ( $line == $select_ref->{'start_line'} ) {
-				$line->deselect;
-				my $start_pos = $select_ref->{'start_pos'};
-				if ( $start_pos > $pos ) {
-				    $line->select( $pos, $start_pos);				    
-					$select_ref->{'mode'} = '-';
-			    }
-				else {
-				    $line->select( $start_pos, $pos );
-					$select_ref->{'mode'} = '+';
-			    }
-				$select_ref->{'stop_line'} = $line;
-		        $select_ref->{'stop_pos'} = $pos;
-		        save_selection($self, $select_ref);
-				return;
-		}
-		if ( $select_ref->{'mode'} eq '+' ) {
-		    my $line_to_select = $select_ref->{'stop_line'};
-			$line_to_select = $select_ref->{'start_line'} if ( ! defined $line_to_select );
-			while ( defined $line_to_select and $line_to_select != $line ) {
-					$line_to_select->deselect;
-					$line_to_select->select;
-					$line_to_select = $line_to_select->next;
-			}
-			return if ( ! $line_to_select ); # MEssage d'erreur ...
-			$line->select( 0, $pos );
-			
-			$line_to_select = $select_ref->{'stop_line'};
-		    $select_ref->{'stop_line'} = $line;
-		    $select_ref->{'stop_pos'} = $pos;
-		    save_selection($self, $select_ref);
-			return if ( ! defined $line_to_select );
-			#Sélection par l'arrière
-			TOP: while ( $line_to_select != $select_ref->{'start_line'} ) {
-		        $line_to_select = $line_to_select->previous;
-				my $string = $line_to_select->select if ( $line_to_select );
-				last TOP if ( ! defined $string );
-		    }
-	    }
-		$select_ref->{'stop_line'} = $line;
-		$select_ref->{'stop_pos'} = $pos;
-		save_selection($self, $select_ref);
+        my ( $self ) = @_;
+        
+        print "Dans shift_page_down de Key\n";
+        my $select_ref = set_start_selection_point($self, '+');
+        
+        my ( $line, $pos ) = page_down( $self, 'shift' );
+        return if ( ! $line );
+        #print "Line récupérée de left $line, ", $line->text, " |", $line->ref, "\n";
+        #print "Start Line ", $select_ref->{'start_line'}, $select_ref->{'start_line'}->text, " |", $select_ref->{'start_line'}->ref, "\n";
+        if ( $line == $select_ref->{'start_line'} ) {
+                $line->deselect;
+                my $start_pos = $select_ref->{'start_pos'};
+                if ( $start_pos > $pos ) {
+                    $line->select( $pos, $start_pos);                    
+                    $select_ref->{'mode'} = '-';
+                }
+                else {
+                    $line->select( $start_pos, $pos );
+                    $select_ref->{'mode'} = '+';
+                }
+                $select_ref->{'stop_line'} = $line;
+                $select_ref->{'stop_pos'} = $pos;
+                save_selection($self, $select_ref);
+                return;
+        }
+        if ( $select_ref->{'mode'} eq '+' ) {
+            my $line_to_select = $select_ref->{'stop_line'};
+            $line_to_select = $select_ref->{'start_line'} if ( ! defined $line_to_select );
+            while ( defined $line_to_select and $line_to_select != $line ) {
+                    $line_to_select->deselect;
+                    $line_to_select->select;
+                    $line_to_select = $line_to_select->next;
+            }
+            return if ( ! $line_to_select ); # MEssage d'erreur ...
+            $line->select( 0, $pos );
+            
+            $line_to_select = $select_ref->{'stop_line'};
+            $select_ref->{'stop_line'} = $line;
+            $select_ref->{'stop_pos'} = $pos;
+            save_selection($self, $select_ref);
+            return if ( ! defined $line_to_select );
+            #Sélection par l'arrière
+            TOP: while ( $line_to_select != $select_ref->{'start_line'} ) {
+                $line_to_select = $line_to_select->previous;
+                my $string = $line_to_select->select if ( $line_to_select );
+                last TOP if ( ! defined $string );
+            }
+        }
+        $select_ref->{'stop_line'} = $line;
+        $select_ref->{'stop_pos'} = $pos;
+        save_selection($self, $select_ref);
 }
 
 sub set_start_selection_point {
-		my ( $self, $mode ) = @_;
-		
-		my $select_ref = $self->load_info('select');
-		if ( ! defined $select_ref ) {
-		    my ( $line, $pos ) = $self->cursor->get;
-			$select_ref = {
-					'start_line' => $line,
-					'start_pos' => $pos, 
-					'mode' => $mode,
-			};
-			#$self->save_info($select_ref, 'select');
-	    }
-		else {
-		    $select_ref->{'start_line'} = Text::Editor::Easy::Line->new( $self, $select_ref->{'start_line'} );
-			$select_ref->{'stop_line'} = Text::Editor::Easy::Line->new( $self, $select_ref->{'stop_line'} );
-	    }
-		#print "Départ : mode = ", $select_ref->{'mode'}, "\n";
-		return $select_ref;
+        my ( $self, $mode ) = @_;
+        
+        my $select_ref = $self->load_info('select');
+        if ( ! defined $select_ref ) {
+            my ( $line, $pos ) = $self->cursor->get;
+            $select_ref = {
+                    'start_line' => $line,
+                    'start_pos' => $pos, 
+                    'mode' => $mode,
+            };
+            #$self->save_info($select_ref, 'select');
+        }
+        else {
+            $select_ref->{'start_line'} = Text::Editor::Easy::Line->new( $self, $select_ref->{'start_line'} );
+            $select_ref->{'stop_line'} = Text::Editor::Easy::Line->new( $self, $select_ref->{'stop_line'} );
+        }
+        #print "Départ : mode = ", $select_ref->{'mode'}, "\n";
+        return $select_ref;
 }
 
 sub delete_start_selection_point {
-		my ( $self, $mode ) = @_;
-		
-		my $select_ref = undef;
-		$self->async->save_info($select_ref, 'select');
-		$self->deselect;
+        my ( $self, $mode ) = @_;
+        
+        my $select_ref = undef;
+        $self->async->save_info($select_ref, 'select');
+        $self->deselect;
 }
 
 
 sub save_selection {
-	my ( $self, $select_ref ) = @_;
-		
+    my ( $self, $select_ref ) = @_;
+        
     if ( my $start_line = $select_ref->{'start_line'} ) {
-		$select_ref->{'start_line'} = $start_line->ref;
+        $select_ref->{'start_line'} = $start_line->ref;
     }
     if ( my $stop_line = $select_ref->{'stop_line'} ) {
-		$select_ref->{'stop_line'} = $stop_line->ref;
+        $select_ref->{'stop_line'} = $stop_line->ref;
     }
-	#print "Fin : mode = ", $select_ref->{'mode'}, "\n";
-	$self->async->save_info($select_ref, 'select');
+    #print "Fin : mode = ", $select_ref->{'mode'}, "\n";
+    $self->async->save_info($select_ref, 'select');
 }
 
 
@@ -892,10 +892,10 @@ sub sel_second {
 
 sub search {
     my ( $self ) = @_;
-	
-	Text::Editor::Easy->save_current( $self->get_ref );
+    
+    Text::Editor::Easy->save_current( $self->get_ref );
 
-		my $macro_instructions = << 'END_PROGRAM';
+        my $macro_instructions = << 'END_PROGRAM';
 my $editor = Text::Editor::Easy->last_current;
 my $exp = "";
 my ( $line, $start, $end, $regexp ) = $editor->search($exp);
@@ -905,71 +905,71 @@ my $text = $line->select($start, $end);
 $editor->visual_search( $regexp, $line, $end);
 END_PROGRAM
         my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
-		$eval_editor->bind_key ( {'package' => 'Text::Editor::Easy::Key', 'sub' => 'enter_search', 'key' => 'Return' } );
-		$eval_editor->bind_key ( {'package' => 'Text::Editor::Easy::Key', 'sub' => 'enter_search', 'key' => 'KP_Enter' } );
+        $eval_editor->bind_key ( {'package' => 'Text::Editor::Easy::Key', 'sub' => 'enter_search', 'key' => 'Return' } );
+        $eval_editor->bind_key ( {'package' => 'Text::Editor::Easy::Key', 'sub' => 'enter_search', 'key' => 'KP_Enter' } );
         $eval_editor->empty;
         $eval_editor->insert($macro_instructions);
-		$eval_editor->focus;
-		$eval_editor->cursor->set( 11, $eval_editor->number(2));
+        $eval_editor->focus;
+        $eval_editor->cursor->set( 11, $eval_editor->number(2));
         return;
 }
 
 sub enter_search {
     my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
-	# Fonctionnement par défaut des touches récupérés
-	$eval_editor->bind_key ( {'key' => 'Return' } );
-	$eval_editor->bind_key ( {'key' => 'KP_Enter' } );
-	my $exp = eval $eval_editor->number(2)->text;
-	#print "REGEXP = $regexp\n";
+    # Fonctionnement par défaut des touches récupérés
+    $eval_editor->bind_key ( {'key' => 'Return' } );
+    $eval_editor->bind_key ( {'key' => 'KP_Enter' } );
+    my $exp = eval $eval_editor->number(2)->text;
+    #print "REGEXP = $regexp\n";
     my $editor = Text::Editor::Easy->last_current;
-	
+    
     #$options_ref = Text::Editor::Easy->data_get_search_options ( $self->get_ref );
-	my ( $line_init, $pos ) = $editor->cursor->get;
+    my ( $line_init, $pos ) = $editor->cursor->get;
     my ( $line, $start, $end, $regexp ) = $editor->search($exp);
-	Text::Editor::Easy::Async->data_set_search_options ( $editor->get_ref, {
-		'exp' => dump ($regexp),
-		'line_init' => $line_init->ref,
-		'pos_init' => $pos,
-	} );
-	#print "Référence pour save ", $editor->get_ref, "\n";
+    Text::Editor::Easy::Async->data_set_search_options ( $editor->get_ref, {
+        'exp' => dump ($regexp),
+        'line_init' => $line_init->ref,
+        'pos_init' => $pos,
+    } );
+    #print "Référence pour save ", $editor->get_ref, "\n";
     $editor->deselect;
     return if ( ! defined $line );
     my $text = $line->select($start, $end, {'force' => 'middle_top'} );
-	$editor->cursor->set( $end, $line );
-	$editor->focus;
-	$editor->visual_search( $regexp, $line, $end);
+    $editor->cursor->set( $end, $line );
+    $editor->focus;
+    $editor->visual_search( $regexp, $line, $end);
 }
 
 sub f3_search {
     my $editor = Text::Editor::Easy->last_current;
-	my $options_ref = Text::Editor::Easy->data_get_search_options ( $editor->get_ref );
-	#print "Référence pour load ", $editor->get_ref, "\n";
+    my $options_ref = Text::Editor::Easy->data_get_search_options ( $editor->get_ref );
+    #print "Référence pour load ", $editor->get_ref, "\n";
     #print "EXP : $options_ref->{'exp'}\n";
-	#print "LINE: $options_ref->{'line_init'}\n";
-	#print "pos : $options_ref->{'pos_init'}\n";
-	my ( $line, $start, $end, $regexp ) = $editor->search(eval $options_ref->{'exp'}, {
-			'stop_line' => $options_ref->{'line_init'},
-			'stop_pos' => $options_ref->{'pos_init'},
-	} );
+    #print "LINE: $options_ref->{'line_init'}\n";
+    #print "pos : $options_ref->{'pos_init'}\n";
+    my ( $line, $start, $end, $regexp ) = $editor->search(eval $options_ref->{'exp'}, {
+            'stop_line' => $options_ref->{'line_init'},
+            'stop_pos' => $options_ref->{'pos_init'},
+    } );
     $editor->deselect;
     if ( ! defined $line ) {
-		# Positionnement à l'endroit initial
-		my $line_init = Text::Editor::Easy::Line->new($editor, $options_ref->{'line_init'});
-		$editor->cursor->set($options_ref->{'pos_init'},$line_init);
-		return;
-	}
+        # Positionnement à l'endroit initial
+        my $line_init = Text::Editor::Easy::Line->new($editor, $options_ref->{'line_init'});
+        $editor->cursor->set($options_ref->{'pos_init'},$line_init);
+        return;
+    }
     my $text = $line->select($start, $end, {'force' => 'middle_top'} );
-	$editor->cursor->set( $end, $line );
-	$editor->focus;
-	$editor->visual_search( $regexp, $line, $end);
+    $editor->cursor->set( $end, $line );
+    $editor->focus;
+    $editor->visual_search( $regexp, $line, $end);
 }
 
 sub close {
     my ( $self ) = @_;
-	
-	print "Dans key close, avant kill\n";
-	
-	$self->kill;
+    
+    print "Dans key close, avant kill\n";
+    
+    $self->kill;
 }
 
 

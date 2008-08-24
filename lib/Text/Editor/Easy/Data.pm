@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 use Data::Dump qw(dump);
 use threads;
@@ -71,7 +71,7 @@ use constant {
     CONTEXT  => 9,
 
     #------------------------------------
-    # LEVEL 3 : $self->[THREAD]{$tid}[???]
+    # LEVEL 3 : $self->[THREAD][$tid][???]
     #------------------------------------
     STATUS      => 0,
     CALL_ID     => 1,
@@ -256,6 +256,10 @@ sub init_data {
     #print "Data a été créé\n";
     $self->[COUNTER] = 0;         # PAs de redirection de print
     $self_global = $self;         # Mise à jour de la variable 'globale'
+    if ( defined %Text::Editor::Easy::Trace and $Text::Editor::Easy::Trace{'trace_print'} eq 'full' ) {
+        create_full_trace_server();
+        $self->[FULL_TRACE] = 1;
+    }
 }
 
 use IO::File;
@@ -295,10 +299,12 @@ sub trace_print {
     #Ecriture sur fichier
     my $seek_start = tell ENC;
     no warnings;    # @param peut contenir des élément undef
+    print DBG "Début d'écriture sur ENC, start = $seek_start\n";
     print ENC @param;
     my $param = join( '', @param );
     use warnings;
     my $seek_end = tell ENC;
+    print DBG "Fin d'écriture sur ENC, end = $seek_end\n";
 
     # Traçage des print
     my %options;
@@ -330,13 +336,13 @@ sub trace_print {
     #return if ( !defined $thread_ref );
 
     if ( my $eval_ref = $thread_ref->[EVAL] ) {
-        for my $indice ( 1 .. scalar(@calls) / 3 ) {
-            my $file = $calls[ 3 * $indice - 2 ];
+        for my $tab_ref ( @calls ) {
+            my $file = $tab_ref->[1];
 
          #print ENC "evaluated file $eval_ref->[0]|$eval_ref->[1]|FILE|$file\n";
             if ( $file =~ /\(eval (\d+)/ ) {
                 if ( $1 >= $eval_ref->[1] ) {
-                    $calls[ 3 * $indice - 2 ] = $eval_ref->[0];
+                    $tab_ref->[1] = $eval_ref->[0];
                 }
             }
         }
@@ -374,7 +380,7 @@ sub trace_print {
 
             # Eviter l'autovivification
             next RED
-              if ( !defined $call_id_ref
+            if ( !defined $call_id_ref
                 and $tid != $redirect_ref->{'thread'} );
 
 #print DBG "redirect_ref thread = ", $redirect_ref->{'thread'}, " (tid = $tid)\n";
@@ -391,7 +397,7 @@ sub trace_print {
                   if (  defined $excluded
                     and defined $call_id_ref->[THREAD_LIST]{$excluded} );
                 Text::Editor::Easy::Async->ask2( $redirect_ref->{'method'},
-                    $param );
+                    $seek_start, $param );
 # Redirection synchrone impossible : appel de méthode quasi-standard (ask2) donc demande
 # de traçage de la méthode (trace_call, trace_start puis trace_response) au thread Data qui ne peut
 # par conséquent pas attendre ici (sans quoi, il ne répondrait plus aux requêtes de traçage et tout se bloque...)
@@ -405,26 +411,41 @@ sub trace_print {
         }
     }
 
-    if ( !$self->[FULL_TRACE] ) {
-        $self->[FULL_TRACE] = 1;
-        Text::Editor::Easy->create_new_server(
-            {
-                'use'     => 'Text::Editor::Easy::Trace::Print',
-                'package' => "Text::Editor::Easy::Trace::Print",
-                'methods' => [ 'trace_full', 'get_info_for_display' ],
-                'object'  => [],
-                'init'    => [
-                    'Text::Editor::Easy::Trace::Print::init_trace_print',
-                    $own_STDOUT
-                ],
-            }
-        );
+    if ( $self->[FULL_TRACE] ) {
+        if ( ! defined $options{'line'} ) {
+            Text::Editor::Easy::Async->trace_full_print( $seek_start, $seek_end, $tid,
+            $call_id, $options{'on'}, $options{'calls'}, $param );
+        }
+        else {
+            Text::Editor::Easy::Async->trace_full_eval_err ( $seek_start, $seek_end, $dump_hash, $param );
+        }
     }
-    Text::Editor::Easy::Async->trace_full( $seek_start, $seek_end, $tid,
-        $call_id, $options{'calls'}, $param );
     #print DBG "Fin trace_print $self\n";
-    return
-      ;  # Eviter autre chose que le context void pour Text::Editor::Easy::Async
+    
+    # Eviter autre chose que le context void pour Text::Editor::Easy::Async
+    return;
+}
+
+sub create_full_trace_server {
+    Text::Editor::Easy->create_new_server( {
+        'use'     => 'Text::Editor::Easy::Trace::Full',
+        'package' => "Text::Editor::Easy::Trace::Full",
+        'methods' => [ 
+            'trace_full_print',
+            'get_info_for_display',
+            'trace_full_call',
+            'get_info_for_call',
+            'trace_full_eval',
+            'get_code_for_eval',
+            'trace_full_eval_err',
+            'get_info_for_eval_display',
+        ],
+        'object'  => [],
+        'init'    => [
+            'Text::Editor::Easy::Trace::Full::init_trace_full',
+            $own_STDOUT
+        ],
+    } );
 }
 
 sub reference_print_redirection {
@@ -452,7 +473,17 @@ sub trace_call {
     print DBG "C|$call_id|$server|$seconds|$micro|$method\n";
 
     my ( $client, $id ) = split( /_/, $call_id );
-    my $thread_ref  = $self->[THREAD][$client];
+    my $thread_ref = $self->[THREAD][$client]; 
+    
+    if ( $self->[FULL_TRACE] ) {
+        my $client_call_id = $thread_ref->[CALL_ID];
+        #print DBG "Appel trace_full_call pour call_id = $call_id\n";
+        Text::Editor::Easy::Async->trace_full_call( $call_id, $client_call_id, @calls );
+    }
+    #else {
+    #    print DBG "Pas d'appel pour call_id = $call_id => $self->[FULL_TRACE]\n";
+    #}
+    
     my $call_id_ref = $self->[CALL]{$call_id};
     $call_id_ref->[CONTEXT] = $context;
     if ( length($context) == 1 )
@@ -476,6 +507,8 @@ sub trace_call {
             #    print DBG "PAs une référence de hachage pour thread client $client, call_id en cours $call_id\n" .
             #     "\t|$previous_call_id_ref|$previous_call_id_ref->[THREAD_LIST]|, tid", threads->tid, "\n";
             #}
+            #print DBG "CALL_ID = $thread_ref->[CALL_ID], ref =  $previous_call_id_ref, $previous_call_id_ref->[THREAD_LIST]\n";
+            #print DBG "=> appel du previous par $call_id synchrone\n";
             %{ $call_id_ref->[THREAD_LIST] } =
               %{ $previous_call_id_ref->[THREAD_LIST] };
             %{ $call_id_ref->[METHOD_LIST] } =
@@ -564,6 +597,7 @@ sub trace_response {
     my ($client) = split( /_/, $call_id );
 
     my $status_ref = $self->[THREAD][$client][STATUS];
+    
     if ( $call_id_ref->[SYNC] ) {
         if ( scalar(@$status_ref) < 2 ) {
 
@@ -574,7 +608,7 @@ sub trace_response {
             shift @$status_ref;
         }
     }
-
+    
     $self->[THREAD][$client][STATUS] = $status_ref;
 
     # Ménage de THREAD (systématique)
@@ -706,6 +740,7 @@ sub trace_start {
         #print DBG "\n";
         #}
     }
+    #print DBG "Fin de trace_start : $call_id, $call_id_ref, $call_id_ref->[THREAD_LIST]\n";
 }
 
 sub trace_display_calls {
@@ -861,7 +896,84 @@ sub data_set_search_options {
         $self->[SEARCH]{$ref} = $options_ref;
 }
 
-my %tab_editor;
+my $event_number = 0;
+
+sub trace_user_event {
+    my ( $self, $unique_ref, $event, $options_ref ) = @_;
+    
+    # Procédure appelée uniquement par le thread graphique (tid 0)
+    return if ( $self->[THREAD][0][STATUS][0] !~ /^idle/ );
+    
+    my $call_id = 'U_' . $event_number;
+    #trace_call ( $self, $call_id, 0, $event, $unique_ref, 'void', 0, 0);
+    if ( $self->[FULL_TRACE] ) {
+        Text::Editor::Easy::Async->trace_full_call( $call_id, undef, $event );
+    }
+    my $call_id_ref = $self->[CALL]{$call_id};
+    $call_id_ref->[INSTANCE_LIST]{$unique_ref} = 1;
+    $call_id_ref->[METHOD_LIST]{'user event'} = 1;
+    $call_id_ref->[THREAD_LIST]{0} = 1;
+    $call_id_ref->[C_INSTANCE] = $unique_ref;
+    $call_id_ref->[STATUS] = 'started';
+    $self->[CALL]{$call_id} = $call_id_ref;
+    print DBG "Evènement $event\n\tDéclaration de call_id $call_id, ref $call_id_ref, $call_id_ref->[THREAD_LIST]\n";
+    trace_start ( $self, 0, $call_id, $event, 0, 0 );
+}
+
+sub trace_end_of_user_event {
+    my ( $self, $info ) = @_;
+    
+    # Procédure appelée uniquement par le thread graphique (tid 0)
+    
+    my $call_id = 'U_' . $event_number;
+    my $call_id_ref = $self->[CALL]{$call_id};
+    if ( !defined $call_id_ref ) {
+        print DBG "L'évènement $call_id ('$info') n'avait pas été déclarée initialement ?...\n";
+        return;
+    }
+    else {
+        print DBG "Fin correctement déclarée de l'évènement '$info'\n";
+    }
+    %{ $call_id_ref->[INSTANCE_LIST] } = ();
+    %{ $call_id_ref->[METHOD_LIST] } = ();
+
+        #$call_id_ref->[PREVIOUS] = 0;
+    $self->[CALL]{$call_id} = $call_id_ref;
+    @{ $self->[CALL]{$call_id} } = ();
+    delete $self->[CALL]{$call_id};
+    $self->[THREAD][0] = ();
+    $self->[THREAD][0][STATUS][0] = "idle|$call_id";
+
+    #trace_response ( $self, 0, $call_id, undef, 0, 0 );
+    $event_number += 1;
+}
+
+sub trace_eval {
+    my ( $self, $eval, $tid, $file, $package,$line ) = @_;
+#
+    my $call_id = $self->[THREAD][$tid][CALL_ID];
+    print DBG "Dans trace_eval : eval = $eval\n";
+    print DBG "\t tid $tid|call_id $call_id\n";
+    print DBG "\tpackage $package | line $line\n";
+    if ( $self->[FULL_TRACE] ) {
+        Text::Editor::Easy::Async->trace_full_eval (
+            $eval, $tid, $file, $package, $line, $call_id,
+        );
+    }
+    return $call_id;
+    #\ttid $tid\n\tprevious $previous_call_id\n\tCALLS @calls\n";
+}
+
+sub tell_length_slash_n {
+    print DBG "Dans tell ltength\n";
+    return if ( ! $Text::Editor::Easy::Trace{'trace_print'} );
+    my $first = tell ENC;
+    print DBG "Dans tell ltength : first = $first\n";
+    print ENC "\n";
+    print DBG "Dans tell ltength : taille ", tell(ENC) - $first,"\n";    
+    return tell(ENC) - $first;
+}
+
 
 =head1 FUNCTIONS
 

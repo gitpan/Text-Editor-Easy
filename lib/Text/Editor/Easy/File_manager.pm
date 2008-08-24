@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 =head1 SYNOPSIS
 
@@ -52,6 +52,8 @@ use Text::Editor::Easy::Comm;
 use Scalar::Util qw(refaddr);
 use Data::Dump qw(dump);
 use Devel::Size qw(size total_size);
+
+Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 
 my $one_more_line;
 
@@ -95,7 +97,7 @@ use constant {
     DIRTY       => 11,
     FILE_NAME   => 12,
     LINE_NUMBER => 13,
-
+    PSEUDO_SEEK_START => 14,
 
     # Gestion de LINE_NUMBER
     LAST_COMPUTE => 0,
@@ -251,6 +253,8 @@ sub modify_line {
 sub delete_line {
     my ( $self, $ref ) = @_;
 
+
+    print "Dans delete_line REF = $ref\n";
     $self->[DIRTY] = 1;
     $self->[LAST_UPDATE] += 1;
 
@@ -260,6 +264,7 @@ sub delete_line {
     my $line_ref = $self->[HASH_REF]{$ref};
     $line_ref->[TYPE] = "empty";
     delete $self->[HASH_REF]{$ref};
+    print "Fin de la suppression de REF = $ref\n";
 }
 
 sub read_until {
@@ -356,9 +361,9 @@ sub save_line_number {
 }
 
 sub prev_line {
-    my ( $segment_ref, $pos ) = @_;
+    my ( $segment_ref, $pos, $line_ref ) = @_;
 
-    #print "Début de prev_line $pos\n";
+    print DBG "Début de prev_line $pos\n";
     if ( !$segment_ref->[FILE_DESC] ) {
 
         # Pas de fichier connu, donc on est au début du fichier
@@ -368,17 +373,19 @@ sub prev_line {
     my $end_position = tell $segment_ref->[FILE_DESC];
     return ( 0, "" ) if ( !$end_position );    # On est au début du fichier
 
-    #print "position > 0\n";
+    print DBG "position > 0\n";
     my $decrement = 0;
 
     # But de la boucle, être sûr de lire une ligne entière
   SEEK: while ( tell $segment_ref->[FILE_DESC] == $end_position ) {
         $decrement += 50;
+        print DBG "Decrement $decrement\n";
         if ( $decrement < $pos ) {
             seek $segment_ref->[FILE_DESC], $pos - $decrement, 0;
             readline $segment_ref->[FILE_DESC];
         }
         else {
+            print DBG "Positionnement au début du fichier\n";
             seek $segment_ref->[FILE_DESC], 0, 0;
             my $start_position = 0;
             while ( tell $segment_ref->[FILE_DESC] != $end_position ) {
@@ -390,18 +397,31 @@ sub prev_line {
         }
     }
 
-    #print "Après première boucle : $end_position\n";
+    print DBG "Après première boucle : ", tell $segment_ref->[FILE_DESC], "\n";
     my $text;
     while ( tell $segment_ref->[FILE_DESC] != $end_position ) {
         $pos = tell $segment_ref->[FILE_DESC];
 
-        #print "pos = $pos\n";
+        print DBG "pos A = $pos\n";
         $text = readline $segment_ref->[FILE_DESC];
 
-        #print tell  $segment_ref->[FILE_DESC], "\n";
+        my $last_position = tell  $segment_ref->[FILE_DESC];
+        print DBG "POS B = $last_position | texte = $text\n";
+        if ( $last_position > $end_position ) {
+            print DBG "On est à la fin d'un fichier qui grossit continuellement (growing file) sans retour charriot\n";
+            # Il faut sortir et mettre à jour la taille de tous les segments parents à cette ligne (SEEK_END)
+            $line_ref->[SEEK_END] = $last_position;
+            $segment_ref->[SEEK_END] = $last_position;
+            while ( $segment_ref->[PARENT] ) {
+                $segment_ref = $segment_ref->[PARENT];
+                $segment_ref->[SEEK_END] = $last_position;
+            }
+            #$self->[ROOT][SEEK_END] = $last_position;
+            last;
+        }
     }
 
-    #print "Fin de prev_line $pos, $text\n";
+    print DBG "Fin de prev_line $pos, $text\n";
     return ( $pos, $text );
 }
 
@@ -439,9 +459,10 @@ sub save_internal {
 
     return if ( !$self->[DIRTY] );    # Rien n'a été modifié, sauvegarde inutile
 
-    if ( !$file_name ) {
-        if ( !$self->[ROOT][FILE_NAME] ) {
-            print STDERR "Sauvegarde impossible : aucun nom disponible\n";
+    if ( ! $file_name ) {
+        if ( ! $self->[ROOT][FILE_NAME] ) {
+            return if ( $self->[PARENT]->name eq 'eval*' );
+            print STDERR "Can't save file : no file name has been given\n";
             return;
         }
         $file_name = $self->[ROOT][FILE_NAME];
@@ -934,10 +955,11 @@ sub last_ {
     # Si "empty" : n'existe pas vraiment : renvoie le suivant
     my ($segment_ref) = @_;
 
-    #print "Dans last_\n";
+    print DBG "Dans last_ de segment_ref $segment_ref\n";
 
     if ( $segment_ref->[LAST] ) {
         if ( $segment_ref->[LAST][SEEK_END] == $segment_ref->[SEEK_END] ) {
+            print DBG "Un segment last qui correspond à la fin du fichier : $segment_ref->[LAST]\n";
             return ( last_( $segment_ref->[LAST] ) );
         }
         else {
@@ -945,6 +967,7 @@ sub last_ {
             $line_ref->[PREVIOUS] = $segment_ref->[LAST];
             $line_ref->[SEEK_END] = $segment_ref->[SEEK_END];
             $line_ref->[PARENT]   = $segment_ref;
+            print DBG "Création d'un nouveau segment : $line_ref\n";
             return ( read_previous_($line_ref) );
         }
     }
@@ -962,7 +985,7 @@ sub last_ {
         if ( $segment_ref->[FILE_DESC] ) {
             if ( $segment_ref->[SEEK_START] != $segment_ref->[SEEK_END] ) {
 
-                # Fichier intact
+                print DBG "Fichier intact\n";
                 my $line_ref;
                 $line_ref->[SEEK_END] = $segment_ref->[SEEK_END];
                 $line_ref->[PARENT]   = $segment_ref;
@@ -971,17 +994,19 @@ sub last_ {
         }
         else {
 
-            # Cas d'un buffer vide à faire ici
+            print DBG "Cas d'un buffer vide à faire ici\n";
             return;
         }
     }
     if ( $segment_ref->[TYPE] eq "empty" ) {
         if ( $segment_ref->[PREVIOUS] ) {
+            print DBG "Récup de last du segment précédent $segment_ref->[PREVIOUS]\n";
             return ( last_( $segment_ref->[PREVIOUS] ) );
         }
         else {
 
             # On considère qu'un segment vide a toujours un parent
+            print DBG "Récup du précédent du parent $segment_ref->[PARENT]\n";
             return ( previous_( $segment_ref->[PARENT] ) );
         }
     }
@@ -990,8 +1015,12 @@ sub last_ {
 sub read_previous_ {
     my ($line_ref) = @_;
 
+    print DBG "Dans read_previous de line_ref $line_ref\n";
+
     my ( $seek_start, $text ) =
-      prev_line( $line_ref->[PARENT], $line_ref->[SEEK_END] );
+      prev_line( $line_ref->[PARENT], $line_ref->[SEEK_END], $line_ref );
+
+    print DBG "On a lu seek_start $seek_start et text $text\n";
 
     $line_ref->[TEXT] = $text;
     chomp $line_ref->[TEXT];
@@ -1075,10 +1104,10 @@ sub previous_line {
 
     if ( !$ref ) {
 
-        #print "Previous à blanc demandé\n";
+        print DBG "Previous à blanc demandé\n";
         my $line_ref = last_( $self->[ROOT] );
 
-        #print "line_ref trouvé = $line_ref\n";
+        print DBG  "line_ref trouvé = $line_ref\n";
         if ($line_ref) {
             my $ref = save_line( $self, $line_ref );
             return ( $ref, $line_ref->[TEXT] );
@@ -1086,10 +1115,16 @@ sub previous_line {
         return 0;
     }
 
-    #print "Previous de $ref demandé\n";
+    print DBG  "Previous de $ref demandé\n";
     # Utilisation de la référence pour connaître la position
     my $line_ref = $self->[HASH_REF]{$ref};
 
+    if ( defined $line_ref ) {
+        print DBG "Line ref trouvée : $line_ref\n";
+    }
+    else {
+        print DBG "Pas de line ref trouvée\n";
+    }
     my $previous_line_ref = previous_($line_ref);
     if ($previous_line_ref) {
         my $previous_ref = save_line( $self, $previous_line_ref );
@@ -1104,7 +1139,43 @@ sub line_seek_start {
     return if ( !$ref );
     my $line_ref = $self->[HASH_REF]{$ref};
     return if ( !defined $line_ref );
-    return $line_ref->[SEEK_START];
+    if ( defined $line_ref->[PSEUDO_SEEK_START] ) {
+        return $line_ref->[PSEUDO_SEEK_START];
+    }
+    init_pseudo_seek_start ( $line_ref );
+    return $line_ref->[PSEUDO_SEEK_START];
+}
+
+sub init_pseudo_seek_start {
+    my ( $line_ref ) = @_;
+    
+    my $seek_start = $line_ref->[SEEK_START];
+    if ( $seek_start == 0 ) {
+        my $seek_end = $line_ref->[SEEK_END];
+        if ( $seek_end == 0 ) {
+            return;
+        }
+    }
+    $line_ref->[PSEUDO_SEEK_START] = $line_ref->[SEEK_START];
+}
+
+sub line_add_seek_start {
+    my ( $self, $ref, $seek_added ) = @_;
+
+    return if ( !$ref );
+    my $line_ref = $self->[HASH_REF]{$ref};
+    return if ( !defined $line_ref );
+    my $seek_start = $line_ref->[PSEUDO_SEEK_START];
+    if ( ! defined $seek_start ) {
+        init_pseudo_seek_start( $line_ref );
+        $seek_start = $line_ref->[PSEUDO_SEEK_START];
+    }
+    if ( ! defined $seek_start ) {
+        $line_ref->[PSEUDO_SEEK_START] = $seek_added;
+    }
+    else {
+        $line_ref->[PSEUDO_SEEK_START] = $seek_start . ";" . $seek_added;
+    }
 }
 
 sub get_ref_for_empty_structure {

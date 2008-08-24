@@ -10,11 +10,11 @@ This module will replace "common parts" of the old "Screen.pm".
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "window_" puis reprennent
 # le nom de la méthode

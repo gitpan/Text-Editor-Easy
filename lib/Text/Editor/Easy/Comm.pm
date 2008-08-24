@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 =head1 SYNOPSIS
 
@@ -235,7 +235,7 @@ sub PRINT {
     my @calls;
     my $indice = 0;
     while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
-        push @calls, ( $pack, $file, $line );
+        push @calls, [ $pack, $file, $line ];
     }
     my $array_dump = dump @calls;
     my $hash_dump  = dump(
@@ -476,10 +476,12 @@ sub simple_context_call {
     my $response;
     #print DBG "SIMPLE_CONTEXT_CALL : $call_id|$sub_name|\n";
     if ( $context eq 'A' or $context eq 'AA' ) {
+        # Inter-thread call, not to be shown in trace
         my @return = $sub_ref->( $self, @param );
         $response = dump @return;
     }
     else {
+        # Inter-thread call, not to be shown in trace
         my $return = $sub_ref->( $self, @param );
         $response = dump $return;
     }
@@ -617,6 +619,7 @@ sub ask2 {
     if ( defined $tid ) {
          print DBG "TID défini pour méthode $method... : $tid\n";
         $server_tid = $tid;
+        # Following call not to be shown in trace
         return new_ask( $self, $method, $unique_ref, $client_tid, $server_tid, @data );
     }
     # La méthode s'exécute dans le contexte du thread client appelant
@@ -638,6 +641,7 @@ sub ask2 {
         print DBG "La méthode $method est spécifique à la référence $unique_ref\n";
     }
     my $sub_ref = eval "\\&$sub";
+    # Following call not to be shown in trace
     return $sub_ref->( $self, @data );
 }
 
@@ -697,7 +701,7 @@ sub new_ask {
         my @calls;
         my $indice = 0;
         while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
-            push @calls, ( $pack, $file, $line );
+            push @calls, [ $pack, $file, $line ];
         }
         my @call_params = (
             $call_id, $server_tid,    $method, $unique_ref,
@@ -774,6 +778,7 @@ sub ask_thread {
     
 # Attention, la première donnée de la fonction est $unique_ref || $self ==> cad la référence avec laquelle la méthode de thread
 # a été appelée
+    # Following call not to be shown in trace
     return new_ask( 
         $self, $method, $unique_ref, threads->tid, $server_tid, $unique_ref || $self, @data
     );
@@ -1068,6 +1073,10 @@ sub create_data_thread {
                 'data_last_current',
                 'data_get_search_options',
                 'data_set_search_options',
+                'trace_user_event',
+                'trace_end_of_user_event',
+                'trace_eval',
+                'tell_length_slash_n',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data'],
@@ -1455,7 +1464,10 @@ sub verify_motion_thread {
     }
 
     #print DBG "Taille de \%event $unique_ref :", scalar(%event), "\n";
-    if ( !defined $motion_thread and $motion_thread_useful ) {
+    
+    #if ( !defined $motion_thread and $motion_thread_useful ) {
+    if ( ! defined $motion_thread ) {
+        #print "Je crée le motion thread\n";
 
         my $tid = Text::Editor::Easy->create_new_server(
             {
@@ -1472,12 +1484,11 @@ sub verify_motion_thread {
             $queue = $server_queue_by_tid{$tid};
         }
 
-        $motion_thread = $tid
-          if ( !defined $motion_thread )
-          ;    # Création multi-thread possible : on n'est pas seul...
+        # Création multi-thread possible : on n'est pas seul...
+        $motion_thread = $tid if ( !defined $motion_thread );
+        
         if ( $motion_thread != $tid ) {
-
-    # Le model_thread a été créé par un autre éditeur, il faut éliminer le notre
+    # Le motion_thread a été créé par un autre éditeur, il faut éliminer le notre
             my $message = dump (undef);
             $queue->enqueue($message);
 
@@ -1499,7 +1510,6 @@ sub verify_motion_thread {
 
         Text::Editor::Easy->reference_event( $event, $unique_ref,
             $event{$event} );
-
     }
 }
 
@@ -2049,11 +2059,8 @@ sub create_new_server {
 
     print DBG "Create_new_server_thread : Je renvoie $tid\n";
     if ( my $init_sub_ref = $options_ref->{'init'} ) {
+        # There is an "init sub" associated with the thread creation : we execute it
         my ( $what, @param ) = @$init_sub_ref;
-
-#print DBG "Je devrais appeler $what avec tid $tid params @param\n";
-# C'est "$unique_ref || $self" qui serait appelé dans un appel de méthode standard (cad $self_caller)
-
         Text::Editor::Easy::Async->ask_thread( $what, $tid, @param );
     }
 

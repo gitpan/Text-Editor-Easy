@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 =head1 SYNOPSIS
 
@@ -1192,6 +1192,15 @@ sub clic {
 
 sub motion {
     my ( $edit_ref, $x, $y, $key ) = @_;
+    
+    Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[UNIQUE], 
+        "User moved mouse at X = $x and Y = $y", {
+            'x' => $x,
+            'y' => $y,
+            'key' => $key,
+        }
+    );
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'motion';
@@ -1232,6 +1241,7 @@ sub motion {
         }
     }
     
+    
     if ( $event eq 'b1_motion_last' ) {
         b1_motion ( $edit_ref, {
             'x' => $x,
@@ -1256,6 +1266,8 @@ sub motion {
             }
         );
     }
+    #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+    return 'motion';
 }
 
 sub b1_motion {
@@ -1450,7 +1462,7 @@ sub repeat_instance_method {
    # Tk est plutôt moyen en ce sens que l'on ne peut pas donner de paramètre en plus de la callback 
    # aux procédures du genre "after"
    #              Mais perl est tellement dynamique !
-   # ====>  Création de la nouvelle sub à la volée qui appelle la méthode de classe donnée en paramètre !!!
+   # ====>  Création de la nouvelle sub à la volée qui appelle la méthode d'instance donnée en paramètre !!!
    my $async = $self->[PARENT]->async;
    my $sub_ref = sub { $async->$method };
    
@@ -1631,6 +1643,10 @@ sub key_press {
 
     #print "KEY CODE : $key_code\n";
     #return;
+    Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[UNIQUE],
+        "User pressed key $key_code",
+    );
     $sub_sub_origin = $key_code;
 
     my $reference = $edit_ref->[KEY]{$key_code};
@@ -1661,8 +1677,8 @@ sub key_press {
             }
             $code_ref->( $first_parameter, @tab );
         }
-
-        return;
+        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+        return $key_code;
     }
     #else {
     #    print "Aucune action associée à $key_code\n";
@@ -1670,17 +1686,20 @@ sub key_press {
 
     #print "|$key|$ascii|" if ( $alt_key );
     #print "|$key|$ascii|";
-    return if ( length($ascii) != 1 );
-
-    return if ( $special );
+    if ( length($ascii) != 1 or $special ) {
+        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+        return $key_code;
+    }
     
     if ( defined $edit_ref->[SELECTION] ) {
         Text::Editor::Easy::Abstract::Key::delete_selection($edit_ref);
     }
     
     # assist doit pointer sur une référence à un package ou une fonction
-    return insert( $edit_ref, $ascii,
+    insert( $edit_ref, $ascii,
         { 'assist' => $edit_ref->[ASSIST], 'indent' => 'auto' } );
+    #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+    return $key_code;
 }
 
 sub cursor_make_visible {
@@ -2533,7 +2552,7 @@ sub erase {
     my $length_line = length( $line_ref->[TEXT] );
     if ( $cursor_pos + $number > $length_line ) {
 
-        # Appels récursifs
+        # Pseudo-appels récursifs
         while ($number) {
             my $suppress;
             if ( $number > $length_line - $cursor_pos ) {
@@ -2563,7 +2582,7 @@ sub erase {
                         'sub_sub_origin' => $sub_sub_origin,
                     }
                 );
-            }        
+            }
         return;
     }
 

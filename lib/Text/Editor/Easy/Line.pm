@@ -9,11 +9,11 @@ Text::Editor::Easy::Line - Object oriented interface to a file line (managed by 
 
 =head1 VERSION
 
-Version 0.35
+Version 0.40
 
 =cut
 
-our $VERSION = '0.35';
+our $VERSION = '0.40';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
@@ -72,8 +72,7 @@ sub next {
     my $editor    = $ref_Editor{$ref};
     my ($next_id) = $editor->next_line( $ref_id{$ref} );
     return Text::Editor::Easy::Line->new(
-        $editor
-        , # Cette référence n'est renseignée que pour l'objet editeur du thread principal (tid == 0)
+        $editor,
         $next_id,
     );
 }
@@ -157,12 +156,14 @@ sub displayed {
     }
 }
 
-my %sub =
-  ( 'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], 
-   'deselect' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_deselect ],
-   'top_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_top_ord ],
-   'bottom_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_bottom_ord ],
-   'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ], );
+my %sub = (
+    'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], 
+    'deselect' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_deselect ],
+    'top_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_top_ord ],
+    'bottom_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_bottom_ord ],
+    'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ],
+    'add_seek_start' => 1,
+);
 
 
 sub AUTOLOAD {
