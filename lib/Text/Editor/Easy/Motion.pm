@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -123,7 +123,14 @@ my %line_number;    # Sauvegarde des recherches, fuite mémoire pas important ici
 sub move_over_eval_editor {
     my ( $unique_ref, $editor, $hash_ref ) = @_;
     
-    $hash_ref->{'eval'} = 1;
+    $hash_ref->{'editor'} = 'eval';
+    move_over_out_editor ( $unique_ref, $editor, $hash_ref );
+}
+
+sub move_over_external_editor {
+    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    
+    $hash_ref->{'editor'} = 'external';
     move_over_out_editor ( $unique_ref, $editor, $hash_ref );
 }
 
@@ -146,18 +153,38 @@ sub move_over_out_editor {
     my $pos = $hash_ref->{'line_pos'};
 
     my ( $first, $last, @enreg, $ref_first, $pos_first, $ref_last, $pos_last);
-    if ( $hash_ref->{'eval'} ) {
+    if ( my $type = $hash_ref->{'editor'} ) {
+        if ( $type eq 'external' ) { # log of external program
+            ( $ref_first, $pos_first, $ref_last, $pos_last, @enreg ) 
+             = Text::Editor::Easy->get_info_for_extended_trace (
+                 $line_of_out->seek_start,
+                 $pos,
+                 $editor->get_ref,
+                 $line_of_out->ref,
+               );
+            return if ( ! defined $ref_first );            
+        }
+        else { # $type eq 'eval', log of macro instructions
+            ( $ref_first, $pos_first, $ref_last, $pos_last, @enreg ) 
+             = Text::Editor::Easy->get_info_for_eval_display (
+                 $editor->get_ref,
+                 $line_of_out->ref,
+                 $pos
+               );
+            return if ( ! defined $ref_first );
+            print "Dans motion, j'ai bien reçu ref_first = $ref_first\n";
+        }
+    }
+    else { # Editor (internal log)
         ( $ref_first, $pos_first, $ref_last, $pos_last, @enreg ) 
-            = Text::Editor::Easy->get_info_for_eval_display($editor->get_ref, $line_of_out->ref, $pos);
-        return if ( ! defined $ref_first );
-        print "Dans motion, j'ai bien reçu ref_first = $ref_first\n";
+         = Text::Editor::Easy->get_info_for_display (
+             $seek_start,
+             $pos,
+             $editor->get_ref,
+             $line_of_out->ref,
+           );
+        print "Reçu de get_info_for_display $ref_first et $pos_first\n";
     }
-    else {
-        ( $first, $last, @enreg ) = Text::Editor::Easy->get_info_for_display($seek_start, $pos);
-        return if ( !defined $first );
-    }
-
-    print "Après appel get_info: FIRST\n";
 
     return if (anything_for_me);    # Abandonne si autre chose à faire
 
@@ -166,7 +193,7 @@ sub move_over_out_editor {
     $show_calls_editor->empty;
     return if (anything_for_me);    # Abandonne si autre chose à faire
 
-    print "ENREG 1 = $enreg[1]\n";
+    #print "ENREG 1 = $enreg[1]\n";
     
     my ( $info ) = $enreg[1] =~ /^\t(.+)/;
     
@@ -191,69 +218,23 @@ sub move_over_out_editor {
 
     $editor->deselect;
     
-    print "Avant bidouille motion\n";
-    if ( ! defined $ref_first ) {
-
-    print "Dans bidouille motion\n";
-    my $left;
-    my $right;
-    my $length_text = length( $line_of_out->text );
-
-#if ( $first >= $seek_start  ) { # line_select devra gérer les entrées négatives et supérieures à la longueur
-
-    my $start;
-    my $length_to_select;    # = $last - $first;
-    my $save_seek_start = $seek_start;
-    if ( $first < $seek_start )
-    {   # A gérer à cause de la différence de taille du \n entre Windows et Unix
-        $start = 0;
-        my $previous_line = $line_of_out->previous;
-        $seek_start = $previous_line->seek_start;
-        $start -= length $previous_line->text;
-        $length_to_select += length $previous_line->text;
-        while ( $first < $seek_start ) {
-            $previous_line = $previous_line->previous;
-            $seek_start    = $previous_line->seek_start;
-            $start -= length $previous_line->text;
-            $length_to_select += length $previous_line->text;
-        }
-    }
-    $start += $first - $seek_start;
-
-    $seek_start = $save_seek_start;
-    my $end;
-    my $current_line = $line_of_out;
-    while ( $last > ( $seek_start + $length_text ) ) {
-        $end += $length_text;
-        $current_line = $current_line->next;
-        return if ( !defined $current_line );    # A revoir...
-        $length_text = length( $current_line->text );
-        $seek_start  = $current_line->seek_start;
-    }
-    $end += $last - $seek_start;
-    $line_of_out->select( $start, $end, 'pink' );
-
+    #print "Dans motion, je sélectionne $ref_first de $pos_first à $pos_last\n";
+    if ( $ref_first == $ref_last ) {
+        $editor->line_select( $ref_first, $pos_first, $pos_last, 'pink' );
     }
     else {
-        print "Dans motion, je sélectionne $ref_first de $pos_first à $pos_last\n";
-        if ( $ref_first == $ref_last ) {
-            $editor->line_select( $ref_first, $pos_first, $pos_last, 'pink' );
+        $editor->line_select( $ref_first, $pos_first, undef, 'pink' );
+        my ( $new_ref ) = $editor->next_line( $ref_first );
+        while ( $new_ref != $ref_last ) {
+            $editor->line_select( $new_ref, undef, undef, 'pink' );
+            ( $new_ref ) = $editor->next_line ( $new_ref );
         }
-        else {
-            $editor->line_select( $ref_first, $pos_first, undef, 'pink' );
-            my ( $new_ref ) = $editor->next_line( $ref_first );
-            while ( $new_ref != $ref_last ) {
-                $editor->line_select( $new_ref, undef, undef, 'pink' );
-                ( $new_ref ) = $editor->next_line ( $new_ref );
-            }
-            $editor->line_select( $ref_last, 0, $pos_last, 'pink' );
-        }
+        $editor->line_select( $ref_last, 0, $pos_last, 'pink' );
     }
 
-    print "Dans motion, après else\n";
     # Reprise
     $new_editor->deselect;
-    $line->select( undef, undef, 'white' );
+    $line->select( undef, undef, {'force' => 1, 'color' => 'white'} );
 
 
     #return if (anything_for_me);
@@ -296,7 +277,7 @@ sub manage_eval {
     return if ( $eval !~ /eval (.+)$/ );
     
     my @code = Text::Editor::Easy->get_code_for_eval( $1 );
-    print "Gestion de l'eval dans motion : reçu ", join ("\n", @code), "\n";
+    #print "Gestion de l'eval dans motion : reçu ", join ("\n", @code), "\n";
     my $new_editor = $editor{''};
     if ( ! $new_editor ) {
             $new_editor = Text::Editor::Easy->new(

@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 =head1 SYNOPSIS
 
@@ -771,23 +771,6 @@ sub last_current {
     return;
 }
 
-sub substitute_eval_with_file {
-    my ( $self, $file ) = @_;
-
-    return if ( !defined $file );
-
-    # Les eval sont comptés par thread
-    eval "{{;";
-    my $message = $@;
-    my $number  = 0;
-    if ( $message =~ /eval (\d+)/ ) {
-        $number = $1;
-
-        #print "NUMBER = $number\n";
-    }
-    Text::Editor::Easy->data_substitute_eval_with_file( $file, $number + 1 );
-}
-
 package Text::Editor::Easy::Async;
 our @ISA = 'Text::Editor::Easy';
 
@@ -875,8 +858,6 @@ Class method : returns the editor instance who had the focus when ctrl-f was pre
 =head2 search
 
 =head2 slurp
-
-=head2 substitute_eval_with_file
 
 =head2 visual_search
 

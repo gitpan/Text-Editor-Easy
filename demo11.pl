@@ -4,7 +4,7 @@
 # Well, this is not really a demo.
 #
 # If you have done demos 7 to 9, you shoud have obtained
-# text printed in the "Eval_out" editor.
+# text printed in the "Eval" editor.
 #
 # Now that traces of the macro panel program begin to work,
 # you can mouve your mouse over these displays, allways with
@@ -13,7 +13,7 @@
 # Well for the moment, maybe it will not work everywhere but
 # it's not too bad : you should be able to obtain, for instance,
 # the following historic in the "stack call Editor" that I explain here
-# (mouse move with demo8, last printed characters on Eval_out) :
+# (mouse move with demo8, last printed characters on "Eval" editor) :
 #
 #     12|4_4980|STDOUT 
 #          ==> the print was made by the thread with tid 12 on STDOUT while it was executing "call_id" 4_4980.
@@ -55,3 +55,5 @@
 # aim is dynamic designing, you'll agree that traces are very important : modifying code
 # during execution will require tools and method...
 #
+# Anyway, it can help me to debug all this horrible code... I'm
+# now going to understand what I've done !

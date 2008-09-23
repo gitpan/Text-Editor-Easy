@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 =head1 SYNOPSIS
 
@@ -1803,7 +1803,7 @@ sub verify_if_cursor_is_visible_horizontally {
     #    "\t\$edit_ref->[SCREEN][HEIGHT] = ", $edit_ref->[SCREEN][HEIGHT], "\n",
     #    "\t\$next_line_ref->[ORD] = ", $next_line_ref->[ORD], "\n",
     #    "\t\$cursor_line_ref = ", $cursor_line_ref, "\n",
-    #    "\t\$cursor_line_ref->[ORD] = ", $cursor_line_ref->[ORD], "\n"; # zzzzz
+    #    "\t\$cursor_line_ref->[ORD] = ", $cursor_line_ref->[ORD], "\n"; # 
     
     if ( $next_line_ref->[ORD] > $edit_ref->[SCREEN][HEIGHT] ) {
         if ( ! defined $next_line_ref->[ORD] ) {
@@ -3051,7 +3051,7 @@ sub position_cursor_in_display {
 
     # Positionnement correct du tag "bottom'
     # ==>  Couteux : à ne faire que si la "hauteur" du curseur à changé
-    if ( $line_ref != $previous_line_ref ) { # zzzzz
+    if ( $line_ref != $previous_line_ref ) { #
 
 #print "Tag BOTTOM de $cursor_ref->[LINE_REF][ORD] à $edit_ref->[SCREEN][LAST][ORD]\n";
 
@@ -3402,6 +3402,7 @@ sub line_select {
     if ( defined $options_ref ) {
         if ( ref $options_ref ) {
             $force = $options_ref->{'force'};
+            $color = $options_ref->{'color'};
         }
         else {
             $color = $options_ref;
@@ -3898,6 +3899,7 @@ sub display_bottom_of_the_screen
             add_tag_complete( $edit_ref, $last_ref, 'bottom' );
         }
         else {
+            #print "Aucune nouvelle ligne trouvée après ref = $last_ref->[REF]\n";
             return;
         }
     }
@@ -4052,7 +4054,7 @@ sub display_with_tag {
         }
         $text_ref = $text_ref->[NEXT];
     }
-    $line_ref->[ORD] = $ord; # zzzz
+    $line_ref->[ORD] = $ord;
     return $line_ref;
 }
 
@@ -4363,6 +4365,15 @@ sub growing_check {
     #print "Dans growing_check $self, $size_increment, $end\n";
     if ( $self->[AT_END] ) {
         Text::Editor::Easy::Abstract::Key::end_file( $self, 0 );
+        return;
+    }
+    my $screen_ref = $self->[SCREEN];
+    my $last = $screen_ref->[LAST];
+    if ( $last->[ORD] < $screen_ref->[HEIGHT] ) {
+        print "Il faudrait remplir le bas de la zone : last (", $last->[REF], ") = ", $last->[TEXT], "\n";
+        print "Texte de la dernière ligne |", $last->[TEXT], "|n";
+        # Problème à résoudre d'un fichier qui grandit sans retour chariot ... (quand seule la dernière ligne grossit)
+        display_bottom_of_the_screen ($self );
     }
 }
 

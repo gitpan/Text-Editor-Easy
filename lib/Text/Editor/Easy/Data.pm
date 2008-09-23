@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Data::Dump qw(dump);
 use threads;
@@ -439,6 +439,8 @@ sub create_full_trace_server {
             'get_code_for_eval',
             'trace_full_eval_err',
             'get_info_for_eval_display',
+            'declare_trace_for',
+            'get_info_for_extended_trace',
         ],
         'object'  => [],
         'init'    => [
@@ -830,23 +832,6 @@ sub print_thread_list {
     print $string, "|\n";
 }
 
-sub data_substitute_eval_with_file {
-    my ( $self, $file, $number ) = @_;
-
-    # Récupération du thread ayant appelé cette procédure
-    print DBG "Dans data_substitute_eval_with_file : $self|$file|$number\n";
-    my $call_id = $self->[THREAD][ threads->tid ][CALL_ID];
-    print DBG
-      "Dans data_substitute_eval_with_file : après récupération de call_id\n";
-    my $calling_thread;
-    if ( defined $call_id ) {
-        print DBG "Call_id : $call_id\n";
-        ($calling_thread) = split( /_/, $call_id );
-        print DBG "Calling thread : $calling_thread\n";
-        $self->[THREAD][$calling_thread][EVAL] = [ $file, $number ];
-    }
-}
-
 sub reference_zone {
     my ( $self, $hash_ref ) = @_;
 
@@ -964,14 +949,20 @@ sub trace_eval {
     #\ttid $tid\n\tprevious $previous_call_id\n\tCALLS @calls\n";
 }
 
+my $length_s_n;
+
 sub tell_length_slash_n {
-    print DBG "Dans tell ltength\n";
+    print DBG "Dans tell length\n";
+    if ( defined $length_s_n ) {
+        return $length_s_n;
+    }
     return if ( ! $Text::Editor::Easy::Trace{'trace_print'} );
     my $first = tell ENC;
     print DBG "Dans tell ltength : first = $first\n";
     print ENC "\n";
     print DBG "Dans tell ltength : taille ", tell(ENC) - $first,"\n";    
-    return tell(ENC) - $first;
+    $length_s_n = tell(ENC) - $first;
+    return $length_s_n;
 }
 
 
@@ -1000,8 +991,6 @@ Get the Text::Editor::Easy reference that had focus when ctrl-f was pressed.
 =head2 data_set_search_options
 
 Set the search options (regexp, initial positions) : not yet finished.
-
-=head2 data_substitute_eval_with_file
 
 =head2 find_in_zone
 

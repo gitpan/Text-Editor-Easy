@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
@@ -44,6 +44,7 @@ use constant {
     HIDE => 5,
     INTER_CALL => 6,
     EVAL_DESC => 7,
+    EXTENDED_SELF => 8,
 };
 
 # Hash content : depends on the key shape
@@ -167,58 +168,14 @@ sub trace_full_print {
     }
 
 # La donnée a été écrite sur le fichier, on peut l'ouvrir et analyser les départs de nouvelles lignes
-    if ( !open( FIC, $self->[OUT_NAME] ) ) {
-        print DBG "Ouverture trace en erreur : $!\n";
-        return;
+    # On utilise pour cette analyse la variable $length_s_n (pas d'ouverture du fichier)
+    my @lines = split ( /\n/, $data );
+    my $seek_current = $seek_start;
+    return if ( scalar ( @lines ) < 2 );
+    for my $line ( @lines ) {
+        $seek_current += length ( $line ) + $length_s_n;
+        $self->[HASH]{$seek_current} = $value;
     }
-
-    my $start_of_line = $seek_start;
-    my $new_position;
-
-    #print DBG "\tRecherche vrai début seek_start : $seek_start\n";
-    if ($start_of_line)
-    { # si $start_of_line est nul ==> on est bien au début de la ligne puisqu'on est au début du fichier
-        do {
-            $start_of_line -= 5;
-            $start_of_line = 0 if ( $start_of_line < 0 );
-            if ( !seek FIC, $start_of_line, 0 ) {
-
-                #print DBG "Positionnement trace en erreur : $!\n";
-                close FIC;
-                return;
-            }
-            <FIC>;
-            $new_position = tell FIC;
-
-            #print DBG "\tBOUCLE start|$start_of_line|new|$new_position|\n";
-        } while ( $new_position > $seek_start );
-    }
-
-    #print DBG "\tFIN Boucle start|$start_of_line|new|$new_position|\n";
-    if ( $start_of_line != $seek_start ) {
-
-  #print DBG "\tCondition start|$start_of_line|new|$new_position|$seek_start\n";
-      READ: while ( $new_position <= $seek_start ) {
-            $start_of_line = $new_position;
-            my $enreg = <FIC>;
-            last READ if ( !defined $enreg );
-            $new_position = tell FIC;
-
-       #print DBG "\tTEST start|$start_of_line|new|$new_position|$seek_start\n";
-        }
-    }
-
-    #print DBG "\tFIN start|$start_of_line|\n";
-    while ( $start_of_line < $seek_end ) {
-        if ( !defined $self->[HASH]{$start_of_line} ) {
-            $self->[HASH]{$start_of_line} = $value;
-        }
-
-        #print DBG "Clé $start_of_line, valeur : |$value|$data\n";
-        <FIC>;
-        $start_of_line = tell FIC;
-    }
-    close FIC;
 }
 
 =head2 get_info_for_display 
@@ -231,7 +188,7 @@ my %editor;
 
 sub get_info_for_eval_display {
     my ( $self, $ref_editor, $ref_line, $pos_in_line ) = @_;
-    
+
     print DBG "Dans get_info_for_eval_display : ref_editor : $ref_editor| ref_line $ref_line| pos_in_line $pos_in_line\n";
     my $editor = $editor{$ref_editor};
     if ( ! $editor ) {
@@ -251,38 +208,38 @@ sub get_info_for_eval_display {
     print DBG "\tCURRENT LENGTH $current_length\n";
     my $indice = 0;
     my ( $top_start, $real_start ) = split ( /,/, $seek_start[0] );
+
     while ( $to_calc ) {
         my ( $start, $end, $length ) = split ( /,/, $seek_start[$indice] );
         print DBG "\tSEEK_START $start de la position ", $current_length, " à la position ", $current_length + $length, "\n";
-        if ( $pos_in_line <= $current_length + $length ) {
-            print DBG "C'est ce seek_start $start qu'il faut renvoyer\n";
+        if ( $pos_in_line <= $current_length + $length - ( $end - $start ) ) {
+            print DBG "C'est ce seek_start $start qu'il faut renvoyer :\n";
             my $seek = $self->[HASH]{$start};
-            if ( $indice == 0 ) {
-                return (
-                    get_first_line_for_print ( $self, $editor, $ref_line, $seek, $start, $end, $length ),
-                    $ref_line,
-                    $current_length + $length, 
-                    get_call_list_for_print ( $self, $seek ),
-                );
+            if ( print_info_is_more_precise ( $self, $seek, $length ) ) {
+                my ( $ref_first, $pos_first ) = get_first_line_for_print ( $self, $editor, $ref_line, $current_length, $end - $start );
+                # Analyse de $@ : les messages sont par ligne entière (voir "trace_full_eval_err").
+                # Seule la première ligne peut commencer au milieu (message précédent le $@ sans \n)
+                print DBG "Après analyse ref_first $ref_first, pos_first $pos_first, ref_line $ref_line\n";
+                if ( $ref_first != $ref_line ) {
+                    return get_info_for_display ( $self, $end, $pos_in_line, $ref_editor, $ref_line );
+                }
+                my ( $ref1, $pos1, @next ) = get_info_for_display ( $self, $start, $pos_in_line, $ref_editor, $ref_line );
+                return ( $ref1, $pos1 + $pos_first, @next );
             }
-            if ( $indice == $#seek_start ) {
-                return (
-                    $ref_line,
-                    $current_length,
-                    get_last_line_for_print ( $self, $editor, $ref_line, $seek, $start, $end, $length ),
-                    get_call_list_for_print ( $self, $seek ),
-                );
-            }
-
+            print DBG "\tcurrent_length = $current_length\n";
+            print DBG "\tpos_in_line = $pos_in_line\n";
+            print DBG "\treal_start = $real_start\n";
+            print DBG "\tstart = $start\n";
+            print DBG "\tend = $end\n";
+            print DBG "\tlength = $length\n";
+            
             return (
-                $ref_line,
-                $current_length,
-                $ref_line,
-                $current_length + $length, 
+                get_first_line_for_print ( $self, $editor, $ref_line, $current_length, $end - $start ),
+                get_last_line_for_print ( $self, $editor, $ref_line, 0, $length + $current_length - ( $end - $start )),
                 get_call_list_for_print ( $self, $seek ),
             );
         }
-        $current_length += $length;
+        $current_length += $length - ( $end - $start );
         print DBG "\tCURRENT LENGTH $current_length\n";
         $to_calc -= 1;
         $indice += 1;
@@ -314,12 +271,32 @@ sub get_info_for_eval_display {
     return;
 }
 
+sub print_info_is_more_precise {
+    my ( $self, $seek, $length ) = @_;
+
+    seek $self->[INFO_DESC], $seek, 0;    
+    my $enreg = readline( $self->[INFO_DESC] );
+    seek $self->[INFO_DESC], 0, 2;
+    chomp $enreg;
+    my ( $seek_1, $seek_2 ) = split ( /\|/, $enreg );
+    my $info_length = $seek_2 - $seek_1;
+    if ( $info_length < $length ) {
+        print DBG "Il y a plus d'information sur le fichier print info... :\n";
+        print DBG "START = $seek_1 | End = $seek_2 | length $info_length (au lieu de $length)\n";
+        return 1;
+    }
+    return;
+}
+
 sub get_first_line_for_print {
-    my ( $self, $editor, $ref_line, $seek, $start, $end, $length ) = @_;
+    my ( $self, $editor, $ref_line, $start, $end ) = @_;
     
     my $remain = $end - $start;
     print DBG "Dans get_first_line_for_print : Il faut remonter de $remain caractères\n";
     my $text;
+    if ( $remain <= 0 ) {
+        return ( $ref_line, -$remain );
+    }
     while ( $remain > 0 ) {
         $remain -= $length_s_n;
         ( $ref_line, $text ) = $editor->previous_line( $ref_line );
@@ -335,22 +312,26 @@ sub get_first_line_for_print {
 }
 
 sub get_last_line_for_print {
-    my ( $self, $editor, $ref_line, $seek, $start, $end, $length ) = @_;
+    my ( $self, $editor, $ref_line, $start_of_line, $end ) = @_;
 
-    seek $self->[INFO_DESC], $seek, 0;
-    my $info = readline ( $self->[INFO_DESC] );
-    chomp $info;
-    print DBG "Dans get_last : info lu pour start = $seek : $info\n";
-    my ( $seek_1, $seek_2 ) = split ( /\|/, $info );
-    seek $self->[INFO_DESC], 0, 2;
-    
-    my $remain = $seek_2 - $seek_1 - $length;
+    my $text = $editor->get_text_from_ref ( $ref_line );
+
+    my $remain = $end - length ( $text ) - $start_of_line;
     print DBG "Dans get_last_line_for_print : Il faut descendre de $remain caractères\n";
-    #$remain = 0;
-    my $text;
+
+    if ( $remain < 0 ) {
+        return ( $ref_line, length ( $text ) + $remain );
+    }
     while ( $remain > 0 ) {
         $remain -= $length_s_n;
-        ( $ref_line, $text ) = $editor->next_line( $ref_line );
+        
+        # Contournement d'un bug sur la gestion des "\n" en fin de fichier (ligne suivante (vide) absente...à voir)
+        my ( $new_ref_line, $new_text ) = $editor->next_line( $ref_line );
+        if ( ! defined $new_ref_line ) {
+            return ( $ref_line, length($text) );
+        }
+        ( $ref_line, $text ) = ( $new_ref_line, $new_text );
+        
         my $length = length($text);
         if ( $length >= $remain ) {
             return ( $ref_line, $remain );
@@ -362,21 +343,38 @@ sub get_last_line_for_print {
     return ( $ref_line, 0 );
 }
 
-
 sub get_info_for_display {
-    my ( $self, $start_of_line, $shift ) = @_;
+    my ( $self, $start_of_line, $shift, $ref_editor, $ref_line ) = @_;
 
     print DBG "Dans get_info_for_display : |$start_of_line| décalage : $shift\n";
+    my $editor = $editor{$ref_editor};
+    if ( ! $editor ) {
+        $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
+        Text::Editor::Easy::Comm::set_ref ($editor, $ref_editor);
+        $editor{$ref_editor} = $editor;
+    }
+
     my $value = $self->[HASH]{$start_of_line};
-    return if ( ! defined $value );
+    if ( ! defined $value ) {
+        print DBG "No info for print at position $start_of_line\n";
+    }
     print DBG "Clé $start_of_line trouvée !! valeur : |$value|\n";
     seek $self->[INFO_DESC], $value, 0;
     my $enreg = readline $self->[INFO_DESC];
-    my ( $start, $end ) = $enreg =~ /^(\d+)\|(\d+)$/;
-    while ( $end < $start + $shift ) {
+    print DBG "Enreg lu : $enreg | start_of_line $start_of_line | shift $shift\n";
+    my ( $start, $end ) = $enreg =~ /^(\d+)\|(\d+)/;
+    print DBG "\tSTART et END : $start|$end\n";
+    while ( $end < $start_of_line + $shift ) {
         ($start, $end ) = next_display( $self );
+         print DBG "\tSTART et END : $start|$end\n";        
     }
-    return ($start, $end, get_call_list_for_print( $self, $value ) );
+    print DBG "\tRenvoyé ==> START et END : $start|$end\n";
+    return (
+       get_first_line_for_print ( $self, $editor, $ref_line, $start, $start_of_line ),
+       get_last_line_for_print ( $self, $editor, $ref_line, $start_of_line, $end ),
+       #$ref_line, $end,
+       get_call_list_for_print( $self, $self->[HASH]{$start} )
+    );
 }
     
 sub get_call_list_for_print {
@@ -390,7 +388,7 @@ sub get_call_list_for_print {
     my @enreg = $enreg;
     my ( $tid, $call_id ) = split( /\|/, $enreg );
     $enreg = readline $self->[INFO_DESC];
-    PRINT: while ( $enreg =~ /^\t/ ) {
+    PRINT: while ( defined $enreg and $enreg =~ /^\t/ ) {
         chomp $enreg;
         my ( $file, $line, $package ) = split( /\|/, $enreg );
         if ( $package eq 'Text::Editor::Easy::Comm' ) {
@@ -408,11 +406,13 @@ sub get_call_list_for_print {
         if ( $file =~ /^\t\(eval / ) {
             $enreg = try_to_identify_eval ( $self, $enreg, $call_id, $self->[INFO_DESC] );
         }
+        print DBG "J'empile $enreg\n";
         push @enreg, $enreg;
         $enreg = readline $self->[INFO_DESC];
     }
     seek $self->[INFO_DESC], 0, 2;
     
+    print DBG "Retour de get_call_list...\n";
     return @enreg;
 }
 
@@ -429,9 +429,10 @@ sub next_display {
 sub try_to_identify_eval {
     my ( $self, $enreg, $call_id, $file_desc ) = @_;
     
+    print DBG "Dans try_to_identify : clé E$call_id\n";
     my $value = $self->[HASH]{'E_' . $call_id};
     return $enreg if ( ! defined $value );
-    print "Dans identify : trouvé $value pour clé E_$call_id\n";
+    print DBG "Dans identify : trouvé $value pour clé E_$call_id\n";
     
     my $seek = tell $file_desc;
     my $eval_call = readline $file_desc;
@@ -593,54 +594,118 @@ sub get_code_for_eval {
 sub trace_full_eval_err {
     my ( $self, $seek_start, $seek_end, $dump_hash, $message ) = @_;
     
+    print DBG "Dans trace_full_eval_err, reçu : $seek_start | $seek_end | message\n$message";
     
-    print DBG "Dans trace_full_eval_err, reçu : $seek_start | $seek_end\n";
-    # 1 - retrouver l'eval à partir de la pile d'appel : inutile...
-    
-    my @line = split ( /\n/, $message );
-    if ( scalar(@line) > 1 ) {
-        print "Cas pas encore géré : retrouver la taille du \\n\n";
-        return;
-    }
+    my @line = split ( /\n/, $message, -1 );
+#    if ( scalar(@line) > 1 ) {
+#        print "Cas pas encore géré : retrouver la taille du \\n\n";
+#        return;
+#    }
     
     my ( $num_eval, $num_line );
-    
+    my $seek_start_current = $seek_start;
+    my $seek_end_current = $seek_start;
+    my $to_write = 0;
     my $info = $line[0];
     my $value = tell $self->[INFO_DESC];
     
     # très dangereux !
-    $self->[HASH]{$seek_start} = $value;
-    
     
     my %option = eval $dump_hash;
-    if ( $info =~ / at \(eval (\d+)\) line (\d+)/ ) {
-        ( $num_eval, $num_line ) = ( $1, $2 );
-        print { $self->[INFO_DESC] } "$seek_start|$seek_end\n";
-        print { $self->[INFO_DESC] } "\t$option{'who'}|$option{'call_id'}|STDERR\n";
-        print { $self->[INFO_DESC] } "\t(eval $num_eval)|$num_line|$option{'package'}\n";
-        print { $self->[INFO_DESC] } "\t$option{'file'}|$option{'line'}|$option{'package'}\n";
-        
-        #(eval 265)|1|Text::Editor::Easy::Program::Eval::Exec
-        my @calls = eval $option{'calls'};
-        for my $tab_ref ( @calls ) {
-            my ( $pack, $file, $line ) = @$tab_ref;
-            print { $self->[INFO_DESC] } "\t$file|$line|$pack\n";
+    for my $info ( @line ) {
+        print DBG "Elément |$info| dans la boucle de traitement\n";
+        if ( $info =~ / at \(eval (\d+)\) line (\d+)/ ) {
+            if ( $to_write ) {
+                print DBG "On va écrire $info et ce qui précède : seek_start : $seek_start_current\n";
+                print DBG "SEEK end current : $seek_end_current\n";
+                print DBG "Valeur $value pour la clé $seek_start_current\n";
+                $self->[HASH]{$seek_start_current} = $value;   
+                print { $self->[INFO_DESC] } "$seek_start_current|$seek_end_current\n";
+                print { $self->[INFO_DESC] } "\t$option{'who'}|$option{'call_id'}|STDERR (\$@)\n";
+                print { $self->[INFO_DESC] } "\t(eval $num_eval)|$num_line|$option{'package'}\n";
+                print { $self->[INFO_DESC] } "\t$option{'file'}|$option{'line'}|$option{'package'}\n";
+                my @calls = eval $option{'calls'};
+                for my $tab_ref ( @calls ) {
+                    my ( $pack, $file, $line ) = @$tab_ref;
+                    print { $self->[INFO_DESC] } "\t$file|$line|$pack\n";
+                }
+                $value = tell $self->[INFO_DESC];
+                $seek_start_current = $seek_end_current;
+            }
+            ( $num_eval, $num_line ) = ( $1, $2 );
+            $to_write = 1;
         }
+        $seek_end_current += $length_s_n + length( $info );
     }
-    # 2 - décomposer le message d'erreur en ligne : trouver la longueur d'un \n
-    # => pour chaque ligne analyser la provenance dans le texte de la ligne
-    # => modifier la pile d'appel pour ajouter l'eval ainsi que le numéro de ligne dans l'eval trouvé
-    # => envoyer un premier trace_full_print en mettant à jour seek_end en fonction de la longueur \n trouvée
-    # Les autres lignes sont toutes entières : le travail complexe de trace_full_print est inutile
-    
+    print DBG "Fin : On va écrire $info et ce qui précède : seek_start : $seek_start_current\n";
+    $seek_end_current -= $length_s_n;
+    print DBG "SEEK end current : $seek_end_current\n";
+    print DBG "Valeur $value pour la clé $seek_start_current\n";
+    $self->[HASH]{$seek_start_current} = $value;
+    print { $self->[INFO_DESC] } "$seek_start_current|$seek_end_current\n";
+    print { $self->[INFO_DESC] } "\t$option{'who'}|$option{'call_id'}|\$@\n";
+    print { $self->[INFO_DESC] } "\t(eval $num_eval)|$num_line|$option{'package'}\n";
+    print { $self->[INFO_DESC] } "\t$option{'file'}|$option{'line'}|$option{'package'}\n";
+        
+    my @calls = eval $option{'calls'};
+    for my $tab_ref ( @calls ) {
+        my ( $pack, $file, $line ) = @$tab_ref;
+        print { $self->[INFO_DESC] } "\t$file|$line|$pack\n";
+    }
 }
 
+sub declare_trace_for {
+    my ( $self, $name, $file_name ) = @_;
+
+    my $editor = Text::Editor::Easy->whose_name( $name );
+    my $ref = $editor->get_ref;
+    $editor{$ref} = $editor;
+    
+    my $new_self;
+    $new_self->[OUT_NAME] = $file_name;
+    $new_self->[HIDE] = {};
+    $new_self->[INTER_CALL] = {};
+    print DBG "Fin de declare_trace_for $name, $file_name, reference $ref\n";
+    $self->[EXTENDED_SELF]{$ref} = $new_self;
+    print DBG "1 self $self, new_self $new_self, out_name ", $new_self->[OUT_NAME], "\n";
+}
+
+sub get_info_for_extended_trace {
+    my ( $self, $start, $shift, $ref_editor, $ref_line ) = @_;
+    
+    print DBG "Dans get_info_for_extended ref_editor = $ref_editor\n";
+    my $new_self = $self->[EXTENDED_SELF]{$ref_editor};
+    print DBG "2 self $self, new_self $new_self, out_name ", $new_self->[OUT_NAME], "\n";
+    my $file_name = $new_self->[OUT_NAME];
+    if ( ! -f $file_name or ! -f "${file_name}.print_info" ) {
+        print DBG "Problème d'initialisation... fichiers de log absents\n";
+        return;
+    }
+    my %h;
+    if ( defined $new_self->[INFO_DESC] ) {
+        close ( $new_self->[INFO_DESC] );
+        untie %{$new_self->[HASH]};
+    }
+    open ( $new_self->[INFO_DESC], "${file_name}.print_info" ) or die "Can't open $file_name : $!\n";
+    tie( %h, 'SDBM_File', $file_name, O_RDONLY, 0666 )
+      or die "Couldn't tie SDBM file $file_name: $!; aborting";
+    $new_self->[HASH] = \%h;
+    
+    return get_info_for_display ( $new_self, $start, $shift, $ref_editor, $ref_line );
+}
 =head1 COPYRIGHT & LICENSE
 
 Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
 
 =cut
 
 1;
+
+
+
+
+# End

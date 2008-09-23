@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use threads;    # Pour debug
 
@@ -46,7 +46,11 @@ sub print_eval {
 
     my $seek_current = $seek_start;
     my $indice = 0;
-    my @data = split ( /\n/, $data );
+    my @data = split ( /\n/, $data, -1 );
+    print DBG "\tTaille du tableau \@data = ", scalar(@data), "\n";
+    print DBG "\tLongueur de la chaîne \$data = ", length( $data ), "\n";
+    my $total_length = length($data) + ($length_s_n - 1 )*( scalar(@data) - 1 );
+    print DBG "\tTaille réelle trouvée = $total_length\n";
     for my $line ( @lines ) {
         
         # Le texte doit être celui contenu dans $data, pas celui de la ligne !
@@ -61,8 +65,8 @@ sub print_eval {
         $indice += 1;
         #print DBG "Ligne |$text|\n\tseek_start 1 = ", $line->seek_start, "\n";
         #if ( length($text) != 0 ) {
-        $line->add_seek_start( "$seek_start,$seek_current,$length" );
-        print "tutu";
+        $line->add_seek_start( "$seek_start,$seek_current,$total_length" );
+        #print "tutu";
         $seek_current += $length + $length_s_n;
         print DBG "Ligne |$text| seek_start 2 = ", $line->seek_start, "\n";
         #}

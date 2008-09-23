@@ -1,6 +1,12 @@
 Revision history for Text-Editor-Easy
 
 -----------------------+
+0.41  : 23 Septembre 2008 !
+-----------------------+
+        - start of external program traces (perl program edited and runned by F5)
+        - better management of Eval and internal log traces
+
+-----------------------+
 0.4   : 24 August 2008 !
 -----------------------+
         - start of inter-thread and eval traces
@@ -29,7 +35,7 @@ Revision history for Text-Editor-Easy
 -----------------------+
         - main window size and position are now saved in the editor session
         - should skip tests on machins with no support of ithreads or Tk (not so
-        obvious to leave with return code 0 of a ".t file" checking Tk that fails)
+        obvious to leave with return code 0 from a ".t file" checking Tk that fails)
 
 -----------------------+
 0.32  : 04 July 2008   !

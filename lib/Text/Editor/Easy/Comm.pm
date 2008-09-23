@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 =head1 SYNOPSIS
 
@@ -1065,7 +1065,6 @@ sub create_data_thread {
                 'print_thread_list',
                 'data_get_editor_from_name',
                 'data_get_editor_from_file_name',
-                'data_substitute_eval_with_file',
                 'reference_zone',
                 'zone_named',
                 'zone_list',

@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 =head1 SYNOPSIS
 
@@ -172,16 +172,23 @@ sub growing_update {
     my $file_name = $segment_ref->[FILE_NAME];
     my $old_size = $segment_ref->[SEEK_END];
     
+    if ( ! defined $file_name ) {
+        print STDERR "File name is undefined : this is forbidden for a growing file\n";
+        return;
+    }
     my $actual_size =   ( stat ($file_name ) )[7] || ( stat ($segment_ref->[FILE_DESC] ) )[7];
 
     #print "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
     
     if ( $actual_size != $old_size ) {
-        CORE::close $segment_ref->[FILE_DESC];
+        if ( defined $segment_ref->[FILE_DESC] ) {
+            CORE::close $segment_ref->[FILE_DESC];
+        }
         open( $segment_ref->[FILE_DESC], $file_name );
         $self->[FILE_DESC] = $segment_ref->[FILE_DESC];
 
         $segment_ref->[SEEK_END] = $actual_size;
+        print DBG "Appel à growing_check, nouvelle taille $actual_size\n";
         $self->[PARENT]->async->growing_check( $actual_size - $old_size, $actual_size );
     }
 }
@@ -406,7 +413,7 @@ sub prev_line {
         $text = readline $segment_ref->[FILE_DESC];
 
         my $last_position = tell  $segment_ref->[FILE_DESC];
-        print DBG "POS B = $last_position | texte = $text\n";
+        #print DBG "POS B = $last_position | texte = $text\n";
         if ( $last_position > $end_position ) {
             print DBG "On est à la fin d'un fichier qui grossit continuellement (growing file) sans retour charriot\n";
             # Il faut sortir et mettre à jour la taille de tous les segments parents à cette ligne (SEEK_END)
@@ -742,6 +749,9 @@ sub next_line {
         my $next_ref = save_line( $self, $next_line_ref );
         return ( $next_ref, $next_line_ref->[TEXT] );
     }
+    print DBG "PAs de ligne suivante trouvée derrière $ref\n";
+    print DBG "SEEK START de cette dernière ligne $line_ref->[SEEK_START]\n";
+    print DBG "SEEK END  de cette dernière ligne $line_ref->[SEEK_END]\n";
     return;
 }
 
@@ -750,6 +760,7 @@ sub next_ {
 # Récupère le segment suivant à partir d'un segment : renvoie undef si rien après (à la fin)
     my ($segment_ref) = @_;
 
+    print DBG "Dans next_ de $segment_ref\n";
     if (    $segment_ref->[NEXT]
         and $segment_ref->[NEXT][SEEK_START] == $segment_ref->[SEEK_END] )
     {
@@ -786,6 +797,7 @@ sub next_ {
         return;
     }
     if ( $segment_ref->[PARENT] ) {
+        print DBG "Avant appel next_ de $segment_ref->[PARENT], seek_end = $segment_ref->[PARENT][SEEK_END]\n";
         return ( next_( $segment_ref->[PARENT] ) );
     }
     
@@ -1520,7 +1532,6 @@ Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 

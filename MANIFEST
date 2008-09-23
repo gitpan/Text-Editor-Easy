@@ -1,11 +1,13 @@
 .cvsignore
 Changes
 Editor.pl
+META.yml
 Makefile.PL
 account.hst
 demo1.pl
 demo10.pl
 demo11.pl
+demo12.pl
 demo2.pl
 demo3.pl
 demo4.pl
@@ -14,6 +16,7 @@ demo6.pl
 demo7.pl
 demo8.pl
 demo9.pl
+editor.session
 exec.pl
 expenses.cpt
 lib/Text/Editor/Easy.pm
@@ -47,7 +50,6 @@ lib/Text/Editor/Easy/Trace/Full.pm
 lib/Text/Editor/Easy/Window.pm
 lib/Text/Editor/Easy/Zone.pm
 manifest
-meta.yml
 prove.bat
 prove.sh
 README

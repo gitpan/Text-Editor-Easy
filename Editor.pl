@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
@@ -286,7 +286,7 @@ sub main {
         {
             'zone'         => $zone2,
             'file'         => "tmp/${name}_trace.trc",
-            'name'         => 'Editor_out',
+            'name'         => 'Editor',
             'growing_file' => 1,
             'shift_motion_last'  => {
                 'use'     => 'Text::Editor::Easy::Motion',
@@ -300,7 +300,7 @@ sub main {
     my $out = Text::Editor::Easy->new(
         {
             'zone' => $zone2,
-            'name' => 'Eval_out',
+            'name' => 'Eval',
             'shift_motion_last'  => {
                 'use'     => 'Text::Editor::Easy::Motion',
                 'package' => 'Text::Editor::Easy::Motion',
@@ -451,7 +451,37 @@ END_PROGRAM
         return;
     }
     if ( defined $file_name ) {
-        #print "fichier $file_name\n";
+        print "fichier $file_name\n";
+        my $out_name = $file_name;
+        $out_name =~ s/\.pl$//;
+        return if ( $out_name eq $file_name );
+        my $out_editor = Text::Editor::Easy->whose_name( $out_name );
+    
+        if ( ! defined $out_editor ) {
+        
+          $out_editor = Text::Editor::Easy->new( {
+            'zone' => 'zone2',
+            'name' => $out_name,
+            'file'         => "tmp/${file_name}_trace.trc",
+            'growing_file' => 1,
+            'shift_motion_last'  => {
+                'use'     => 'Text::Editor::Easy::Motion',
+                'package' => 'Text::Editor::Easy::Motion',
+                'sub'     => 'move_over_external_editor',
+                'mode'    => 'async',
+            },
+          } );
+          Text::Editor::Easy->declare_trace_for ( 
+              $out_name,
+              "tmp/${file_name}_trace.trc",
+          );
+        }
+        else {
+           print "Le fichier correspondant à $out_name existe : $out_name\n";
+            $out_editor->empty;
+            $out_editor->set_at_end;
+        }
+
         print EXEC
 "$file_name|start|perl -Ilib -MText::Editor::Easy::Program::Flush $file_name\n";
     }
@@ -459,8 +489,7 @@ END_PROGRAM
 
 sub demo8 {
     my $editor = Text::Editor::Easy->whose_name('demo8.pl');
-    Text::Editor::Easy->substitute_eval_with_file('demo8.pl');
-
+    
     my $sub_ref = eval $editor->slurp;
     return $sub_ref->(@_);
 

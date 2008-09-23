@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Text::Editor::Easy::Comm;
 

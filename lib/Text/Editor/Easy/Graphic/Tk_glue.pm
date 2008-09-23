@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe

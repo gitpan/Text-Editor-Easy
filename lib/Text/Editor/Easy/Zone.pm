@@ -10,11 +10,11 @@ But only one "Text::Editor::Easy" object can be on the top of its zone. So , in 
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use threads; # debug
 use Scalar::Util qw(refaddr);

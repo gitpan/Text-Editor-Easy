@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.40
+Version 0.41
 
 =cut
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 use Text::Editor::Easy::Comm;
 
