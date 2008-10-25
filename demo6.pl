@@ -89,14 +89,22 @@ my %compte = (
     "ASL" => 1
 );
 
+# Start from a distant path
+use File::Basename;
+my ($file_name, $file_path ) = fileparse($0);
+
+
 Text::Editor::Easy->new(
     {
         'zone'      => $zone1,
         'sub'       => 'main',
-        'file'      => 'expenses.cpt',
+        'file'      => "${file_path}expenses.cpt",
         'highlight' => { 'sub' => 'input', },
+		'font_size' => 10,
         'y_offset'  => 100,
         'height'    => 500,
+        'x_offset'  => 100,
+        'width'    =>1000,
     }
 );
 
@@ -115,8 +123,9 @@ sub main {
     Text::Editor::Easy->new(
         {
             'zone'      => $zone2,
-            'file'      => 'account.hst',
+            'file'      => "${file_path}account.hst",
             'highlight' => { 'sub' => 'output', },
+			'font_size' => 10,
         }
     );
 }

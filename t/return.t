@@ -17,16 +17,36 @@ use Text::Editor::Easy;
 
 Text::Editor::Easy->new({
     'sub' => 'main',
+        #'trace' => {
+           # 'all' => 'tmp/',
+
+            #    'Text::Editor::Easy::Data' => undef,
+            #     'Text::Editor::Easy::Data' => 'tmp/',
+            #'trace_print' => 'full',
+        #},
+
 });
 
 sub main {
-		my ( $editor ) = @_;
+	my ( $editor ) = @_;
 		
 
-        use Test::More qw( no_plan );
-		is ( ref($editor), 'Text::Editor::Easy', 'Object type');
+    use Test::More qw( no_plan );
+	is ( ref($editor), 'Text::Editor::Easy', 'Object type');
 
-		my $text = "Returns in end of test file\n\n\n";
+    test_string ( $editor, "No return at end of test file" . "\n" x 16 . "end");
+	   
+	$editor->empty;
+	
+	test_string ( $editor, "Returns at end of test file" . "\n" x 16);
+	
+    Text::Editor::Easy->exit(0);
+}
+
+
+sub test_string {
+		my ( $editor, $text ) = @_;
+
 		$editor->insert($text);
 		$editor->save('return_saved.txt');	
 		if ( ! open ( FIL,  'return_saved.txt' ) ) {
@@ -43,7 +63,7 @@ sub main {
 	    }
         is ( 1, 1, 'Perl read' );
 
-        is ( $saved, $text, 'Saving file with returns at end' );
+        is ( $saved, $text, 'Saving file' );
 		
 		use File::Copy;
 		copy ( 'return_saved.txt', 'return_to_open.txt' );
@@ -51,8 +71,33 @@ sub main {
             'file' => 'return_to_open.txt',
         });
 
-		is ( $editor2->slurp, $text, 'Opening file with returns at end');
+		is ( $editor2->slurp, $text, 'Opening file');
 		$editor2->close;
-        unlink ( 'return_to_open.txt' );
-        Text::Editor::Easy->exit(0);
+		
+		my $editor3 = Text::Editor::Easy->new({
+            'file' => 'return_to_open.txt',
+        });
+		
+		$editor3->dump_file_manager;
+		
+		$editor3->key_press('ctrl_End');
+		
+		$editor3->save('return_saved3.txt');	
+		if ( ! open ( FIM,  'return_saved3.txt' ) ) {
+		    is ( 1, 0, 'Second save or re-open unsuccessful, skip other tests...' );
+            Text::Editor::Easy->exit(0);
+	    }
+		is ( 1, 1, 'Text::Editor::Easy->save' );
+
+		$number = read FIM, $saved, 100;
+		if ( ! defined $number ) {
+		    is ( 1, 0, 'Second read unsuccessful, skip other tests...' );
+            Text::Editor::Easy->exit(0);
+	    }
+        is ( 1, 1, 'Second perl read' );
+
+        is ( $saved, $text, 'Second saving file' );
+		is ( $editor3->slurp, $text, 'Opening file by bottom');
+		
+		$editor3->close;
 }

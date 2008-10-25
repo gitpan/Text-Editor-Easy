@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 =head1 SYNOPSIS
 
@@ -1117,6 +1117,7 @@ sub verify_graphic {
                 );
         }
         else {
+        print "Réservation du thread avec tid 0 pour le graphique, référence de la première instance : $ref\n";
         $editor->create_new_server(
             {
                 'use'     => 'Text::Editor::Easy::Abstract',
@@ -1125,10 +1126,13 @@ sub verify_graphic {
                     'Text::Editor::Easy::Abstract::new',
                     'Text::Editor::Easy::Abstract',
                     $hash_ref, $editor, $ref
-                ],
-                'put_tid' => 1
-                , # Multi-plexed ('put_tid' option useless because no 'name' option)
+                ]
+                ,
+                 # Multi-plexed ('put_tid' option useless because no 'name' option)
+                'put_tid' => 1,
+                
                 'do_not_create' => 1,
+                
                 'methods'       => [
                     'test',
 
@@ -1149,7 +1153,6 @@ sub verify_graphic {
                     'on_top',
 
                     #    'reference_zone_event', class method
-
                     'abstract_size',
 
                     'new_editor',
@@ -1215,6 +1218,7 @@ sub verify_graphic {
                     'unset_at_end',
 
                     # Event generation
+                    'key_press',
                     'clic',
                     'motion',
                 ],
@@ -1271,6 +1275,7 @@ sub verify_graphic {
         }
     }
     else {
+        print "Appel de add_thread_object par le thread ", threads->tid, " pour l'instance $ref\n";
         $editor->ask_thread(
             'add_thread_object',
             0,

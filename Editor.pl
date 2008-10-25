@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
@@ -25,19 +25,23 @@ if ( ! -d "tmp" ) {
     exit 1;
 }
 
+# Start from a distant path
+use File::Basename;
+my ($file_name, $file_path ) = fileparse($0);
+
 # Start of launching perl process (F5 key management)
-open EXEC, "| perl exec.pl" or die "Fork impossible\n";
+open EXEC, "| perl ${file_path}exec.pl" or die "Fork impossible\n";
 autoflush EXEC;
 
 # List of main tab files (loading delayed)
 my @files_session;
 for my $demo ( 1 .. 11 ) {
-    my $file_name = "demo${demo}.pl";
+    $file_name = "${file_path}demo${demo}.pl";
     push @files_session,
       {
         'zone'      => 'zone1',
         'file'      => $file_name,
-        'name'      => $file_name,
+        'name'      => "demo${demo}.pl",
         'highlight' => {
             'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
             'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
@@ -454,9 +458,14 @@ END_PROGRAM
         print "fichier $file_name\n";
         my $out_name = $file_name;
         $out_name =~ s/\.pl$//;
+        $out_name =~ s/\.t$//;
         return if ( $out_name eq $file_name );
         my $out_editor = Text::Editor::Easy->whose_name( $out_name );
-    
+
+        print "Avant lancement : $file_name|start|perl -I${file_path}lib -MText::Editor::Easy::Program::Flush ${file_path}$file_name\n";
+        print EXEC
+"$file_name|start|perl -I${file_path}lib -MText::Editor::Easy::Program::Flush ${file_path}$file_name\n";
+
         if ( ! defined $out_editor ) {
         
           $out_editor = Text::Editor::Easy->new( {
@@ -482,8 +491,6 @@ END_PROGRAM
             $out_editor->set_at_end;
         }
 
-        print EXEC
-"$file_name|start|perl -Ilib -MText::Editor::Easy::Program::Flush $file_name\n";
     }
 }
 
@@ -537,7 +544,7 @@ sub restart {
     save_session ();
     
     # Lancement d'un nouvel éditeur (qui récupèrera la configuration)
-    print EXEC "Editor.pl|start|perl Editor.pl\n";
+    print EXEC "Editor.pl|start|perl ${file_path}Editor.pl\n";
 
     # Fin de l'éditeur courant
     Text::Editor::Easy->exit;
@@ -552,10 +559,6 @@ sub save_session {
     open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
     print INFO dump $session_ref;
     close INFO;
-}
-
-sub toto {
-    print "TOTO\n";
 }
 
 =head1 COPYRIGHT & LICENSE

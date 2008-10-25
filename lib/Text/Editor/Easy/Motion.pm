@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -257,7 +257,15 @@ sub move_over_out_editor {
         }
     }
     chomp $string_to_insert;
-    $show_calls_editor->insert($string_to_insert);
+    my $first_line = $show_calls_editor->first;
+    #$display_options = [ $ref, { 'at' => "ord_$top_ord", 'from' => 'top' } ];
+    $show_calls_editor->insert($string_to_insert, { 
+        'cursor' => 'at_start',
+        'display' => [
+            $first_line->ref,
+            { 'at' => 'top', 'from' => 'top' },
+        ]
+    } );
 
     #if ( anything_for_me ) {
     #    my @param = get_task_to_do;
@@ -266,8 +274,8 @@ sub move_over_out_editor {
 
     return if (anything_for_me);    # Abandonne si autre chose à faire
          # Sélection de la ligne que l'on va traiter : la première
-    my $first_line = $show_calls_editor->first;
-    $show_calls_editor->display( $first_line, { 'at' => 'top' } );
+    #$first_line = $show_calls_editor->first;
+    #$show_calls_editor->display( $first_line, { 'at' => 'top' } );
     $first_line->select( undef, undef, 'orange' );
 }
 
@@ -438,5 +446,18 @@ sub nop {
 
 =cut
 
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+
+=cut
+
 
 1;
+
+
+

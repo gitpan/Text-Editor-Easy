@@ -9,22 +9,34 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 =head1 SYNOPSIS
 
-There is neither an IDE written in perl, nor designing tools to take benefit from the fact that perl is highly dynamic. A perl IDE
-should allow, indeed, much more than what classical IDE does. This module is the first part of this tremendous task.
+There are IDE (or editors) that are currently in active development in perl : for instance, Padre and Kephra. Let's be confident that these projects
+bring us good designing tools that will be, at last, written in perl.
+
+Still, I would like a different IDE that what we can find now, and, as these IDE are still in development, perhaps they won't reach my
+needs once finished. There are now lots of dynamic langages, like perl. The potential of these dynamic langages is not fully used with a 
+standard IDE and static programmation.
+I wish we could build a RAD tool (Rapid Application Development) which would generate "dynamic applications" : that is, applications that
+you can modify while they are running. This editor module will try to be the first part of this tremendous task.
+
+I want the editor to be programmer-oriented : you should be able to use it like a perl module from your perl programs.
+And I would also like the generated applications from the IDE to be programmer-oriented : the code of these applications should
+be accessible during execution and should be modifiable. Programmers should help themselves instead of constantly building "user-oriented"
+applications (a "programmer-oriented" application can still be used by a simple user). Have a look at L<http://sgrommier.free.fr/perl/> if you
+want more explanations about that.
 
 This module enables you to manipulate a highly multi-threaded graphical object. Several demos are provided
 with this module. To run them and have a glance at the capabilities of this module, launch the perl program
 "Editor.pl" which only use "Text::Editor::Easy" objects. See README file for installation instructions.
 
-The demos (9 demos to be tested from the "Editor.pl" program) will show you examples of how to call this module.
+The demos (10 demos to be tested from the "Editor.pl" program) will show you examples of how to call this module.
 
     use Text::Editor::Easy;
 
@@ -33,8 +45,8 @@ The demos (9 demos to be tested from the "Editor.pl" program) will show you exam
 
 =head1 EXPORT
 
-This module is object-oriented. Once a instance is created, numerous methods are accessible. New methods can be added
-on the fly with, why not, new threads associated with these new methods.
+This module is object-oriented. Once a instance is created, numerous methods are accessible (maybe too much, for now !).
+New methods can be added on the fly with, why not, new threads associated with these new methods.
 
 Sometimes, you need to consume CPU to achieve your goal. But this shouldn't block the user who interactively
 use your graphical module : the interface of the module (especially, method "create_new_server") allows
@@ -117,7 +129,7 @@ sub new {
              'methods' => [
                 'delete_line',
                 'get_line',
-                'get_text_from_ref',
+                'line_text',
                 'modify_line',
                 'new_line',
                 'next_line',
@@ -136,6 +148,8 @@ sub new {
                 'get_line_number_from_ref',
                 'get_ref_for_empty_structure',
                 'line_seek_start',
+				'line_set_info',
+				'line_get_info',
                 'empty_internal',
                 'save_info',
                 'load_info',
@@ -145,6 +159,8 @@ sub new {
                 'save_info_on_file',
                 'growing_update',
                 'line_add_seek_start',
+                'dump_file_manager',
+                'insert_bloc',
             ],
             'object' => [],
             'init'   => [
@@ -153,6 +169,7 @@ sub new {
                 $hash_ref->{'file'},
                 $hash_ref->{'growing_file'},
                 $hash_ref->{'save_info'},
+                $hash_ref->{'bloc'},
             ],
             'name' => 'File_manager',
         }
@@ -227,46 +244,6 @@ sub revert {
     }
 }
 
-sub insert_text {
-    my ( $self, $line_text, $text, $pos, $insert, $ref ) = @_;
-
-# Attention, pour efficacité, $line_text et $ref sont liés
-# Cette fonction devrait rester interne et ne devrait pas être dans l'interface ... sauf
-# qu'elle se trouve dans le package Text::Editor::Easy, donc accessible ... à voir
-
-    my $start = substr( $line_text, 0, $pos );
-    my $end = substr( $line_text, $pos );
-    if ($insert) {
-        $line_text = $start . $text . $end;
-    }
-    else {
-        if ( length($end) > length($text) ) {
-            $line_text = $start . $text . substr( $end, length($text) );
-        }
-        else {
-            $line_text = $start . $text;
-        }
-    }
-
-    $self->modify_line( $ref, $line_text );
-    return $line_text;
-}
-
-sub insert_return {
-    my ( $self, $text, $pos, $ref ) = @_;
-
-    my ( $new_text, $new_ref );
-    $new_text =
-      substr( $text, $pos )
-      ;    # Texte de la nouvelle ligne : c'est ce qu'il y a après le curseur
-    $text =
-      substr( $text, 0, $pos );    # Texte de la ligne modifiée (ligne tronquée)
-    $new_ref = $self->new_line( $ref, "after", $new_text );
-
-    $self->modify_line( $ref, $text );
-    return ( $text, $new_text, $new_ref );
-}
-
 sub save_action {
     my ( $self, $line_number, $pos, $insert, $key, $replace ) = @_;
 
@@ -318,7 +295,7 @@ sub regexp {
     }
 
     #print "LINE $line\n";
-    my $text = $self->get_text_from_ref($ref);
+    my $text = $self->line_text($ref);
     return
       if ( !defined $text )
       ;    # La ligne indiquée a été supprimée ... on ne peut pas s'y référer
@@ -709,16 +686,14 @@ sub slurp {
     # But if you know what you are doing...
     my $file;
 
-    my $number = 0;
     my $line   = $self->first;
+    $file = $line->text;
+    $line = $line->next;
     while ($line) {
-        $number += 1;
-        $file .= $line->text . "\n";
+        $file .= "\n" . $line->text;
         $line = $line->next;
     }
-
     return $file;
-
 }
 
 sub get_in_zone {
@@ -825,10 +800,6 @@ been inserted. But as Line objects are scalar references (for encapsulation), ea
 of scalar references (the substitution is done by the calling thread but the "insert execution" is done by the graphical 
 thread and the "File_manager" thread).
 
-=head2 insert_return
-
-=head2 insert_text
-
 =head2 last
 
 =head2 last_current
@@ -900,9 +871,13 @@ In future versions, there will be a "video mode" : perl code to make the images 
 nothing in space compared to actual compressed videos (the sound will be, by far, the heaviest part of them).
 
 All softwares should include "help videos" like what I describe : it would prove that what you are about to use is easy to manipulate and it
-would give you a quick interactive glance of all the possibilities. But most softwares are awfully limited if you want to use them in a
-"programmatic way" (yet, interactively, it's often very pretty, but I don't mind : I want POWER !). In my ill productive point of view,
-most softwares should be written again...
+would give you a quick interactive glance of all the possibilities. But most softwares are awfully limited (or just don't have the ability) when
+you want to drive them from a private program (yet, interactively, it's often very pretty, but I don't mind : I want POWER !). In my ill
+productive point of view, most softwares should be written again...
+
+This is the reason why I'm designing the editor module and the editor program at the same time : the program asks for new needs, and the
+editor module grows according to these needs. When the editor program will be finished, the module should be powerful enough to be used
+by anybody, including the RAD tool and the applications generated by the RAD tool.
 
 =head1 COPYRIGHT & LICENSE
 
@@ -914,4 +889,7 @@ under the same terms as Perl itself.
 
 =cut
 
-1;    # End of Text::Editor::Easy
+1;
+
+
+

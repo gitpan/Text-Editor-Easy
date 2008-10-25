@@ -19,11 +19,8 @@ use Text::Editor::Easy;
 
 Text::Editor::Easy->new(
     {
-        'x_offset' => 240,
-        'y_offset' => 150,
-        'width'    => 300,
-        'height'   => 300,
         'focus'    => 'yes',
+        'trace' => { 'all' => 'tmp/' },
     }
 );
 

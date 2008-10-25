@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -41,8 +41,6 @@ use Scalar::Util qw(refaddr);
 # A un canevas, on fait correspondre un éditeur, l'éditeur qui a le focus
 my %editor;
 
-#my %canva; # A un éditeur, on fait correspondre un canevas : inutile, car contenu
-# dans l'objet Graphic et accessible par ->[CANVA]
 my %graphic;    # Liste des objets graphiques créés
 my $repeat_id;
 
@@ -332,7 +330,15 @@ sub create_main_window {
 
     }
     
-    $mw->geometry("${width}x$height+$x+$y");
+    if ( defined $width and $height ) {
+        if ( defined $x and $y ) {
+            $mw->geometry("${width}x$height+$x+$y");
+        }
+        else {
+            $mw->geometry("${width}x$height");
+        }
+    }
+    #$mw->geometry("${width}x$height+$x+$y");
     return $mw;
 }
 

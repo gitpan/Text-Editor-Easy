@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use threads;    # Pour debug
 
@@ -44,6 +44,12 @@ sub print_eval {
     print DBG "Dans print_eval : $self|$seek_start|$length_s_n|$data\n";
     my @lines = $self->[0]->insert($data);
 
+    print DBG "==================\nReçu les références suivantes :";
+	for my $line ( @lines ) {
+		print DBG "\nREF : ", $line->ref, "|" , $line->text;
+    }
+	print DBG "\n==================\n";
+
     my $seek_current = $seek_start;
     my $indice = 0;
     my @data = split ( /\n/, $data, -1 );
@@ -55,6 +61,15 @@ sub print_eval {
         
         # Le texte doit être celui contenu dans $data, pas celui de la ligne !
         my $text = $line->text;
+		my $info = $line->get_info;
+		if ( ! defined $info ) {
+				$info = '';
+		}
+		else {
+				$info .= ';';
+		}
+		print DBG "Avant |$text| info = $info\n";
+		
         my $length;
         if ( $indice == 0 ) {
             $length = length ( $data[0] );
@@ -65,10 +80,10 @@ sub print_eval {
         $indice += 1;
         #print DBG "Ligne |$text|\n\tseek_start 1 = ", $line->seek_start, "\n";
         #if ( length($text) != 0 ) {
-        $line->add_seek_start( "$seek_start,$seek_current,$total_length" );
+        $line->set_info( "$info$seek_start,$seek_current,$total_length" );
         #print "tutu";
         $seek_current += $length + $length_s_n;
-        print DBG "Ligne |$text| seek_start 2 = ", $line->seek_start, "\n";
+        print DBG "Ligne |$text| seek_start 2 = ", $line->get_info, "\n";
         #}
         
     }

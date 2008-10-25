@@ -24,10 +24,6 @@ use Text::Editor::Easy;
 my $editor_thread_0 = Text::Editor::Easy->new(
     {
         'sub'      => 'main',    # Sub for action
-        'x_offset' => 60,
-        'y_offset' => 170,
-        'width'    => 500,
-        'height'   => 300,
     }
 );
 

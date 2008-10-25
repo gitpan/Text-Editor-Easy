@@ -15,11 +15,11 @@ use strict;
 
 =head1 NAME
 
-- Automatic indentation, addition of characters,...
+Text::Editor::Easy::Syntax::perl_assist -- Automatic indentation, addition of characters,...
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 

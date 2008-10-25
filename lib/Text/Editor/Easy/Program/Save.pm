@@ -34,7 +34,7 @@ sub init {
     $self->{'old'} = "../save/old_list.txt";
     $self->{'dirs_to_clean'} = "../save/old_dirs_list.txt";
     
-    Text::Editor::Easy->repeat_class_method( 5, 'save_arbo');
+    Text::Editor::Easy->repeat_class_method( 10, 'save_arbo');
     
     #open ( OK, "../save/compil_OK
     save_arbo( $self );

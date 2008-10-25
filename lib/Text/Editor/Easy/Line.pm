@@ -9,11 +9,11 @@ Text::Editor::Easy::Line - Object oriented interface to a file line (managed by 
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 # Les fonctions de File_manager.pm réalisant toutes les méthodes de ce package commencent par "line_" puis reprennent
 # le nom de la méthode
@@ -55,14 +55,6 @@ sub new {
     weaken $ref_line{$ref_Editor}{$ref_id};
 
     return $line;
-}
-
-sub text {
-    my ($self) = @_;
-
-    my $ref    = refaddr $self;
-    my $editor = $ref_Editor{$ref};
-    return $editor->get_text_from_ref( $ref_id{$ref} );
 }
 
 sub next {
@@ -163,6 +155,9 @@ my %sub = (
     'bottom_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_bottom_ord ],
     'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ],
     'add_seek_start' => 1,
+	'get_info' => 1,
+	'set_info' => 1,
+    'text' => 1,
 );
 
 

@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Data::Dump qw(dump);
 use threads;
@@ -256,7 +256,7 @@ sub init_data {
     #print "Data a été créé\n";
     $self->[COUNTER] = 0;         # PAs de redirection de print
     $self_global = $self;         # Mise à jour de la variable 'globale'
-    if ( defined %Text::Editor::Easy::Trace and $Text::Editor::Easy::Trace{'trace_print'} eq 'full' ) {
+    if ( defined $Text::Editor::Easy::Trace{'trace_print'} and $Text::Editor::Easy::Trace{'trace_print'} eq 'full' ) {
         create_full_trace_server();
         $self->[FULL_TRACE] = 1;
     }

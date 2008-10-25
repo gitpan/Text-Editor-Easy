@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 use Data::Dump qw(dump);
 
 sub left {
@@ -637,22 +637,26 @@ sub copy {
     }
     my $buffer;
     if ( $ref_stop_line != $ref_start_line ) {
-        $buffer = substr ( $self->[PARENT]->get_text_from_ref( $ref_start_line) , $start_pos );
+        $buffer = substr ( $self->[PARENT]->line_text( $ref_start_line) , $start_pos );
         $buffer .= "\n";
     }
     else {
-        $buffer = substr ( $self->[PARENT]->get_text_from_ref( $ref_start_line ), $start_pos, $stop_pos - $start_pos );
+        $buffer = substr ( $self->[PARENT]->line_text( $ref_start_line ), $start_pos, $stop_pos - $start_pos );
         print "========Debut buffer\n$buffer\n==========Fin buffer\n";
         Text::Editor::Easy->clipboard_set($buffer);
         return;
     }
     my ( $ref_line ) = $self->[PARENT]->next_line( $ref_start_line );
     while ( defined $ref_line and $ref_line != $ref_stop_line ) {
-        $buffer .= $self->[PARENT]->get_text_from_ref( $ref_line ) . "\n";
+        $ref_start_line = $ref_line;
+        $buffer .= $self->[PARENT]->line_text( $ref_line ) . "\n";
         ( $ref_line ) = $self->[PARENT]->next_line( $ref_line );
     }
-    return if ( ! defined $ref_line ); # stop line suppressed
-    $buffer .= substr ( $self->[PARENT]->get_text_from_ref( $ref_line ), 0, $stop_pos );
+    if ( ! defined $ref_line ) { # stop line suppressed ?
+        print STDERR "Can't copy : no line after line with reference $ref_start_line\n";
+        return;
+    }
+    $buffer .= substr ( $self->[PARENT]->line_text( $ref_line ), 0, $stop_pos );
     #print "========Debut buffer\n$buffer\n==========Fin buffer\n";
     Text::Editor::Easy->clipboard_set($buffer);
     #$buffer = $self->cursor->line->text . "\n";
@@ -720,8 +724,8 @@ sub delete_selection {
         $at = 'middle';        
     }
     Text::Editor::Easy::Abstract::cursor_set( $self, $start_pos, $ref_start_line );
-    my $start_text = substr ( $self->[PARENT]->get_text_from_ref( $ref_start_line) , 0, $start_pos );
-    my $end_text = substr ( $self->[PARENT]->get_text_from_ref( $ref_stop_line) , $stop_pos );
+    my $start_text = substr ( $self->[PARENT]->line_text( $ref_start_line) , 0, $start_pos );
+    my $end_text = substr ( $self->[PARENT]->line_text( $ref_stop_line) , $stop_pos );
         
         #print "Nouveau texte première ligne : $start_text$end_text\n";
     Text::Editor::Easy::Abstract::line_set($self, $ref_start_line, $start_text . $end_text );
@@ -903,3 +907,6 @@ under the same terms as Perl itself.
 =cut
 
 1;
+
+
+

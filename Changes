@@ -1,8 +1,13 @@
 Revision history for Text-Editor-Easy
 
------------------------+
-0.41  : 23 Septembre 2008 !
------------------------+
+--------------------------+
+0.42  : 25 October 2008   !
+--------------------------+
+        - bloc insertion, start of insert optimisation...
+
+--------------------------+
+0.41  : 23 September 2008 !
+--------------------------+
         - start of external program traces (perl program edited and runned by F5)
         - better management of Eval and internal log traces
 
@@ -113,3 +118,5 @@ Otherwise, you lose more and more time maintaining your complexity and your comp
 0.01 : 20 January 2008 !
 -----------------------+
         First version, 9 demos in Editor.pl program.
+
+

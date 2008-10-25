@@ -18,14 +18,17 @@ use lib 'lib';
 
 use Text::Editor::Easy;
 
+# Start from a distant path
+use File::Basename;
+my ($file_name, $file_path ) = fileparse($0);
+
 Text::Editor::Easy->new(
     {
-        'file'      => 'expenses.cpt',
+        'file'      => "${file_path}expenses.cpt",
         'highlight' => { 'sub' => 'highlight', },
-        'x_offset'  => 40,
-        'y_offset'  => 40,
-        'width'     => 800,
-        'height'    => 500,
+		'font_size' => 10,
+		'width' => 500,
+		'height' => 400,
     }
 );
 

@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 =head1 SYNOPSIS
 
@@ -90,7 +90,7 @@ use constant {
 
     # REF => 5,
     #PARENT      => 6,
-    TYPE        => 7,    # "container","empty", "line"
+    TYPE        => 7,    # "container", "empty", "line", "break"
     FIRST       => 8,
     LAST        => 9,
     TEXT        => 10,
@@ -98,6 +98,7 @@ use constant {
     FILE_NAME   => 12,
     LINE_NUMBER => 13,
     PSEUDO_SEEK_START => 14,
+	INFO => 15,
 
     # Gestion de LINE_NUMBER
     LAST_COMPUTE => 0,
@@ -107,7 +108,7 @@ use constant {
 sub init_file_manager {
 
     #my ( $editor, $file_name, $growing_file, $save_info ) = @_;
-    my ( $file_manager_ref, $reference, $unique_ref, $file_name, $growing_file, $save_info )
+    my ( $file_manager_ref, $reference, $unique_ref, $file_name, $growing_file, $save_info, $bloc )
       = @_;
 
     #print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$unique_ref|$file_name\n";
@@ -115,6 +116,13 @@ sub init_file_manager {
     $file_manager_ref->[UNIQUE_REF]  = $unique_ref;
     $file_manager_ref->[PARENT] = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref ($file_manager_ref->[PARENT], $unique_ref);
+
+    print DBG "File_manager de l'instance $unique_ref";
+    my $name = Text::Editor::Easy->data_name($unique_ref);
+    if ( defined $name ) {
+        print DBG " ($name)";
+    }
+    print DBG "\n";
 
     my $file_desc;
 
@@ -135,6 +143,7 @@ sub init_file_manager {
             $file_manager_ref->[SEEK_END]  = $seek_end;
         }
         else {
+		    print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
             $segment_ref->[SEEK_END]      = 0;
             $segment_ref->[SEEK_START]    = 0;
             $file_manager_ref->[SEEK_END] = 0;
@@ -160,6 +169,10 @@ sub init_file_manager {
         $file_manager_ref->[GROWING] = 0;
     }
 
+    if ( defined $bloc ) {
+        insert_bloc( $file_manager_ref, $bloc );
+    }
+
     return $file_manager_ref;
 }
 
@@ -178,6 +191,11 @@ sub growing_update {
     }
     my $actual_size =   ( stat ($file_name ) )[7] || ( stat ($segment_ref->[FILE_DESC] ) )[7];
 
+    if ( ! defined $actual_size )  {
+		print STDERR "Actual size undefined... can't update growing file\n";
+		print DBG "SEGMENT_FILE_DESC : $segment_ref->[FILE_DESC]\n";
+		return;
+	}
     #print "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
     
     if ( $actual_size != $old_size ) {
@@ -213,7 +231,7 @@ sub new_line {
     my $new_ref = get_next_ref($self);
     $new_line_ref->[REF]        = $new_ref;
     $new_line_ref->[PARENT]     = $line_ref->[PARENT];
-    $new_line_ref->[TYPE]       = "line";
+    $new_line_ref->[TYPE]       = 'line';
     $self->[HASH_REF]{$new_ref} = $new_line_ref;
 
     if ( $where eq "after" ) {
@@ -362,66 +380,72 @@ sub save_line_number {
     #my ( $self, $ref, $line_number ) = @_;
 
     my $line_ref = $self->[DESC]{$who}[REF];
-    $line_ref->[LINE_NUMBER][LAST_COMPUTE] = $self->[LAST_UPDATE];
+     $line_ref->[LINE_NUMBER][LAST_COMPUTE] = $self->[LAST_UPDATE];
     $line_ref->[LINE_NUMBER][NUMBER]       = $line_number;
     return;
 }
 
 sub prev_line {
-    my ( $segment_ref, $pos, $line_ref ) = @_;
+    my ( $parent_ref, $pos, $line_ref ) = @_;
 
     print DBG "Début de prev_line $pos\n";
-    if ( !$segment_ref->[FILE_DESC] ) {
+    my $file_desc = $line_ref->[PARENT][FILE_DESC];
+    if ( ! $file_desc ) {
 
         # Pas de fichier connu, donc on est au début du fichier
         return ( 0, "" );
     }
-    seek $segment_ref->[FILE_DESC], $pos, 0;
-    my $end_position = tell $segment_ref->[FILE_DESC];
+    
+    if ( ref $file_desc eq 'ARRAY' ) {
+        return ( $pos - 1, $file_desc->[$pos - 1] );
+    }
+    
+    seek $parent_ref->[FILE_DESC], $pos, 0;
+    my $end_position = tell $parent_ref->[FILE_DESC];
     return ( 0, "" ) if ( !$end_position );    # On est au début du fichier
 
     print DBG "position > 0\n";
     my $decrement = 0;
 
     # But de la boucle, être sûr de lire une ligne entière
-  SEEK: while ( tell $segment_ref->[FILE_DESC] == $end_position ) {
+  SEEK: while ( tell $parent_ref->[FILE_DESC] == $end_position ) {
         $decrement += 50;
         print DBG "Decrement $decrement\n";
         if ( $decrement < $pos ) {
-            seek $segment_ref->[FILE_DESC], $pos - $decrement, 0;
-            readline $segment_ref->[FILE_DESC];
+            seek $parent_ref->[FILE_DESC], $pos - $decrement, 0;
+            readline $parent_ref->[FILE_DESC];
         }
         else {
             print DBG "Positionnement au début du fichier\n";
-            seek $segment_ref->[FILE_DESC], 0, 0;
+            seek $parent_ref->[FILE_DESC], 0, 0;
             my $start_position = 0;
-            while ( tell $segment_ref->[FILE_DESC] != $end_position ) {
-                $start_position = tell $segment_ref->[FILE_DESC];
-                readline $segment_ref->[FILE_DESC];
+            while ( tell $parent_ref->[FILE_DESC] != $end_position ) {
+                $start_position = tell $parent_ref->[FILE_DESC];
+                readline $parent_ref->[FILE_DESC];
             }
-            seek $segment_ref->[FILE_DESC], $start_position, 0;
+            seek $parent_ref->[FILE_DESC], $start_position, 0;
             last SEEK;
         }
     }
 
-    print DBG "Après première boucle : ", tell $segment_ref->[FILE_DESC], "\n";
+    print DBG "Après première boucle : ", tell $parent_ref->[FILE_DESC], "\n";
     my $text;
-    while ( tell $segment_ref->[FILE_DESC] != $end_position ) {
-        $pos = tell $segment_ref->[FILE_DESC];
+    while ( tell $parent_ref->[FILE_DESC] != $end_position ) {
+        $pos = tell $parent_ref->[FILE_DESC];
 
         print DBG "pos A = $pos\n";
-        $text = readline $segment_ref->[FILE_DESC];
+        $text = readline $parent_ref->[FILE_DESC];
 
-        my $last_position = tell  $segment_ref->[FILE_DESC];
+        my $last_position = tell  $parent_ref->[FILE_DESC];
         #print DBG "POS B = $last_position | texte = $text\n";
         if ( $last_position > $end_position ) {
             print DBG "On est à la fin d'un fichier qui grossit continuellement (growing file) sans retour charriot\n";
             # Il faut sortir et mettre à jour la taille de tous les segments parents à cette ligne (SEEK_END)
             $line_ref->[SEEK_END] = $last_position;
-            $segment_ref->[SEEK_END] = $last_position;
-            while ( $segment_ref->[PARENT] ) {
-                $segment_ref = $segment_ref->[PARENT];
-                $segment_ref->[SEEK_END] = $last_position;
+            $parent_ref->[SEEK_END] = $last_position;
+            while ( $parent_ref->[PARENT] ) {
+                $parent_ref = $parent_ref->[PARENT];
+                $parent_ref->[SEEK_END] = $last_position;
             }
             #$self->[ROOT][SEEK_END] = $last_position;
             last;
@@ -429,10 +453,49 @@ sub prev_line {
     }
 
     print DBG "Fin de prev_line $pos, $text\n";
-    return ( $pos, $text );
+    
+    #
+    if ( ! chomp $text ) {
+        return ( $pos, $text );
+    }
+    if ( $parent_ref->[SEEK_END] != $end_position ) {
+        return ( $pos, $text );
+        #my $line_ref;        
+    }
+    if ( $line_ref->[NEXT] ) {
+        return ( $pos, $text );
+    }
+    print DBG "Il faut créer une ligne vide supplémentaire (fin de fichier)\n";
+    my $prev_line_ref;
+    
+    # Pour le cas où $parent_ref aurait été modifié
+    $parent_ref = $line_ref->[PARENT];
+    
+    $prev_line_ref->[PARENT] = $parent_ref;
+    $prev_line_ref->[PREVIOUS] = $line_ref->[PREVIOUS];
+    $line_ref->[PREVIOUS] = $prev_line_ref;
+    $prev_line_ref->[TEXT] = $text;
+    $prev_line_ref->[NEXT] = $line_ref;
+    
+    # Vrai mais déjà effectué en dehors
+    #$parent_ref->[LAST] = $line_ref;
+    if ( ! defined $parent_ref->[FIRST] ) {
+        $parent_ref->[FIRST] = $prev_line_ref;
+    }
+
+    $prev_line_ref->[SEEK_END] = $end_position;
+    $prev_line_ref->[SEEK_START] = $pos;
+    
+    # Vrai mais effectué en dehors
+    #$line_ref->[SEEK_END] = $end_position;
+    #$line_ref->[SEEK_START] = $end_position;
+    
+    $prev_line_ref->[TYPE] = 'line';
+    
+    return ( $end_position, '' );
 }
 
-sub get_text_from_ref {
+sub line_text {
     my ( $self, $ref ) = @_;
 
     my $line_ref = $self->[HASH_REF]{$ref};
@@ -464,12 +527,45 @@ sub save_internal {
 # des saisies dans un tampon, rattrapage du tampon sur la nouvelle structure après la fin de la sauvegarde puis bascule sur la nouvelle structure
     my ( $self, $file_name ) = @_;
 
-    return if ( !$self->[DIRTY] );    # Rien n'a été modifié, sauvegarde inutile
+    my $report_file_name = $self->[ROOT][FILE_NAME];
+    if ( ! defined $report_file_name ) {
+        $report_file_name = 'thread__' . threads->tid;
+    }
+    $report_file_name =~ s/\\/__/g;
+    $report_file_name =~ s/\//__/g;
+	$report_file_name =~ s/:/_/g;
+    my $report = "tmp/Save_report_of__${report_file_name}__" . time . ".trc";
+    my $size_before = $self->[ROOT][SEEK_END] || 0;
+    
+    print DBG "Dans save_internal : création d'un rapport $report\n";
+
+    # Ugly code to keep just a unique file handle to write in 2 separate files :
+    #  ==> heavy traces to track the bugs that occur when saving, but only when there is a problem
+    # (Save_reports are removed after each save when everything was OK, but not the general trace file)
+
+    my $tied = tied *DBG;
+    my $save_report = $Text::Editor::Easy::Trace{'save_report'};
+    my $trace_all = $Text::Editor::Easy::Trace{'all'};
+
+    if ( $save_report or $trace_all ) {
+        tie *DBG, "Text::Editor::Easy::File_manager::Save_report", ($report);
+        print DBG "Sauvegarde de $report_file_name\n";
+        print DBG "Taille initiale : $size_before\n";
+    }
+    
+    my $errors_in_dump = dump_file_manager ( $self );
+
+  return if ( !$self->[DIRTY] );    # Rien n'a été modifié, sauvegarde inutile
 
     if ( ! $file_name ) {
         if ( ! $self->[ROOT][FILE_NAME] ) {
             return if ( $self->[PARENT]->name eq 'eval*' );
             print STDERR "Can't save file : no file name has been given\n";
+            CORE::close( DBG );
+            untie *DBG;
+            if ( $tied ) {
+                *DBG = $tied;
+            }
             return;
         }
         $file_name = $self->[ROOT][FILE_NAME];
@@ -489,17 +585,22 @@ sub save_internal {
     my $previous_line_ref;
     while ( my $line_ref = read_line_ref($self) ) {
         if ($previous_line_ref) {
+            print DBG "Dans save : écriture d'un \\n\n";
             print {$new_file_desc} "\n";
             if ( $previous_line_ref->[REF] ) {
                 $previous_line_ref->[SEEK_END] = tell $new_file_desc;
             }
         }
 
-        if ( $line_ref->[REF] ) {
+        my $ref = $line_ref->[REF];
+        if ( $ref ) {
 
 # Duplication de la ligne pour ne pas modifier la vraie ligne (SEEK_END, SEEK_START...)
-            my @new_line     = @{$line_ref};
-            my $new_line_ref = \@new_line;
+            #my @new_line     = @{$line_ref};
+            my $new_line_ref; # = \@new_line;
+            $new_line_ref->[TEXT] = $line_ref->[TEXT];
+            $new_line_ref->[TYPE] = 'line';
+            $new_line_ref->[REF] = $ref;
 
             $new_line_ref->[SEEK_START] = tell $new_file_desc;
             $new_line_ref->[PARENT]     = $new_root_ref;
@@ -513,11 +614,13 @@ sub save_internal {
                 $new_root_ref->[LAST]  = $new_line_ref;
             }
             print $new_file_desc $new_line_ref->[TEXT];
+            print DBG "Dans save : écriture de $line_ref (réf. ", $line_ref->[REF], ")---", $new_line_ref->[TEXT], "---\n";
             $previous_line_ref = $new_line_ref;
-            $hash{ $new_line_ref->[REF] } = $new_line_ref;
+            $hash{ $ref } = $new_line_ref;
         }
         else {
             print $new_file_desc $line_ref->[TEXT];
+            print DBG "Dans save : écriture de ---", $line_ref->[TEXT], "---\n";
             $previous_line_ref = $line_ref;
         }
     }
@@ -542,6 +645,26 @@ sub save_internal {
 
     $self->[ROOT][FILE_NAME] = $file_name;
 
+    $one_more_line = 0;
+    print DBG "Fin de save_internal\n";
+    $errors_in_dump += dump_file_manager ( $self );
+
+    if ( $save_report or $trace_all ) {
+        print DBG "\n\nNouvelle taille : $new_root_ref->[SEEK_END]\n";
+        print DBG "$errors_in_dump erreur(s) pour les 2 dumps...\n";
+        CORE::close( DBG );
+        untie *DBG;
+        if ( $new_root_ref->[SEEK_END] >= $size_before ) {
+            if ( ! defined $save_report or $save_report ne 'keep' ) {
+                unlink ( $report );
+            }
+        }        
+    }
+    if ( $tied ) {
+        #print "Réaffectation de null à DBG\n";
+        *DBG = $tied;
+        #print DBG "Ne doit rien écrire\n";
+    }
     return 1;    # OK
 }
 
@@ -628,7 +751,7 @@ sub read_line_ref {
     }
     if ( !$self->[DESC]{$who} ) {
 
-        #print "ZZZPremier accès pour who = $who\n";
+        print DBG "Premier accès pour who = $who\n";
 
         my $line_ref;
         if ($ref) {
@@ -641,7 +764,7 @@ sub read_line_ref {
 
         if ($line_ref) {
 
-            #print "ZZZwho = $who, text = $line_ref->[TEXT]\n";
+            print DBG "who = $who, text = $line_ref->[TEXT]\n";
             $self->[DESC]{$who}[REF] = $line_ref;
 
             return $line_ref;
@@ -652,8 +775,10 @@ sub read_line_ref {
     }
     my $line_ref = $self->[DESC]{$who}[REF];
     if ( defined $ref ) {
+        print DBG "Dans read_line_ref : ref définie à $ref...\n";
         if ($ref) {
             $line_ref = $self->[HASH_REF]{$ref};
+            print DBG "Line ref trouvée à $line_ref...\n";
         }
         else {
 
@@ -666,6 +791,9 @@ sub read_line_ref {
     }
     $line_ref = next_($line_ref);
     if ($line_ref) {
+        print DBG "Trouvé next de line_ref à $line_ref...\n";
+        print DBG "\tSEEK_END = $line_ref->[SEEK_END]\n" if ( defined $line_ref->[SEEK_END] );
+        print DBG "C'est à dire, texte |", $line_ref->[TEXT], "|\n";
         $self->[DESC]{$who}[REF] = $line_ref;
         return $line_ref;
     }
@@ -766,9 +894,36 @@ sub next_ {
     {
         return ( first_( $segment_ref->[NEXT] ) );
     }
-    if (    $segment_ref->[PARENT]
-        and $segment_ref->[PARENT][SEEK_END] > $segment_ref->[SEEK_END] )
-    {
+    if ( ! $segment_ref->[PARENT] ) {
+        print DBG "Pas de segment parent : seek_end = $segment_ref->[SEEK_END]\n";
+        return if ( ! $one_more_line or $one_more_line != $segment_ref->[SEEK_END] );        
+        
+        print DBG "Encore une ligne : one_more_line = $one_more_line!\n";
+        $one_more_line = 0;
+        my $line_ref;
+        #$segment_ref->[SEEK_END] -= 1;
+        $line_ref->[SEEK_START] = $segment_ref->[SEEK_END];
+        $line_ref->[PARENT]     = $segment_ref;
+        $line_ref->[TEXT] = '';
+        $line_ref->[TYPE] = 'line';
+        $line_ref->[SEEK_END] = $line_ref->[SEEK_START];
+        if ( $segment_ref->[LAST] ) {
+            $line_ref->[PREVIOUS] = $segment_ref->[LAST];
+            $segment_ref->[LAST][NEXT] = $line_ref;
+        }
+        $segment_ref->[LAST] = $line_ref;
+        if ( ! $segment_ref->[FIRST] ) {
+            $segment_ref->[FIRST] = $line_ref;
+        }
+        return $line_ref;
+    } # Fin de if ( ! $segment_ref->[PARENT] )
+
+    # $segment_ref->[PARENT] existe
+    if ( $segment_ref->[PARENT][TYPE] eq 'break' ) {
+        return ( next_($segment_ref->[PARENT]) );
+    }
+    if ( $segment_ref->[PARENT][SEEK_END] > $segment_ref->[SEEK_END] ) {
+        print DBG "Parent $segment_ref->[PARENT][SEEK_END]| segment précédant $segment_ref->[SEEK_END]\n";
         my $line_ref;
 
 # Problème à résoudre : segment_ref peut être un segment sans référence (parcours du fichier)
@@ -783,54 +938,24 @@ sub next_ {
 
 # Normalement impossible car les segments sans référence ne sont pas pointés par les segments référencés
                 print STDERR "2 segments sans réf se suivent\n";
-
             }
         }
         $line_ref->[NEXT] = $segment_ref->[NEXT];   # Peut être affectation vide
         $line_ref->[SEEK_START] = $segment_ref->[SEEK_END];
         $line_ref->[PARENT]     = $segment_ref->[PARENT];
         my $new_line_ref = read_($line_ref);
-        return $new_line_ref if ( defined $new_line_ref );
-
+        
+        if ( defined $new_line_ref ) {
+            print DBG "Segment next lu : seek_end = $new_line_ref->[SEEK_END]\n";
+            return $new_line_ref;
+        }
+        print DBG "Problème new_line_ref indéfinie...\n";
         print STDERR "Bidouille à virer... forçage de la taille du segement PARENT à celle du segment fils\n";
         $segment_ref->[PARENT][SEEK_END] = $segment_ref->[SEEK_END];
         return;
     }
-    if ( $segment_ref->[PARENT] ) {
-        print DBG "Avant appel next_ de $segment_ref->[PARENT], seek_end = $segment_ref->[PARENT][SEEK_END]\n";
-        return ( next_( $segment_ref->[PARENT] ) );
-    }
-    
-    # Pas de ligne suivante dans le fichier mais elle a peut-être était lue avec la précédente (fichier terminé par un retour chariot)
-    #if (   (  $segment_ref->[PARENT]
-    #            and $segment_ref->[PARENT][SEEK_END] == $segment_ref->[SEEK_END]  ) 
-    #    or ! $segment_ref->[PARENT] ) {
-    if ( ! $segment_ref->[PARENT] ) {
-        return if ( ! $one_more_line );
-        
-        $one_more_line = 0;
-        my $line_ref;
-        if ( $segment_ref->[REF] ) {
-            $line_ref->[PREVIOUS] = $segment_ref;
-        }
-        elsif ( $segment_ref->[PREVIOUS] ) {
-            $line_ref->[PREVIOUS] = $segment_ref->[PREVIOUS];
-            if ( !$segment_ref->[PREVIOUS][REF] ) {
-
-# Normalement impossible car les segments sans référence ne sont pas pointés par les segments référencés
-                print STDERR "2 segments sans réf se suivent\n";
-
-            }
-        }
-        $line_ref->[NEXT] = $segment_ref->[NEXT];   # Peut être affectation vide
-        $line_ref->[SEEK_START] = $segment_ref->[SEEK_END];
-        $line_ref->[PARENT]     = $segment_ref->[PARENT];
-        $line_ref->[TEXT] = "";
-        $line_ref->[SEEK_END] = $segment_ref->[SEEK_END];
-        return $line_ref;
-    }
-        
-    return;                                         # Renvoie undef
+    print DBG "Avant appel next_ de $segment_ref->[PARENT], seek_end = $segment_ref->[PARENT][SEEK_END]\n";
+    return ( next_( $segment_ref->[PARENT] ) );
 }
 
 sub first_ {
@@ -841,16 +966,32 @@ sub first_ {
     # Si "empty" : n'existe pas vraiment : renvoie le suivant
     # Si "empty" : n'existe pas vraiment : renvoie le suivant
     my ($segment_ref) = @_;
+    
+    if ( $segment_ref->[TYPE] eq "empty" ) {
+        if ( $segment_ref->[NEXT] ) {
+#Deep recursion on subroutine "File_manager::first_" at ../File_manager.pm line 613
+# Pour éviter ce message, supprimer correctement (voir remarques dans 'delete_line')
+            return ( first_( $segment_ref->[NEXT] ) );
+        }
+        else {
+            # On considère qu'un segment vide a toujours un parent
+            return ( next_( $segment_ref->[PARENT] ) );
+        }
+    }
+    if ( $segment_ref->[TYPE] eq "break" ) {
+        return ( first_( $segment_ref->[FIRST] ) );
+    }
 
     if ( $segment_ref->[FIRST] ) {
         if ( $segment_ref->[FIRST][SEEK_START] == $segment_ref->[SEEK_START] ) {
             return ( first_( $segment_ref->[FIRST] ) );
         }
         else {
+            print DBG "Lecture d'une ligne avant le segment FIRST\n";
             my $line_ref;
             $line_ref->[NEXT]       = $segment_ref->[FIRST];
+            $line_ref->[PARENT] = $segment_ref;
             $line_ref->[SEEK_START] = $segment_ref->[SEEK_START];
-            $line_ref->[PARENT]     = $segment_ref;
             return ( read_($line_ref) );
         }
     }
@@ -872,45 +1013,71 @@ sub first_ {
                 my $line_ref;
                 $line_ref->[SEEK_START] = $segment_ref->[SEEK_START];
                 $line_ref->[PARENT]     = $segment_ref;
-                return ( read_($line_ref) );
+                
+                $segment_ref->[FIRST] = $line_ref;
+                 $segment_ref->[LAST] = $line_ref;
+
+                my $return = read_($line_ref);
+                if ( defined $return ) {
+                    $segment_ref->[FIRST] = $line_ref;
+                     $segment_ref->[LAST] = $line_ref;
+
+                    return $line_ref;
+                }
+                return;
             }
         }
-        else {
-
-            # Cas d'un buffer vide à faire ici
-            return;
-        }
-    }
-    if ( $segment_ref->[TYPE] eq "empty" ) {
-        if ( $segment_ref->[NEXT] ) {
-
-#Deep recursion on subroutine "File_manager::first_" at ../File_manager.pm line 613
-# Pour éviter ce message, supprimer correctement (voir remarques dans 'delete_line')
-            return ( first_( $segment_ref->[NEXT] ) );
-        }
-        else {
-
-            # On considère qu'un segment vide a toujours un parent
-            return ( next_( $segment_ref->[PARENT] ) );
-        }
+        my $line_ref;
+        $line_ref->[TYPE] = 'line';
+        $line_ref->[TEXT] = '';
+        $line_ref->[SEEK_START] = 0;
+        $line_ref->[SEEK_END] = 0;
+        $line_ref->[PARENT] = $segment_ref;
+            
+        $segment_ref->[SEEK_START] = 0;
+        $segment_ref->[SEEK_END] = 0;
+        $segment_ref->[FIRST] = $line_ref;
+        $segment_ref->[LAST] = $line_ref;
+        return $line_ref;
     }
 }
 
 sub read_ {
     my ($line_ref) = @_;
 
-    return if ( !$line_ref->[PARENT][FILE_DESC] );
-
     my $file_desc = $line_ref->[PARENT][FILE_DESC];
-    seek $file_desc, $line_ref->[SEEK_START], 0;
+    if ( ! $file_desc ) {
+        print DBG "Le segment parent $line_ref->[PARENT] de $line_ref ne contient pas de descripteur de fichier !\n";
+        return;
+    }
+    if ( ref $file_desc eq 'ARRAY' ) {
+        # Memory bloc
+        $line_ref->[TEXT] = $file_desc->[$line_ref->[SEEK_START]];
+        $line_ref->[TYPE] = 'line';
+        $line_ref->[SEEK_END] = $line_ref->[SEEK_START] + 1;
+        return $line_ref;
+    }
+
+    my $OK = seek $file_desc, $line_ref->[SEEK_START], 0;
+    if ( ! $OK ) {
+        my $msg = $!;
+        print STDERR "Can't seek to position $line_ref->[SEEK_START] : $msg\n";
+        print DBG "Can't seek to position $line_ref->[SEEK_START] : $msg\n";
+        print DBG "Taille fichier : ", ( stat $file_desc )[7], " positionnement initial à $line_ref->[SEEK_START]\n";
+        return;
+    }
     $line_ref->[TEXT] = readline $file_desc;
     
     if ( ! defined $line_ref->[TEXT] ) {
         print STDERR "Problème de cohérence : appel à read_ après la fin de fichier, thread ", threads->tid, "\n";
+        print DBG "Problème de cohérence : appel à read_ après la fin de fichier, thread ", threads->tid, "\n";
+        print DBG "Taille fichier : ", ( stat $file_desc )[7], " positionnement intial à $line_ref->[SEEK_START]\n";
         return;
     }
     
-    $one_more_line = chomp $line_ref->[TEXT];
+    if ( chomp $line_ref->[TEXT] ) {
+        $one_more_line = tell $file_desc;
+    }
 
     # Suppression des retours chariots
     $line_ref->[TEXT] =~ s/\r//g;
@@ -919,6 +1086,7 @@ sub read_ {
     $line_ref->[TEXT] =~ s/\t/    /g;
 
     $line_ref->[SEEK_END] = tell $file_desc;
+    $line_ref->[TYPE] = 'line';
 
     return $line_ref;
 }
@@ -936,25 +1104,22 @@ sub previous_ {
 #print "segment_ref->[PREVIOUS][TEXT] : $segment_ref->[PREVIOUS][TEXT]\n";
         return ( last_( $segment_ref->[PREVIOUS] ) );
     }
-    if (    $segment_ref->[PARENT]
-        and $segment_ref->[PARENT][SEEK_START] < $segment_ref->[SEEK_START] )
-    {
-        my $line_ref;
-
-# OK mais seulement car il n'existe pas de procédure de parcours arrière sans mémorisation
-#  ==> différence importante par rapport à "sub next_"
-        $line_ref->[NEXT] = $segment_ref;
-
-        $line_ref->[PREVIOUS] =
-          $segment_ref->[PREVIOUS];    # Peut être affectation vide
-        $line_ref->[SEEK_END] = $segment_ref->[SEEK_START];
-        $line_ref->[PARENT]   = $segment_ref->[PARENT];
-        return ( read_previous_($line_ref) );
-    }
     if ( $segment_ref->[PARENT] ) {
+        if ( $segment_ref->[PARENT][SEEK_START] < $segment_ref->[SEEK_START] ) {
+                my $line_ref;
+
+        # OK mais seulement car il n'existe pas de procédure de parcours arrière sans mémorisation
+        #  ==> différence importante par rapport à "sub next_"
+                $line_ref->[NEXT] = $segment_ref;
+
+                $line_ref->[PREVIOUS] =
+                  $segment_ref->[PREVIOUS];    # Peut être affectation vide
+                $line_ref->[SEEK_END] = $segment_ref->[SEEK_START];
+                $line_ref->[PARENT]   = $segment_ref->[PARENT];
+                return ( read_previous_($line_ref) );
+        }
         return ( previous_( $segment_ref->[PARENT] ) );
     }
-
     # Pas de ligne suivante
     return;                            # Renvoie undef
 }
@@ -968,6 +1133,10 @@ sub last_ {
     my ($segment_ref) = @_;
 
     print DBG "Dans last_ de segment_ref $segment_ref\n";
+
+    if ( $segment_ref->[TYPE] eq 'break' ) {
+        return last_( $segment_ref->[LAST] );
+    }
 
     if ( $segment_ref->[LAST] ) {
         if ( $segment_ref->[LAST][SEEK_END] == $segment_ref->[SEEK_END] ) {
@@ -1044,7 +1213,8 @@ sub read_previous_ {
     $line_ref->[TEXT] =~ s/\t/    /g;
 
     $line_ref->[SEEK_START] = $seek_start;
-
+    $line_ref->[TYPE] = 'line';
+    
     return $line_ref;
 }
 
@@ -1064,7 +1234,7 @@ sub save_line {
         $ref = $line_ref->[REF];
     }
     $line_ref->[REF]  = $ref;
-    $line_ref->[TYPE] = "line";
+    $line_ref->[TYPE] = 'line';
 
     my $segment_ref = $line_ref->[PARENT];
     if (    $segment_ref->[FIRST]
@@ -1117,6 +1287,7 @@ sub previous_line {
     if ( !$ref ) {
 
         print DBG "Previous à blanc demandé\n";
+        dump_file_manager( $self );
         my $line_ref = last_( $self->[ROOT] );
 
         print DBG  "line_ref trouvé = $line_ref\n";
@@ -1156,6 +1327,24 @@ sub line_seek_start {
     }
     init_pseudo_seek_start ( $line_ref );
     return $line_ref->[PSEUDO_SEEK_START];
+}
+
+sub line_set_info {
+    my ( $self, $ref, $info ) = @_;
+	
+    return if ( !$ref );
+    my $line_ref = $self->[HASH_REF]{$ref};
+    return if ( !defined $line_ref );
+    $line_ref->[INFO] = $info;
+}
+
+sub line_get_info {
+    my ( $self, $ref, $info ) = @_;
+	
+    return if ( !$ref );
+    my $line_ref = $self->[HASH_REF]{$ref};
+    return if ( !defined $line_ref );
+    return $line_ref->[INFO];
 }
 
 sub init_pseudo_seek_start {
@@ -1279,7 +1468,8 @@ sub load_info {
 sub editor_number {
     my ( $self, $number, $options_ref ) = @_;
     
-    #print "Dans editor_number, reçu : NUMBER $number\n";
+    print DBG "Dans editor_number, reçu : NUMBER $number\n";
+    dump_file_manager ( $self );
 
     my $check_every = 20;
     my $lazy;
@@ -1304,12 +1494,14 @@ sub editor_number {
     while ( defined($text) ) {
         $current += 1;
         $indice += 1;
+        print DBG "Texte de la ligne $current : |$text|\n";
         if ( $current == $number ) {
             my $new_ref = create_ref_current($self, $who);
-            #print "Texte de la ligne : |$text|\n";
+            print DBG "C'est la bonne ligne !\n";
             save_line_number( $self, $who, $new_ref, $number );
             # Désinit
-            $self->[DESC]{$who} = undef;
+            init_read( $self, $who );
+            dump_file_manager ( $self );
             return $new_ref;
         }
         if ( $indice == $check_every ) {
@@ -1324,6 +1516,9 @@ sub editor_number {
         }
         $text = read_next($self, $who);
     }
+    print DBG "Texte undefined, aucune ligne trouvée\n";
+    dump_file_manager ( $self );
+    return;
 }
 
 sub editor_search {
@@ -1432,6 +1627,288 @@ sub get_line_number_from_ref {
     return $number;
 }
 
+sub dump_file_manager {
+    my ( $self ) = @_;
+    
+    my $errors = 0;
+    
+    print DBG "Dans dump_file_manager : tid = ", threads->tid, ", $errors erreurs\n";
+    print DBG "=" x 80;
+    my $root = $self->[ROOT];
+    print DBG "\nROOT : ", $self->[ROOT], "\n";
+    if ( defined $root->[FILE_NAME] ) {
+        print DBG "FILE_NAME  : ", $root->[FILE_NAME], "\n";        
+    }
+    else {
+        print DBG "undefined FILE_NAME\n";        
+    }
+    print DBG "SEEK_START : ", $root->[SEEK_START], "\n" if ( defined $root->[SEEK_START] );
+    print DBG "SEEK_END   : ", $root->[SEEK_END], "\n" if ( defined $root->[SEEK_END] );
+    print DBG "FIRST      : ", $root->[FIRST], "\n" if ( defined $root->[FIRST] );
+    print DBG "LAST       : ", $root->[LAST], "\n" if ( defined $root->[LAST] );
+    print DBG "=" x 80, "\n";
+    
+    $errors += dump_level($root, 1);
+    
+    print DBG "\nLe dump a renvoyé $errors erreurs\n\n";
+    return $errors;
+}
+
+sub dump_level {
+    my ( $root_ref, $level ) = @_;
+    
+    my $errors = 0;
+    my $segment_ref = $root_ref->[FIRST];
+    return 0 if ( ! defined $segment_ref );
+    my $previous_ref;
+    while ( defined $segment_ref ) {
+        $errors += print_segment ( $segment_ref, $level, $root_ref );
+        $previous_ref = $segment_ref;
+        $segment_ref = $segment_ref->[NEXT];
+        if ( defined $segment_ref ) {
+            if ( $previous_ref != $segment_ref->[PREVIOUS] ) {
+                print STDERR "Le segment $segment_ref a un mauvais previous...\n";
+                print DBG "Le segment $segment_ref a un mauvais previous...\n";
+                $errors += 1;
+            }
+        }
+    }
+    print DBG "\t" x $level, "\n";
+    if ( $previous_ref != $root_ref->[LAST] ) {
+        print STDERR "Le LAST du root $root_ref n'est pas correct...\n";
+        print DBG "Le LAST du root $root_ref n'est pas correct...\n";
+        $errors += 1;
+    }
+    print DBG "\t" x $level,  "LAST = ", $root_ref->[LAST], "\n";
+    return $errors;
+}
+
+sub print_segment {
+    my ( $segment_ref, $level, $parent ) = @_;
+
+    my $errors = 0;
+    print DBG "\t" x $level, "Level $level : ", $segment_ref, "\n";
+    
+    if ( defined $segment_ref->[TYPE] ) {
+        print DBG "\t" x $level, "TYPE       : '", $segment_ref->[TYPE], "'\n";
+    }
+    else {
+        print DBG "\t" x $level, "TYPE       : undefined\n";
+        print STDERR "Le segment $segment_ref n'a pas de TYPE\n";
+        print DBG "Le segment $segment_ref n'a pas de TYPE\n";
+        $errors += 1;
+    }        
+    if ( defined $segment_ref->[PREVIOUS] ) {
+        print DBG "\t" x $level, "PREVIOUS   : ", $segment_ref->[PREVIOUS], "\n";
+        if ( $parent->[FIRST] == $segment_ref ) {
+            print STDERR "Le segment $segment_ref a un PREVIOUS mais il est le FIRST de $parent...\n";
+            print DBG "Le segment $segment_ref a un PREVIOUS mais il est le FIRST de $parent...\n";
+            $errors += 1;
+        }
+    }
+    else {
+        print DBG "\t" x $level, "PREVIOUS   : undefined\n";
+        if ( $parent->[FIRST] != $segment_ref ) {
+            print STDERR "Le segment $segment_ref n'a pas de PREVIOUS et n'est pas le FIRST de $parent...\n";
+            print DBG "Le segment $segment_ref n'a pas de PREVIOUS et n'est pas le FIRST de $parent...\n";
+            $errors += 1;
+        }
+    }
+    print DBG "\t" x $level, "SEEK_START : ", $segment_ref->[SEEK_START], "\n";
+    print DBG "\t" x $level, "SEEK_END   : ", $segment_ref->[SEEK_END], "\n";
+    if ( defined $segment_ref->[FIRST] ) {
+       print DBG "\t" x $level, "FIRST      : ", $segment_ref->[FIRST], "\n";
+       $errors += dump_level ( $segment_ref, $level + 1 );
+    }
+    if ( defined $segment_ref->[LAST] ) {
+       print DBG "\t" x $level, "LAST       : ", $segment_ref->[LAST], "\n";
+    }
+    if ( defined $segment_ref->[TEXT] ) {
+       print DBG "\t" x $level, "TEXT       : ", $segment_ref->[TEXT], "\n";
+    }
+    if ( $parent != $segment_ref->[PARENT] ) {
+        print STDERR "Un segment fils ne référence pas son propre père...\n";
+        print DBG "Un segment fils ne référence pas son propre père...\n";
+        $errors += 1;
+    }
+    print DBG "\t" x $level, "PARENT       : ", $segment_ref->[PARENT], "\n";
+    if ( defined $segment_ref->[REF] ) {
+        print DBG "\t" x $level, "REF          : ", $segment_ref->[REF], "\n";
+    }
+    if ( defined $segment_ref->[NEXT] ) {
+        print DBG "\t" x $level, "NEXT       : ", $segment_ref->[NEXT], "\n";
+        if ( $parent->[LAST] == $segment_ref ) {
+            print STDERR "Le segment $segment_ref a un NEXT mais il est le LAST de $parent...\n";
+            print DBG "Le segment $segment_ref a un NEXT mais il est le LAST de $parent...\n";
+            $errors += 1;
+        }
+    }
+    else {
+        print DBG "\t" x $level, "NEXT       : undefined\n";    
+        if ( $parent->[LAST] != $segment_ref ) {
+            print STDERR "Le segment $segment_ref n'a pas de NEXT mais il est le LAST de $parent...\n";
+            print DBG "Le segment $segment_ref n'a pas de NEXT mais il est le LAST de $parent...\n";
+            $errors += 1;
+        }
+    }
+    print DBG "\t" x $level, "=" x 80, "\n";
+    return $errors;
+}
+
+sub insert_bloc {
+    my ( $self, $bloc, $options_ref ) = @_;
+    
+    $options_ref = {} if ( ! defined $options_ref );
+    print DBG "Dans insert_bloc\n\n\nbloc = $bloc\n", join( ', ', %{$options_ref}), "\n\n\n";
+    
+    dump_file_manager ( $self );
+    if ( ! defined $bloc ) {
+        print DBG "Bloc à insérer vide : aucune action\n";
+        return;
+    }
+    my $line_ref;
+    my $ref = $options_ref->{'where'};
+    if ( defined $ref ) {
+        $line_ref = $self->[HASH_REF]{$ref};
+    }
+    if ( ! defined $line_ref ) {
+        $line_ref = first_ ( $self->[ROOT] );
+    }
+    my $where = $options_ref->{'how'} || 'before';
+    
+    # Insertion d'un segment container au niveau de $line_ref
+    my $first_container_ref;
+    $first_container_ref->[TYPE] = 'break';
+    $first_container_ref->[PARENT] = $line_ref->[PARENT];
+    my $seek;
+    if ( $where eq 'before' ) {
+        $seek = $line_ref->[SEEK_START];
+    }
+    else {
+        $seek = $line_ref->[SEEK_END];
+    }
+    $first_container_ref->[SEEK_START] = $seek;
+    $first_container_ref->[SEEK_END] = $seek;
+    
+    if ( $where eq 'before' ) {
+        $first_container_ref->[PREVIOUS] = $line_ref->[PREVIOUS];
+        if ( defined $first_container_ref->[PREVIOUS] ) {
+            $first_container_ref->[PREVIOUS][NEXT] = $first_container_ref;
+        }
+        $line_ref->[PREVIOUS] = $first_container_ref;
+        $first_container_ref->[NEXT] = $line_ref;
+        if ( $line_ref->[PARENT][FIRST] == $line_ref ) {
+            $line_ref->[PARENT][FIRST] = $first_container_ref;
+        }
+    }
+    else { # 'after' understood
+        $first_container_ref->[NEXT] = $line_ref->[NEXT];
+        if ( defined $first_container_ref->[NEXT] ) {
+            $first_container_ref->[NEXT][PREVIOUS] = $first_container_ref;
+        }
+        $line_ref->[NEXT] = $first_container_ref;
+        $first_container_ref->[PREVIOUS] = $line_ref;
+        if ( $line_ref->[PARENT][LAST] == $line_ref ) {
+            $line_ref->[PARENT][LAST] = $first_container_ref;
+        }
+    }
+    
+    # Insertion du container des lignes mémoires
+    my $last_container_ref;
+    $last_container_ref->[SEEK_START] = 0;
+    $last_container_ref->[TYPE] = 'container';
+    my @lines = split (/\n/, $bloc, -1);
+    $last_container_ref->[FILE_DESC] = \@lines;
+    my $size = scalar ( @lines );
+    $last_container_ref->[SEEK_END] = $size;
+    $first_container_ref->[FIRST] = $last_container_ref;
+    $first_container_ref->[LAST] = $last_container_ref;
+    $last_container_ref->[PARENT] = $first_container_ref;
+    
+    # Insertion de la première ligne
+    my $first_line_ref;
+    $first_line_ref->[TYPE] = 'line';
+    $first_line_ref->[TEXT] = $last_container_ref->[FILE_DESC][0];
+    $first_line_ref->[PARENT] = $last_container_ref;
+    $first_line_ref->[SEEK_START] = 0;
+    $first_line_ref->[SEEK_END] = 1;
+    
+    #$last_container_ref->[FIRST] = $first_line_ref;
+    my $first_ref = save_line( $self, $first_line_ref );
+    #print DBG "last_container_ref->[FIRST] = $last_container_ref->[FIRST]\n";
+
+    if ( $size == 1 ) {
+        $last_container_ref->[LAST] = $first_line_ref;
+        print DBG "La taille du bloc à insérer est de 1\n";
+        # Scalar or list context : only one element inserted
+        return $first_ref;
+    }
+
+    # Insertion de la dernière ligne
+    my $last_line_ref;
+    $last_line_ref->[TYPE] = 'line';
+    $last_line_ref->[TEXT] = $last_container_ref->[FILE_DESC][$size - 1];
+    $last_line_ref->[PARENT] = $last_container_ref;
+    $last_line_ref->[SEEK_START] = $size - 1;
+    $last_line_ref->[SEEK_END] = $size;    
+    
+    $last_line_ref->[PREVIOUS] = $first_line_ref;
+    $first_line_ref->[NEXT] = $last_line_ref;
+    
+    #$last_container_ref->[LAST] = $last_line_ref;    
+    my $last_ref = save_line( $self, $last_line_ref );
+    print DBG "\n\n\nFin de insert_bloc\n\n\n";
+    dump_file_manager( $self );
+
+    my @list_refs = ( $first_ref );    
+    if ( $options_ref->{'force_create'} ) {
+        my $next_line_ref = next_($first_line_ref);
+        while ( $next_line_ref ne $last_line_ref ) {
+            push @list_refs, save_line ( $self, $next_line_ref );
+            $next_line_ref = next_($next_line_ref);
+        }
+        
+        print DBG "Après application de l'option force_create :\n\n";
+        dump_file_manager( $self );
+    }
+    push @list_refs, $last_ref;
+    
+    if ( wantarray ) {
+		print DBG "Valeur de retour de insert_bloc : ", join ("\n\t", @list_refs ), "\n";
+        return @list_refs;
+    }
+    if ( $where eq 'before' ) {
+        return $first_ref;
+    }
+    else {
+        return $last_ref;
+    }
+}
+
+package Text::Editor::Easy::File_manager::Save_report;
+
+sub TIEHANDLE {
+    my ( $classe, $name ) = @_;
+
+    my $file_desc;
+    open ( $file_desc, ">$name" ) or die "Can't open $name while trying to tie : $!\n";
+    my $array_ref = [ $name, $file_desc ];
+    
+    bless $array_ref, $classe;
+}
+
+sub PRINT {
+    my $self = shift;
+    
+    no warnings;
+    print { $self->[1] } @_;
+}
+
+sub CLOSE {
+    my $self = shift;
+    
+    close ( $self->[1] );
+}
 
 =head1 FUNCTIONS
 
@@ -1469,8 +1946,6 @@ Return the line of a Text::Editor::Easy instance and the position (start and end
 =head2 get_ref_and_text_from_line_ref
 
 =head2 get_ref_for_empty_structure
-
-=head2 get_text_from_ref
 
 =head2 init_file_manager
 

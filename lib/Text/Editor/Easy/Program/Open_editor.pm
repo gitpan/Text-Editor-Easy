@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 
@@ -64,16 +64,19 @@ sub open {
     
     # Pas encore d'interface utilisable pour travailler en mémoire avec File_manager : passage par un fichier intermédiaire
     # ==> un peu long
-    open (TMP, ">tmp/open_editor.tmp") or print STDERR "Can't open open_editor.tmp : $!\n";
+    #open (TMP, ">tmp/open_editor.tmp") or print STDERR "Can't open open_editor.tmp : $!\n";
+    my $bloc;
     print TMP "$dir\n";
     for ( sort @dirs ) {
         next if ( $_ eq '.' );
-        print TMP "D - $_\n";
+        #print TMP "D - $_\n";
+        $bloc .= "D - $_\n";
     }
     for ( sort @files ) {
-        print TMP "F - $_\n";
+        #print TMP "F - $_\n";
+        $bloc .= "F - $_\n";
     }
-    close TMP;
+    #close TMP;
     
     if ( ! defined $open_editor ) {
             $open_editor = Text::Editor::Easy->new(
@@ -81,7 +84,7 @@ sub open {
             'zone'        => 'zone2',
             'focus'      => 'yes',
             'name'        => 'Open',
-            'file' => "tmp/open_editor.tmp",
+            'bloc' => $bloc,
             'highlight' => {
                 'use'     => 'Text::Editor::Easy::Program::Open_editor',
                 'package' => 'Text::Editor::Easy::Program::Open_editor',
@@ -113,10 +116,16 @@ sub open {
         $open_editor->bind_key({ 'package' => 'Text::Editor::Easy::Program::Open_editor', 'sub' => 'enter', 'key' => 'Return' } );
     }
     else {
-        $open_editor->revert_internal;
-        my $first = $open_editor->first;
-        $open_editor->display( $first, {'at' => 'top' } );
-        $open_editor->cursor->set(0, $first);
+        $open_editor->empty;
+        my $first_line = $open_editor->first;
+        $open_editor->insert( $bloc, {
+            'at_line' => $first_line,
+            'display' => [
+                $first_line->ref,
+                {'at' => 'top' },
+            ],
+            'cursor' => 'at_start',
+        } );
         $open_editor->focus;
     }
     #print "Création de open_editor finie : $open_editor\n";
@@ -220,18 +229,6 @@ sub motion_last {
     return if ( anything_for_me );
     my $final_ord;
     if ( $dir_or_file ne $cursor_display ) {
-
-
-
-
-
-
-
-
-
-
-
-
         print "Display du motion : $dir_or_file soit ", $dir_or_file->text, "\n";
         print "Display du curseur : $cursor_display soit ", $cursor_display->text, "\n";
         ( undef, undef, undef, undef, undef, undef, undef, $final_ord ) = $editor->cursor->set( 0, $dir_or_file );
@@ -276,3 +273,7 @@ under the same terms as Perl itself.
 =cut
 
 1;
+
+
+
+

@@ -11,7 +11,7 @@ my %pid;
 
 while ( my $command = <STDIN> ) {
     chomp $command;
-    print "From program exec.pl : received command $command\n";
+    print "From program exec.pl : received message $command\n";
 
     exit if ( $command eq "quit" );
 
@@ -22,6 +22,7 @@ while ( my $command = <STDIN> ) {
                 kill 9, $pid;
             }
         }
+		print "From program exec.pl : executing command $data...\n";
         $pid{$file_name} = open $file_desc{$file_name}, "| $data";
     }
     elsif ( $action eq 'stop' ) {

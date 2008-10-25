@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 use Text::Editor::Easy::Comm;
 
@@ -295,7 +295,15 @@ sub update_conf {
             $info_ref->{'absolute_path'} = $absolute_path;
             $info_ref->{'full_relative'} = $full_relative;
             $info_ref->{'full_absolute'} = $full_absolute;
-            $info_ref->{'file'} = $full_relative;
+			if ( defined $full_relative ) {
+                $info_ref->{'file'} = $full_relative;
+		    }
+			elsif ( defined $full_absolute ) {
+				$info_ref->{'file'} = $full_absolute;
+		    }
+			else {
+				$info_ref->{'file'} = $file_name;
+		    }
         }
         $info_ref->{'config'} = $info_old_editor_ref;
     }

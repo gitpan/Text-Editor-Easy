@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.41
+Version 0.42
 
 =cut
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
@@ -151,7 +151,7 @@ This function saves the link between a print and the code that generated it.
 sub trace_full_print {
     my ( $self, $seek_start, $seek_end, $tid, $call_id, $on, $calls_dump, $data ) = @_;
 
-    print DBG "Appel à trace_full_print : $data\n";
+    print DBG "Appel à trace_full_print : seek_start $seek_start|seek_end $seek_end|$data\n";
 
     return if ( !$self->[INFO_DESC] );
 
@@ -196,8 +196,8 @@ sub get_info_for_eval_display {
         Text::Editor::Easy::Comm::set_ref ($editor, $ref_editor);
         $editor{$ref_editor} = $editor;
     }
-    my $seek_start = $editor->line_seek_start( $ref_line );
-    my $text = $editor->get_text_from_ref ( $ref_line );
+    my $seek_start = $editor->line_get_info( $ref_line );
+    my $text = $editor->line_text ( $ref_line );
     print DBG "Seek start de la ligne : $seek_start| texte : $text\n";
     
     # Décomposition de la ligne
@@ -211,6 +211,11 @@ sub get_info_for_eval_display {
 
     while ( $to_calc ) {
         my ( $start, $end, $length ) = split ( /,/, $seek_start[$indice] );
+		if ( ! defined $length ) {
+		    print STDERR "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
+			print DBG "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
+			last;
+	    }
         print DBG "\tSEEK_START $start de la position ", $current_length, " à la position ", $current_length + $length, "\n";
         if ( $pos_in_line <= $current_length + $length - ( $end - $start ) ) {
             print DBG "C'est ce seek_start $start qu'il faut renvoyer :\n";
@@ -314,7 +319,7 @@ sub get_first_line_for_print {
 sub get_last_line_for_print {
     my ( $self, $editor, $ref_line, $start_of_line, $end ) = @_;
 
-    my $text = $editor->get_text_from_ref ( $ref_line );
+    my $text = $editor->line_text ( $ref_line );
 
     my $remain = $end - length ( $text ) - $start_of_line;
     print DBG "Dans get_last_line_for_print : Il faut descendre de $remain caractères\n";
