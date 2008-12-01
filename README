@@ -1,6 +1,6 @@
 Text-Editor-Easy
 
-Version 0.42.
+Version 0.43.
 Pure perl editor module and program. 10 demos in the program,
 but still not usable.
 
@@ -13,7 +13,7 @@ Anyway, it contains pure perl modules and programs.
 So it shouldn't be hard to install it manually and run the demos.
 
 It's compatible with Windows and UNIX. I use perl 5.8.8 on Windows
-and perl 5.8.7 on Linux.
+and perl 5.8.8 on Linux.
 
 In order to install it manually to execute the demos,
 save the archive file on your computer (tar.gz file).
@@ -34,14 +34,21 @@ your system (you shoud already have most of them) :
         - File::Copy
         - File::Spec
 
-Once finished, execute the "Editor.pl" program in the root directory.
+Once finished, execute the "Editor.pl" program in the root directory. Don't
+remove the tmp directory : it can be empty but the "Editor.pl" program
+needs one.
 
 SUPPORT AND DOCUMENTATION
 
-There is neither support, nor documentation because it's moving fast.
-
 Here are a few screen shots of what you should get when running the demos :
-http://sgrommier.free.fr/perl
+http://sgrommier.free.fr/perl/editor/
+
+The documentation, that just starts to be written, will be in 3 places :
+    - of course, in the modules as pod
+    - I will try "pseudo-videos" runnable from the Editor.pl program
+    - on the web : http://sgrommier.free.fr/perl/editor/. Compared to pod,
+I can add pictures and translation.
+
 
 COPYRIGHT AND LICENCE
 

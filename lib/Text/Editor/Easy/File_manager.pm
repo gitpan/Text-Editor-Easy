@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 =head1 SYNOPSIS
 
@@ -78,6 +78,7 @@ use constant {
     SAVED_INFO  => 14,
     UNIQUE_REF => 15,
     HASH_REF     => 16,
+    LAST_MODIF => 17,
     
     UNTIL => 0, # Mémorisation de l'appel initial à until (procédure read_until)
                 # On mémorise ici la référence  ne pas dépasser
@@ -98,7 +99,7 @@ use constant {
     FILE_NAME   => 12,
     LINE_NUMBER => 13,
     PSEUDO_SEEK_START => 14,
-	INFO => 15,
+    INFO => 15,
 
     # Gestion de LINE_NUMBER
     LAST_COMPUTE => 0,
@@ -133,7 +134,6 @@ sub init_file_manager {
     if ($file_name) {
         $segment_ref->[FILE_NAME] = $file_name;
         if ( open( $file_desc, $file_name ) ) {
-
             # Le fichier existe
             $segment_ref->[SEEK_START] = 0;
             my $seek_end = ( stat $file_desc )[7];
@@ -141,14 +141,29 @@ sub init_file_manager {
             $segment_ref->[FILE_DESC]      = $file_desc;
             $file_manager_ref->[FILE_DESC] = $file_desc;
             $file_manager_ref->[SEEK_END]  = $seek_end;
+            $file_manager_ref->[LAST_MODIF] = ( stat $file_desc )[9];
         }
         else {
-		    print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
-            $segment_ref->[SEEK_END]      = 0;
-            $segment_ref->[SEEK_START]    = 0;
-            $file_manager_ref->[SEEK_END] = 0;
-        }
+            print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
+            $file_name =~ s{\\}{\/}g;
+            if ( open( $file_desc, $file_name ) ) {
 
+                # Le fichier existe
+                $segment_ref->[SEEK_START] = 0;
+                my $seek_end = ( stat $file_desc )[7];
+                $segment_ref->[SEEK_END]       = $seek_end;
+                $segment_ref->[FILE_DESC]      = $file_desc;
+                $file_manager_ref->[FILE_DESC] = $file_desc;
+                $file_manager_ref->[SEEK_END]  = $seek_end;
+                $file_manager_ref->[LAST_MODIF] = ( stat $file_desc )[9];
+            }
+            else {
+                print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
+                $segment_ref->[SEEK_END]      = 0;
+                $segment_ref->[SEEK_START]    = 0;
+                $file_manager_ref->[SEEK_END] = 0;
+            }
+        }
     }
     $segment_ref->[TYPE] = "container";
 
@@ -192,10 +207,10 @@ sub growing_update {
     my $actual_size =   ( stat ($file_name ) )[7] || ( stat ($segment_ref->[FILE_DESC] ) )[7];
 
     if ( ! defined $actual_size )  {
-		print STDERR "Actual size undefined... can't update growing file\n";
-		print DBG "SEGMENT_FILE_DESC : $segment_ref->[FILE_DESC]\n";
-		return;
-	}
+        print STDERR "Actual size undefined... can't update growing file\n";
+        print DBG "SEGMENT_FILE_DESC : $segment_ref->[FILE_DESC]\n";
+        return;
+    }
     #print "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
     
     if ( $actual_size != $old_size ) {
@@ -279,7 +294,7 @@ sub delete_line {
     my ( $self, $ref ) = @_;
 
 
-    print "Dans delete_line REF = $ref\n";
+    #print "Dans delete_line REF = $ref\n";
     $self->[DIRTY] = 1;
     $self->[LAST_UPDATE] += 1;
 
@@ -521,19 +536,34 @@ sub close {
     CORE::close $self->[ROOT][FILE_DESC];
 }
 
+my @reports;
+
 sub save_internal {
 
 # Cette fonction est bloquante : à réécrire : sauvegarde rapide la structure, puis création d'un thread de sauvegarde avec doublage
 # des saisies dans un tampon, rattrapage du tampon sur la nouvelle structure après la fin de la sauvegarde puis bascule sur la nouvelle structure
     my ( $self, $file_name ) = @_;
+    
+    my $time_start = time;
+    print DBG "Début save internal : absolute time start $time_start, soit ", scalar(localtime($time_start)), "\n";
+    
+    
+    if ( ! $file_name ) {
+        if ( ! $self->[ROOT][FILE_NAME] ) {
+            return if ( $self->[PARENT]->name eq 'eval*' );
+            print STDERR "Can't save file : no file name has been given\n";
+            return;
+        }
+        $file_name = $self->[ROOT][FILE_NAME];
+    }
 
-    my $report_file_name = $self->[ROOT][FILE_NAME];
+    my $report_file_name = $file_name;
     if ( ! defined $report_file_name ) {
         $report_file_name = 'thread__' . threads->tid;
     }
     $report_file_name =~ s/\\/__/g;
     $report_file_name =~ s/\//__/g;
-	$report_file_name =~ s/:/_/g;
+    $report_file_name =~ s/:/_/g;
     my $report = "tmp/Save_report_of__${report_file_name}__" . time . ".trc";
     my $size_before = $self->[ROOT][SEEK_END] || 0;
     
@@ -552,24 +582,20 @@ sub save_internal {
         print DBG "Sauvegarde de $report_file_name\n";
         print DBG "Taille initiale : $size_before\n";
     }
-    
-    my $errors_in_dump = dump_file_manager ( $self );
-
-  return if ( !$self->[DIRTY] );    # Rien n'a été modifié, sauvegarde inutile
-
-    if ( ! $file_name ) {
-        if ( ! $self->[ROOT][FILE_NAME] ) {
-            return if ( $self->[PARENT]->name eq 'eval*' );
-            print STDERR "Can't save file : no file name has been given\n";
-            CORE::close( DBG );
-            untie *DBG;
-            if ( $tied ) {
-                *DBG = $tied;
-            }
-            return;
-        }
-        $file_name = $self->[ROOT][FILE_NAME];
+    my $last_modif = (stat($file_name))[9];
+    if ( defined $self->[LAST_MODIF] and defined $last_modif and $self->[LAST_MODIF] != $last_modif ) {
+        print DBG "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
+        print "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
+        print "==>force to quit during save of file $file_name, done by thread ", threads->tid, "\n";
+        Text::Editor::Easy->exit(1);
     }
+    elsif (defined $last_modif ){
+        print DBG "LAst modif = $last_modif : ", scalar(localtime($last_modif)), "\n";
+    }
+
+    my ( $errors_in_dump, $total_refs ) = dump_file_manager ( $self );
+
+    return if ( !$self->[DIRTY] );    # Rien n'a été modifié, sauvegarde inutile
 
     my $temp_file_name = $file_name . "_tmp_";
     my $new_root_ref;    # Future arborescence (références récupérées)
@@ -624,39 +650,65 @@ sub save_internal {
             $previous_line_ref = $line_ref;
         }
     }
+    my $new_size = tell $new_file_desc;
     if ( $previous_line_ref and $previous_line_ref->[REF] ) {
-        $previous_line_ref->[SEEK_END] = tell $new_file_desc;
+        $previous_line_ref->[SEEK_END] = $new_size;
     }
-    $new_root_ref->[SEEK_END] = tell $new_file_desc;
+    print DBG "\n\n\nDans save : taille du nouveau fichier $new_size\n";
+    $new_root_ref->[SEEK_END] = $new_size;
 
     if ( $self->[ROOT][FILE_DESC] ) {
         CORE::close $self->[ROOT][FILE_DESC];
     }
     CORE::close $new_file_desc;    # Vérification avec diff
     use File::Copy;
-    move( $temp_file_name, $file_name );
-
-    # Ménage à faire (supprimer l'arborescence $self->[ROOT] et [HASH_REF]
-    open( $new_file_desc, "$file_name" )
-      or die "Impossible d'ouvrir $file_name : $!\n";
-    $self->[ROOT]            = $new_root_ref;
-    $self->[ROOT][FILE_DESC] = $new_file_desc;
-    $self->[HASH_REF]        = \%hash;
-
-    $self->[ROOT][FILE_NAME] = $file_name;
-
+    my $OK = move( $temp_file_name, $file_name );
+    if ( ! $OK ) {
+        print STDERR "Can't move file $temp_file_name to $file_name : $!\nSave processs aborted\n";
+        print DBG "Can't move file $temp_file_name to $file_name : $!\nSave processs aborted\n";
+        open( $new_file_desc, $file_name )  or die "Impossible d'ouvrir $file_name : $!\n";
+    }
+    else {
+        open( $new_file_desc, $file_name )  or die "Impossible d'ouvrir $file_name : $!\n";
+        # Ménage à faire (supprimer l'arborescence $self->[ROOT] et [HASH_REF]
+        $self->[ROOT]            = $new_root_ref;
+        $self->[ROOT][FILE_DESC] = $new_file_desc;
+        $self->[HASH_REF]        = \%hash;
+        $last_modif = (stat($new_file_desc))[9];
+        $self->[LAST_MODIF] = $last_modif;
+        if ( defined $last_modif ) {
+            print DBG "LAst modif = $last_modif : ", scalar(localtime($last_modif)), "\n";
+        }
+        else {
+            print DBG "\n\n LAST MODIF NON DEFINI !!!\n";
+        }
+        $self->[ROOT][FILE_NAME] = $file_name;
+    }
     $one_more_line = 0;
-    print DBG "Fin de save_internal\n";
-    $errors_in_dump += dump_file_manager ( $self );
+    
+    my ( $new_errors_in_dump, $new_total_refs ) = dump_file_manager ( $self );
+
+    $errors_in_dump += $new_errors_in_dump;
 
     if ( $save_report or $trace_all ) {
         print DBG "\n\nNouvelle taille : $new_root_ref->[SEEK_END]\n";
         print DBG "$errors_in_dump erreur(s) pour les 2 dumps...\n";
+        print DBG "Lignes référencées passées de $total_refs à $new_total_refs\n";
         CORE::close( DBG );
         untie *DBG;
+        if ( $new_total_refs < $total_refs ) {
+            print STDERR "Referenced lines have disappeared !!!\n\t==> force exit...\n";
+            Text::Editor::Easy->exit(1);
+        }
         if ( $new_root_ref->[SEEK_END] >= $size_before ) {
             if ( ! defined $save_report or $save_report ne 'keep' ) {
-                unlink ( $report );
+                if ( $OK ) {
+                    push @reports, $report;
+                    if ( scalar(@reports) > 5 ) {
+                        my $to_delete = shift @reports;
+                        unlink $to_delete;
+                    }
+                }
             }
         }        
     }
@@ -665,6 +717,9 @@ sub save_internal {
         *DBG = $tied;
         #print DBG "Ne doit rien écrire\n";
     }
+    my $time_stop = time;
+    print DBG "Fin save internal : absolute time stop $time_stop, soit ", scalar(localtime($time_stop)), "\n";
+
     return 1;    # OK
 }
 
@@ -751,7 +806,7 @@ sub read_line_ref {
     }
     if ( !$self->[DESC]{$who} ) {
 
-        print DBG "Premier accès pour who = $who\n";
+        print DBG "\tPremier accès pour who = $who\n";
 
         my $line_ref;
         if ($ref) {
@@ -764,7 +819,7 @@ sub read_line_ref {
 
         if ($line_ref) {
 
-            print DBG "who = $who, text = $line_ref->[TEXT]\n";
+            print DBG "\twho = $who, text = $line_ref->[TEXT]\n";
             $self->[DESC]{$who}[REF] = $line_ref;
 
             return $line_ref;
@@ -775,10 +830,10 @@ sub read_line_ref {
     }
     my $line_ref = $self->[DESC]{$who}[REF];
     if ( defined $ref ) {
-        print DBG "Dans read_line_ref : ref définie à $ref...\n";
+        print DBG "\tDans read_line_ref : ref définie à $ref...\n";
         if ($ref) {
             $line_ref = $self->[HASH_REF]{$ref};
-            print DBG "Line ref trouvée à $line_ref...\n";
+            print DBG "\tLine ref trouvée à $line_ref...\n";
         }
         else {
 
@@ -791,9 +846,9 @@ sub read_line_ref {
     }
     $line_ref = next_($line_ref);
     if ($line_ref) {
-        print DBG "Trouvé next de line_ref à $line_ref...\n";
-        print DBG "\tSEEK_END = $line_ref->[SEEK_END]\n" if ( defined $line_ref->[SEEK_END] );
-        print DBG "C'est à dire, texte |", $line_ref->[TEXT], "|\n";
+        print DBG "\tTrouvé next de line_ref à $line_ref...\n";
+        print DBG "\t\tSEEK_END = $line_ref->[SEEK_END]\n" if ( defined $line_ref->[SEEK_END] );
+        print DBG "\tC'est à dire, texte |", $line_ref->[TEXT], "|\n";
         $self->[DESC]{$who}[REF] = $line_ref;
         return $line_ref;
     }
@@ -878,8 +933,18 @@ sub next_line {
         return ( $next_ref, $next_line_ref->[TEXT] );
     }
     print DBG "PAs de ligne suivante trouvée derrière $ref\n";
-    print DBG "SEEK START de cette dernière ligne $line_ref->[SEEK_START]\n";
-    print DBG "SEEK END  de cette dernière ligne $line_ref->[SEEK_END]\n";
+    if ( defined $line_ref->[SEEK_START] ) {
+        print DBG "SEEK START de cette dernière ligne $line_ref->[SEEK_START]\n";
+    }
+    else {
+        print DBG "SEEK START de cette dernière ligne : undef\n";
+    }
+    if ( defined $line_ref->[SEEK_END] ) {
+        print DBG "SEEK END de cette dernière ligne $line_ref->[SEEK_END]\n";
+    }
+    else {
+        print DBG "SEEK END de cette dernière ligne : undef\n";
+    }
     return;
 }
 
@@ -1058,12 +1123,16 @@ sub read_ {
         return $line_ref;
     }
 
-    my $OK = seek $file_desc, $line_ref->[SEEK_START], 0;
+   my $pos = $line_ref->[SEEK_START];
+
+   print DBG "===> Dans read_ à partir de seek_start = $pos (lu sur fichier)\n";
+
+    my $OK = seek $file_desc, $pos, 0;
     if ( ! $OK ) {
         my $msg = $!;
-        print STDERR "Can't seek to position $line_ref->[SEEK_START] : $msg\n";
-        print DBG "Can't seek to position $line_ref->[SEEK_START] : $msg\n";
-        print DBG "Taille fichier : ", ( stat $file_desc )[7], " positionnement initial à $line_ref->[SEEK_START]\n";
+        print STDERR "Can't seek to position $pos : $msg\n";
+        print DBG "Can't seek to position $pos : $msg\n";
+        print DBG "Taille fichier : ", ( stat $file_desc )[7], " positionnement initial à $pos\n";
         return;
     }
     $line_ref->[TEXT] = readline $file_desc;
@@ -1331,7 +1400,7 @@ sub line_seek_start {
 
 sub line_set_info {
     my ( $self, $ref, $info ) = @_;
-	
+    
     return if ( !$ref );
     my $line_ref = $self->[HASH_REF]{$ref};
     return if ( !defined $line_ref );
@@ -1340,7 +1409,7 @@ sub line_set_info {
 
 sub line_get_info {
     my ( $self, $ref, $info ) = @_;
-	
+    
     return if ( !$ref );
     my $line_ref = $self->[HASH_REF]{$ref};
     return if ( !defined $line_ref );
@@ -1627,10 +1696,13 @@ sub get_line_number_from_ref {
     return $number;
 }
 
+my $total_ref_lines;
+
 sub dump_file_manager {
     my ( $self ) = @_;
     
     my $errors = 0;
+    $total_ref_lines = 0;
     
     print DBG "Dans dump_file_manager : tid = ", threads->tid, ", $errors erreurs\n";
     print DBG "=" x 80;
@@ -1651,7 +1723,7 @@ sub dump_file_manager {
     $errors += dump_level($root, 1);
     
     print DBG "\nLe dump a renvoyé $errors erreurs\n\n";
-    return $errors;
+    return ( $errors, $total_ref_lines);
 }
 
 sub dump_level {
@@ -1734,6 +1806,9 @@ sub print_segment {
     print DBG "\t" x $level, "PARENT       : ", $segment_ref->[PARENT], "\n";
     if ( defined $segment_ref->[REF] ) {
         print DBG "\t" x $level, "REF          : ", $segment_ref->[REF], "\n";
+        if ( $segment_ref->[TYPE] ne 'empty' ) {
+            $total_ref_lines += 1;
+        }
     }
     if ( defined $segment_ref->[NEXT] ) {
         print DBG "\t" x $level, "NEXT       : ", $segment_ref->[NEXT], "\n";
@@ -1801,7 +1876,7 @@ sub insert_bloc {
             $line_ref->[PARENT][FIRST] = $first_container_ref;
         }
     }
-    else { # 'after' understood
+    else { # 'after'
         $first_container_ref->[NEXT] = $line_ref->[NEXT];
         if ( defined $first_container_ref->[NEXT] ) {
             $first_container_ref->[NEXT][PREVIOUS] = $first_container_ref;
@@ -1837,10 +1912,22 @@ sub insert_bloc {
     my $first_ref = save_line( $self, $first_line_ref );
     #print DBG "last_container_ref->[FIRST] = $last_container_ref->[FIRST]\n";
 
+    my $search_ref = $options_ref->{'search'};
+    if ( defined $search_ref->{'1'} ) {
+        $search_ref->{'1'} = $first_ref;
+    }
+
     if ( $size == 1 ) {
         $last_container_ref->[LAST] = $first_line_ref;
         print DBG "La taille du bloc à insérer est de 1\n";
         # Scalar or list context : only one element inserted
+        if ( defined $search_ref ) {
+            my $answer_ref = {};
+            $answer_ref->{'last'} = $first_ref;
+            $answer_ref->{'return'} = [ $first_ref ];
+            $answer_ref->{'found'} = $search_ref;
+            return $answer_ref;
+        }
         return $first_ref;
     }
 
@@ -1857,6 +1944,10 @@ sub insert_bloc {
     
     #$last_container_ref->[LAST] = $last_line_ref;    
     my $last_ref = save_line( $self, $last_line_ref );
+    if ( defined $search_ref->{$size} ) {
+        $search_ref->{$size} = $last_ref;
+    }
+
     print DBG "\n\n\nFin de insert_bloc\n\n\n";
     dump_file_manager( $self );
 
@@ -1872,9 +1963,37 @@ sub insert_bloc {
         dump_file_manager( $self );
     }
     push @list_refs, $last_ref;
+
+    if ( defined $search_ref ) {
+        my $answer_ref = {};
+        $answer_ref->{'last'} = $last_ref;
+        $answer_ref->{'return'} = \@list_refs;
+        my $current_line_ref = $first_line_ref;
+        for my $number ( sort keys %$search_ref ) {
+            if ( ! $search_ref->{$number} and $number < $size ) {
+                # Adding new referenced line
+    my $new_line_ref;
+    $new_line_ref->[TYPE] = 'line';
+    $new_line_ref->[TEXT] = $last_container_ref->[FILE_DESC][$number - 1];
+    $new_line_ref->[PARENT] = $last_container_ref;
+    $new_line_ref->[SEEK_START] = $number - 1;
+    $new_line_ref->[SEEK_END] = $number;
     
+    $last_line_ref->[PREVIOUS] = $new_line_ref;
+    $current_line_ref->[NEXT] = $new_line_ref;
+        
+    $search_ref->{$number} = save_line( $self, $new_line_ref );
+    $current_line_ref = $new_line_ref;
+                # End of adding new referenced line
+                print "Ajout pour number $number de la ligne |", $new_line_ref->[TEXT], "|\n";
+            }
+        }
+        $answer_ref->{'found'} = $search_ref;
+        return $answer_ref;
+    }
+
     if ( wantarray ) {
-		print DBG "Valeur de retour de insert_bloc : ", join ("\n\t", @list_refs ), "\n";
+        print DBG "Valeur de retour de insert_bloc : ", join ("\n\t", @list_refs ), "\n";
         return @list_refs;
     }
     if ( $where eq 'before' ) {

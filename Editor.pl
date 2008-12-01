@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
@@ -20,14 +20,14 @@ use Text::Editor::Easy::Comm;
 use IO::File;
 use Data::Dump qw(dump);
 
-if ( ! -d "tmp" ) {
-    print "Pas de tmp : arrêt\n";
+if ( ! -d 'tmp' ) {
+    print "Need a tmp directory under your current directory : can't go on\n";
     exit 1;
 }
 
 # Start from a distant path
 use File::Basename;
-my ($file_name, $file_path ) = fileparse($0);
+my ( $file_name, $file_path ) = fileparse($0);
 
 # Start of launching perl process (F5 key management)
 open EXEC, "| perl ${file_path}exec.pl" or die "Fork impossible\n";
@@ -92,9 +92,6 @@ my $zone4 = Text::Editor::Easy::Zone->new(
         'name'      => 'zone4',
         'trace' => {
             'all' => 'tmp/',
-
-            #    'Text::Editor::Easy::Data' => undef,
-            #     'Text::Editor::Easy::Data' => 'tmp/',
             'trace_print' => 'full',
         },
     }
@@ -570,3 +567,5 @@ under the same terms as Perl itself.
 
 
 =cut
+
+

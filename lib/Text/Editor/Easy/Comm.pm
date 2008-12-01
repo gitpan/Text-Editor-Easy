@@ -8,32 +8,39 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 =head1 SYNOPSIS
 
-There are 2 (or 3 if we include the "Text::Editor::Easy::File_manager" module) complex modules in the "Text::Editor::Easy" tree.
-This module and the "Text::Editor::Easy::Abstract" which handles graphics in an encapsulated way.
+This is an internal module. Several threads are created during the first "Text::Editor::Easy" instance creation. You can create your own threads too.
+All these threads can make actions to "Text::Editor::Easy" instances by simply calling methods of the interface, thanks to this module.
+
+=head1 PRINCIPLE
+
+There are 2 (or 3 if we include the L<Text::Editor::Easy::File_manager> module) complex modules in the "Text::Editor::Easy" tree.
+This module and the L<Text::Editor::Easy::Abstract> which handles graphics in an encapsulated way.
 
 This module tries to make thread manipulation obvious with "Text::Editor::Easy" objects. Maybe this module could be adpated to be used
-with other objects to facilitate thread creation and use. This is not my goal : my goal is to write a generator of applications that can be
-modified dynamically (the Editor is the first part of that).
+with other objects to facilitate thread creation and use.
 
 There are 2 main classes of threads : server and client.
+
 A client thread is, for instance, your program that runs sequentially and, from time to time, ask a server thread for a service.
-A server thread is a waiting thread that manages a particular service. From time to time, it's called by a client (which can be a real client
-thread or another server thread : the calling server thread can be seen here as a client for our responding server), responds to the client and then
-waits again. Of course, if the server is saturated with calls, it won't wait and will execute all the calls in the order they have been made. So, the clients (real
-or other servers) may have to wait for the response of the server... but not always. Here come asynchronous calls : in an asynchronous call,
-the client asks for something to the server (gets, if it wants, an identification of the call, the "call_id"), and can go on without waiting for the
-response. But asynchronous calls are not always possible. Often, you have to make things in a certain order and be sure they have been
-made before going on. So most calls to server threads (by client) will be synchronous and blocking.
+
+A server thread is a waiting thread that manages a particular service. From time to time, the server threads is called by a client which 
+can be a real client thread or another server thread : the calling server thread can be seen here as a client for our responding server. The server
+thread responds to the client and then waits again. Of course, if the server is saturated with calls, it won't wait and will execute all the calls in the
+order they have been made. So, the clients (real or other servers) may have to wait for the response of the server... but not always. Here come 
+asynchronous calls : in an asynchronous call, the client asks for something to the server (gets, if it wants, an identification of the call, the "call_id"),
+and can go on without waiting for the response. But asynchronous calls are not always possible. Often, you have to make things in a certain order
+and be sure they have been made before going on. So most calls to server threads (by client) will be synchronous and blocking.
 
 Now that we have seen the 2 classes of threads let's talk more about server threads.
+
 There are mainly 3 types of server threads : owned by an instance (let's call it OWNED thread), shared by all the instances with separate data
 for all the instances (let's call it MULTIPLEXED thread), shared with all instances with no separate data (let's call it CLASS thread).
 All these types of threads haven't been invented for theorical beauty, but just because I needed them. The OWNED thread is the "File_manager"
@@ -44,7 +51,7 @@ is only used to create new threads, the "Data" thread number 2, that shares comm
 The thread system allows me to create all the types of threads defined previously (OWNED, MULTIPLEXED, and CLASS) but it allows me 
 more. First, there is no real limit between the 3 types of threads (I can have a thread with a MULTIPLEXED and CLASS personnality...
 or any other combination). Second, I'm able to define dynamic methods and have access to the code of all the methods to enable dynamic
-modifications. The demo8 of version 0.01 gave me ideas about what I needed to increase my productivity in developping my Editor.
+modifications.
 
 The "create_new_server" method can be called either with an instance, or with a class :
 
@@ -120,8 +127,6 @@ Here are the parameters of the given hash to the "create_new_server" method :
         # instead of "have_task_done" to have a better control over the client calls : see
         # 'Text::Editor::Easy::Abstract::examine_external_request' for that).
         # The tid returned by the "create_new_server" will be the tid of the calling client
-        # This option and the desire to create interruptible methods are the only 2 reasons why you
-        # should include "Text::Editor::Easy::Comm" in a private module
         'do_not_create' => 1,
   } );
 
@@ -259,6 +264,10 @@ sub TIEHANDLE {
 }
 
 sub PRINT {
+    return;
+}
+
+sub CLOSE {
     return;
 }
 
@@ -1095,7 +1104,7 @@ sub verify_graphic {
     my ( $hash_ref, $editor ) = @_;
     my $zone_ref = $hash_ref->{'zone'};
 
-    #print "verify graphic : ZONE_REF $zone_ref\n";
+    #print "verify graphic : force_resize $force_resize\n";
     my $ref = refaddr $editor;
     $com_unique{$ref} = $ref;
 
@@ -1221,6 +1230,7 @@ sub verify_graphic {
                     'key_press',
                     'clic',
                     'motion',
+                    'resize',
                 ],
             }
         );
@@ -1563,7 +1573,7 @@ sub redirect {
                 Text::Editor::Easy::Async->manage_events( $method, $ref,
                     $hash_ref );
 
-                return;    # Garder un context Void sur "manage_event"
+                return;    # Garder un context Void sur "manage_events"
             }
             else {
 
@@ -1579,7 +1589,7 @@ sub redirect {
             Text::Editor::Easy::Async->manage_events( $method, $ref,
                 $hash_ref );
 
-            return;    # Garder un context Void sur "manage_event"
+            return;    # Garder un context Void sur "manage_events"
         }
     }
     else {
@@ -2257,7 +2267,6 @@ Copyright 2008 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 

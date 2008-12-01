@@ -1,7 +1,6 @@
 .cvsignore
 Changes
 Editor.pl
-META.yml
 Makefile.PL
 account.hst
 demo1.pl
@@ -16,6 +15,7 @@ demo6.pl
 demo7.pl
 demo8.pl
 demo9.pl
+editor.session
 exec.pl
 expenses.cpt
 lib/Text/Editor/Easy.pm
@@ -26,6 +26,7 @@ lib/Text/Editor/Easy/Cursor.pm
 lib/Text/Editor/Easy/Data.pm
 lib/Text/Editor/Easy/Data/Events.pm
 lib/Text/Editor/Easy/Display.pm
+lib/Text/Editor/Easy/Events.pm
 lib/Text/Editor/Easy/File_manager.pm
 lib/Text/Editor/Easy/Graphic/Console_glue.pm
 lib/Text/Editor/Easy/Graphic/Gtk_glue.pm
@@ -48,10 +49,15 @@ lib/Text/Editor/Easy/Test/Test3.pm
 lib/Text/Editor/Easy/Trace/Full.pm
 lib/Text/Editor/Easy/Window.pm
 lib/Text/Editor/Easy/Zone.pm
-MANIFEST
+manifest
+meta.yml
+options_ref.txt
 prove.bat
 prove.sh
 README
+return_saved.txt
+return_saved3.txt
+return_to_open.txt
 t/00-check_Tk.t
 t/00-load.t
 t/boilerplate.t
@@ -65,6 +71,11 @@ t/instance_thread_add_object.t
 t/instance_thread_creation.t
 t/multiplexed_thread_creation.t
 t/multiplexed_without_thread_creation.t
+t/new_insert.t
 t/pod.t
 t/return.t
+t/test_filename_9753124680.pl
 t/test_tk.pl
+t/tk_is_ok
+test_filename_9753124680.pl
+tk_is_ok

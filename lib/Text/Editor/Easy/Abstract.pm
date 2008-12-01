@@ -11,19 +11,33 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 =head1 SYNOPSIS
 
-There are 2 (or 3 if we include the "Text::Editor::Easy::File_manager" module) complex modules in the "Text::Editor::Easy" tree.
-This module and the "Text::Editor::Easy::Comm" which handles communication between threads.
+This is an internal module. It implements the graphical part in an abstract way : it should be compatible with different user interfaces, but
+at present, it works only with 'Tk'.
+
+This module is used only by the graphical thread, with tid 0. All other threads that want to make graphic actions have to use the object interface :
+calling graphical methods on "Text::Editor::Easy" instances will be redirected here, in this module, and will allways be executed by the
+graphical thread.
+
+Have a look at L<Text::Editor::Easy::Comm>  if you want more explanations about thread communications.
+
+Have a look at L<Text::Editor::Easy>, L<Text::Editor::Easy::Line>, L<Text::Editor::Easy::Cursor>, L<Text::Editor::Easy::Display> if you want 
+more explanations about the object interface.
+
+=head1 PRINCIPLE
+
+There are 2 (or 3 if we include the L<Text::Editor::Easy::File_manager> module) complex modules in the "Text::Editor::Easy" tree.
+This module and the L<Text::Editor::Easy::Comm> which handles communication between threads.
 
 If you create a "Text::Editor::Easy" object, this module will be called very often. Lots of methods are
-redirected here (but you don't even have to know that this module exists, thanks to "Text::Editor::Easy::Comm").
+redirected here (but you don't even have to know that this module exists).
 
 At the beginning (in 2006), there was only this "module-program". Little by little, this module has grown and
 has soon become an ugly mess (well, it still is !).
@@ -60,6 +74,7 @@ use Text::Editor::Easy::Abstract::Key;
 use Text::Editor::Easy::Comm
   qw(anything_for_me get_task_to_do execute_this_task reference_event_conditions);
 
+use Data::Dump qw(dump);
 use Scalar::Util qw(refaddr);
 use Devel::Size qw(size total_size);
 
@@ -182,21 +197,34 @@ my %key = (
     'ctrl_Home'  => \&Text::Editor::Easy::Key::top_file,
     'ctrl_Right' => \&Text::Editor::Easy::Key::jump_right,
     'ctrl_Left'  => \&Text::Editor::Easy::Key::jump_left,
-    'ctrl_q'     => \&Text::Editor::Easy::Key::query_segments,
-    'ctrl_Q'     => \&Text::Editor::Easy::Key::query_segments,
-    'ctrl_s'     => \&Text::Editor::Easy::Key::save,
-    'ctrl_S'     => \&Text::Editor::Easy::Key::save,
 
     'F3' => \&Text::Editor::Easy::next_search,
 
     'ctrl_c' => [ \&Text::Editor::Easy::Abstract::Key::copy, 'Abstract' ],
     'ctrl_C' => [ \&Text::Editor::Easy::Abstract::Key::copy, 'Abstract' ],
+    'ctrl_f'    => \&Text::Editor::Easy::Key::search,
+    'ctrl_F'    => \&Text::Editor::Easy::Key::search,
+
+    'ctrl_i'    => [ \&Text::Editor::Easy::Abstract::test_new_insert, 'Abstract' ],
+    'ctrl_I'    => [ \&Text::Editor::Easy::Abstract::test_new_insert, 'Abstract' ],
+    
+    'ctrl_j'    => \&Text::Editor::Easy::Abstract::print_clipboard,
+    'ctrl_J'    => \&Text::Editor::Easy::Abstract::print_clipboard,
+
     'ctrl_l' => \&Text::Editor::Easy::Key::close,
     'ctrl_L' => \&Text::Editor::Easy::Key::close,
+    'ctrl_m'    => \&decrease_line_space,
+    'ctrl_M'    => \&decrease_line_space,
+    'ctrl_p'    => \&increase_line_space,
+    'ctrl_P'    => \&increase_line_space,
 
+    'ctrl_q'     => \&Text::Editor::Easy::Key::query_segments,
+    'ctrl_Q'     => \&Text::Editor::Easy::Key::query_segments,
 
     'ctrl_r' => \&revert,
     'ctrl_R' => \&revert,
+    'ctrl_s'     => \&Text::Editor::Easy::Key::save,
+    'ctrl_S'     => \&Text::Editor::Easy::Key::save,
 
     'ctrl_v' => [ \&Text::Editor::Easy::Abstract::Key::paste, 'Abstract' ],
     'ctrl_V' => [ \&Text::Editor::Easy::Abstract::Key::paste, 'Abstract' ],
@@ -208,8 +236,6 @@ my %key = (
 
     'ctrl_x'    => [ \&Text::Editor::Easy::Abstract::Key::cut, 'Abstract' ],
     'ctrl_X'    => [ \&Text::Editor::Easy::Abstract::Key::cut, 'Abstract' ],
-    'ctrl_f'    => \&Text::Editor::Easy::Key::search,
-    'ctrl_F'    => \&Text::Editor::Easy::Key::search,
     'F3'    => \&Text::Editor::Easy::Key::f3_search,
     
     'ctrl_Up'   => \&Text::Editor::Easy::Key::jump_up,
@@ -217,10 +243,6 @@ my %key = (
     'alt_Up'    => \&Text::Editor::Easy::Key::move_up,
     'alt_Down'  => \&Text::Editor::Easy::Key::move_down,
 
-    'ctrl_p'    => \&increase_line_space,
-    'ctrl_P'    => \&increase_line_space,
-    'ctrl_m'    => \&decrease_line_space,
-    'ctrl_M'    => \&decrease_line_space,
     'ctrl_plus' => \&increase_font,
 
     'ctrl_shift_n' => \&Text::Editor::Easy::Key::print_screen_number,
@@ -262,7 +284,7 @@ my %use;
 sub new {
     my ( $classe, $hash_ref, $editor, $unique_ref ) = @_;
 
-    #print "Dans Abstract::new : ", $hash_ref->{'zone'}->{'name'}, "\n";
+    #print "Dans Abstract::new : force_resize = $force_resize\n";
 
     # Début construction
     my $edit_ref = bless [], $classe;
@@ -529,7 +551,6 @@ sub new {
     $edit_ref->[INIT_TAB] = $hash_ref->{'config'};
 
     return $edit_ref;
-
 }    # Fin new
 
 my %ref_sub;
@@ -604,14 +625,26 @@ sub clipboard_set {
 }
 
 sub clipboard_get {
-    my $compteur = 0;
     for ( keys %abstract ) {
-        $compteur += 1;
         return $abstract{$_}->[GRAPHIC]->clipboard_get();
     }
     print STDERR
 "Can't call clipboard_get when no Text::Editor::Easy object is created\n";
     return;
+}
+
+sub print_clipboard {
+    my $clipboard = clipboard_get();
+    
+    my @lines = split( /\n/, $clipboard );
+    for my $line ( @lines ) {
+        print "$line|\n\t";
+        for my $indice ( 0..length($line) - 1 ) {
+            my $char = substr( $line, $indice, 1 );
+            print ord($char), ":";
+        }
+        print "\n";
+    }
 }
 
 #-------------------------------------------------
@@ -890,7 +923,6 @@ sub display_text_from_memory {
 }
 
 sub check_cursor {
-
     # Une ligne complète vient d'être affichée
     my ( $edit_ref, $line_ref ) = @_;
 
@@ -1072,8 +1104,6 @@ sub concat {
     $line_ref->[NEXT] = $line_ref->[NEXT][NEXT];
 
     return $line_ref;
-
-    #        display_everything ( $edit_ref );
 }
 
 sub suppress_from_screen_line {
@@ -1416,6 +1446,7 @@ sub resize {
     if ( $height == $old_height and ! $edit_ref->[SCREEN][WRAP] ) {
         # Optimisation à checker : en particulier, en cas d'offset, il faudrait déplacer éventuellement le canevas vers la gauche
         # pour voir plus de choses si l'on agrandit et que l'on était en limite droite à l'affichage
+        check_offset( $edit_ref );
         return;
     }
 
@@ -1423,6 +1454,38 @@ sub resize {
     my $line_ref = get_first_complete_line($edit_ref);
 
     $edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
+    check_offset( $edit_ref, 'end' );
+}
+
+sub check_offset {
+    my ( $edit_ref, $end ) = @_;
+    
+    my $screen_ref = $edit_ref->[SCREEN];
+    #if ( defined $end ) {
+    #    print "Check_offset called from end\n";
+    #}
+    my $line_ref = $screen_ref->[FIRST];
+    my $x_max = $line_ref->[SIZE];
+    $line_ref = $line_ref->[NEXT];
+    while ( $line_ref ) {
+        my $x = $line_ref->[SIZE];
+        $x_max = $x if ( $x > $x_max );
+        $line_ref = $line_ref->[NEXT];
+    }
+    $x_max += $screen_ref->[MARGIN];
+    my $offset = $screen_ref->[VERTICAL_OFFSET];
+    my $shift = $screen_ref->[WIDTH] - ( $x_max - $offset );
+    #print "VER OFFSET = $offset, x_max = $x_max, width ", $screen_ref->[WIDTH], "shift $shift\n";
+    
+    if ( $shift > 0 and $shift > $offset ) {
+         $shift = $offset;
+    }
+    elsif ( $shift < 0 and $shift < $offset ) {
+        $shift = $offset;
+    }
+    #print "VER OFFSET = $offset, x_max = $x_max, width ", $screen_ref->[WIDTH], "shift $shift\n";
+    $screen_ref->[VERTICAL_OFFSET] -= $shift;
+    $edit_ref->[GRAPHIC]->move_tag( 'all', $shift, 0 );
 }
 
 sub repeat {
@@ -1508,7 +1571,7 @@ sub init {
 
     }
     if ( my $line_ord = $edit_ref->[INIT_TAB]{'first_line_ord'} ) {
-        $edit_ref->display( $line_ref->[REF], { 'at' => "ord_$line_ord", 'from' => 'bottom', 'no_check' => 1 } );
+        $edit_ref->display( $line_ref->[REF], { 'at' => $line_ord, 'from' => 'bottom', 'no_check' => 1 } );
     }
     elsif ( my $line_at = $edit_ref->[INIT_TAB]{'first_line_at'} ) {
         $edit_ref->display( $line_ref->[REF], { 'at' => $line_at } );
@@ -1720,7 +1783,7 @@ sub verify_if_cursor_is_visible_horizontally {
     # bottom
     my ( $top, $bottom, $displayed );
     my $cursor_line_ref = $edit_ref->[CURSOR][LINE_REF];
-
+    
 # Vérification que la ligne qui porte le curseur fait bien partie des lignes affichées
     if ( $cursor_line_ref == $edit_ref->[SCREEN][FIRST] ) {
         $top       = 1;
@@ -1740,7 +1803,7 @@ sub verify_if_cursor_is_visible_horizontally {
         }
     }
     if ( !$displayed ) {
-        print "Ligne non affichée : display\n";
+        #print "Ligne non affichée : display\n";
         return $edit_ref->display( $cursor_line_ref->[REF],
             { 'at' => 'middle' } );
     }
@@ -1923,9 +1986,11 @@ sub suppress_top_invisible_lines {
         $line_ref = $line_ref->[NEXT];
     }
     if ( $line_ref->[ORD] < 0 ) {
-        $screen_ref->[FIRST] =
-          $line_ref->[NEXT]
-          ;    # Attention, bug subtil si pas de next (écran minuscule)
+        if ( ! $line_ref->[NEXT] ) {
+            #print STDERR "Screen too small !\n"; # Lines won't be suppressed
+            return;
+        }
+        $screen_ref->[FIRST] = $line_ref->[NEXT];
         suppress_from_screen_line( $edit_ref, $line_ref, 'for_speed' );
         $line_ref->[NEXT][PREVIOUS] = undef;
 
@@ -2213,151 +2278,574 @@ sub increase_font {
 #
 ######################################################################
 
+sub test_new_insert {
+    my ( $edit_ref ) = @_;
+
+    my $text = $edit_ref->[GRAPHIC]->clipboard_get;
+    my $options_ref = do 'options_ref.txt';
+    # Test gros bloc
+    #$text = "";
+    #my $texte = " : ligne n° : ";
+    #my $indice = 0;
+    #while ( $indice++ < 100000 ) {
+    #    $text .= "\n" . $indice . $texte . $indice;
+    #}
+    #
+    #print "start time ", scalar(localtime), "\n";
+    new_insert( $edit_ref, $text, $options_ref );
+    #print "stop time ", scalar(localtime), "\n";
+}
+
+sub position_bottom_tag_from {
+    my ( $edit_ref, $line_ref ) = @_;
+    
+    $edit_ref->[GRAPHIC]->delete_tag('bottom');
+    
+    while ( $line_ref ) {
+        #print "Adding bottom tag to ", $line_ref->[TEXT], "\n";
+        my $text_ref = $line_ref->[FIRST];
+        while ( $text_ref ) {
+            $edit_ref->[GRAPHIC]->add_tag( 'bottom', $text_ref->[ID] );
+            $text_ref = $text_ref->[NEXT];
+        }
+        $line_ref = $line_ref->[NEXT];
+    }
+}
+
 sub insert {
     my ( $edit_ref, $text, $options_ref ) = @_;
 
+    if ( ! defined( $text ) or $text eq q{} ) {
+        print STDERR "No text to insert, no insert execution...\n";
+        return;
+    }
+    
+    $options_ref = {} if ( ! defined $options_ref );
+    
+    #print "Dans new insert : options_ref = ", dump( $options_ref ), "\n";
+    #print "Text = |$text|\n";
     $text =~ s/\t/    /g;    # Suppression des tabulations
 
-    cursor_make_visible($edit_ref) if ( $origin eq 'graphic' );
+    my $display_should_be_done = 0;
+    my $display_options = $options_ref->{'display'};
+    my $search_ref = {};
 
-#-----------------------------------------------------
-# Gestion des "\n" :
-# ---->  Appels récursifs à changer pour optimisation mais très efficace pour le codage
-#-----------------------------------------------------
-    # Parenthèses pour ne pas ignorer les  "empty trailing fields"
-    my @lines = split( /(\n)/, $text );
-    if ( scalar(@lines) > 1 ) {
-        if ( scalar(@lines) > 7 ) {
-            return bloc_insertion( $edit_ref, $options_ref, split( "\n", $text, -1 ) );
-        }
-        # Liste des références des lignes modifiées ou créées
-        my @ref;
-      INSERT: for my $index ( 0 .. $#lines ) {
-            if ( $lines[$index] eq "\n" ) {
+    $text =~ s/\t/    /g;    # Suppression des tabulations    
+    my @lines = split( /\n/, $text, -1 );
+    my $size_line = scalar(@lines);
 
-                # Envoi d'un "\n" : création d'une ligne
-                # Récupération en contexte de liste
-                my @ref1 = enter( $edit_ref, $options_ref );
-
-     # Gestion du code retour (construction du tableau des références modifiées)
-                if ( !@ref or $ref[$#ref] ne $ref1[0] ) {
-                    push @ref, @ref1;    # 1 ou 2 éléments insérés dans @ref
-                }
-                else {
-                # Ici, on est sûr d'avoir 2 lignes retournées par "enter" (l'élément $ref1[1] existe)
-                    push @ref, $ref1[1];
-                }
+    if ( defined $display_options ) {
+        if ( ref $display_options eq 'ARRAY' ) {
+            $display_should_be_done = 1;
+            my $line = $display_options->[0];
+            if ( $line =~ /^line_(\d+)/ ) {
+                $search_ref->{$1} = 0;
             }
-
-            else {
-
-                # Le texte a insérer ici ne contient plus aucun "\n"
-                # Appel récursif
-                my ($ref) = insert( $edit_ref, $lines[$index], $options_ref );
-
-     # Gestion du code retour (construction du tableau des références modifiées)
-                next INSERT if ( !defined $ref );
-                if ( !@ref or $ref[$#ref] ne $ref ) {
-                    # Mise dans le tableau seulement si pas déjà (insertion retour chariot d'avant, même ref)
-                    push @ref, $ref;
-                }
+            elsif ( $line eq 'line_end' ) {
+                my $number = $size_line - 1;
+                $search_ref->{$number} = 0;
+                $display_options->[0] = "line_$number";
             }
-        }
-
-        # Gestion du code retour pour une demande qui contenait des "\n";
-        if (wantarray) {
-
-            # En contexte liste, on renvoie la liste des références modifées
-            return @ref;
         }
         else {
-
-            # En contexte scalaire, on renvoie la dernière ligne (celle qui contient le curseur)
-            return pop @ref;
+            $display_options = undef;
         }
     }
 
-    #-----------------------------------------------------
-    # Fin de la gestion des "\n" :
-    #   Si on est ici, c'est que $text ne contient pas de "\n";
-    #-----------------------------------------------------
-    if ( !defined( $options_ref->{'insert'} ) ) {
-
-# Récupération du "mode inser" courant de l'éditeur si pas défini par l'appelant
-        $options_ref->{'insert'} = $edit_ref->[INSER];
+    # Insertion point
+    # test du curseur
+    my $ref = $edit_ref->[CURSOR][LINE_REF][REF];
+    my $line_ref;
+    $line_ref = get_line_ref_from_ref( $edit_ref, $ref );
+    my $cursor_should_remain_visible = 0;
+    if ( $line_ref ) {
+        $cursor_should_remain_visible = 1;    
+    }
+    # option 'line'
+    my $line_option = $options_ref->{'line'};
+    my $insertion_point_is_given = 0;
+    my $insert_is_visible = 0;
+    if ( defined $line_option ) {
+        $insertion_point_is_given = 1;
+        $ref = $line_option;
+        $line_ref = get_line_ref_from_ref( $edit_ref, $ref );        
+        if ( defined $line_ref ) {
+            $insert_is_visible = 1;
+        }
+    }
+    elsif ( $cursor_should_remain_visible ) {
+        $insert_is_visible = 1;        
+    }
+    my $initial_text = $edit_ref->[PARENT]->line_text( $ref );
+    # options 'pos'
+    my $pos_option = $options_ref->{'pos'};
+    if ( defined $pos_option ) {
+        $insertion_point_is_given = 1;
+    }
+    my $pos;
+    my $initial_cursor_pos = $edit_ref->[CURSOR][POSITION_IN_LINE];
+    if ( $insertion_point_is_given ) {
+        if ( defined $pos_option ) {
+            $pos = $pos_option;
+            #print "Pos fixée à la valeur de pos_option, soit $pos\n";            
+        }
+        else {
+            $pos = length( $initial_text );
+            #print "Pos fixée à la fin de la ligne ref $ref, soit $pos\n";
+        }
+    }
+    else {
+        $pos = $initial_cursor_pos;
+        #print "Pos fixée à la position actuelle du curseur, soit $pos\n";
+    }
+    
+    my $replace = $options_ref->{'replace'}; 
+    if ( ! defined $replace ) {
+        if ( $edit_ref->[INSER] ) {
+            $replace = 0;
+        }
+        else {
+            $replace = 1;
+        }
     }
 
-    my $line_ref = $edit_ref->[CURSOR][LINE_REF];
-    my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
+    my $cursor_options = $options_ref->{'cursor'};
+    if ( defined $cursor_options ) {
+        if ( ref $cursor_options and ref $cursor_options eq 'ARRAY' ) {
+            my $line = $cursor_options->[0];
+            if ( $line =~ /^line_(\d+)/ ) {
+                $search_ref->{$1} = 0;
+            }
+            elsif ( $line eq 'line_end' ) {
+                $search_ref->{$size_line - 1} = 0;
+            }
+        }
+    }
+    #print "Search ref = ", dump( $search_ref ), "\n";
+
+    my $answer_ref;
+    if ( $size_line > 15 ) {
+        #print "Insertion par bloc\n";
+        my $wantarray = 0;
+        if ( wantarray ) {
+            $wantarray = 'true';
+        }
+        $answer_ref = bloc_insertion( $edit_ref, $ref, $pos, $replace, $search_ref, $wantarray, @lines );
+        if ( $insert_is_visible ) {
+            $display_should_be_done = 1;
+        }
+    }
+    elsif ( $insert_is_visible ) {
+        if ( $display_should_be_done ) {
+            #print "Insertion non visuelle (display à venir)\n";
+            $answer_ref = non_visual_insertion( $edit_ref, $ref, $initial_text, $pos, $replace, $search_ref, @lines );            
+        }
+        else {
+            #print "Insertion visuelle\n";
+            $answer_ref = visual_insertion ( $edit_ref, $ref, $line_ref, $pos, $replace, $search_ref, @lines );
+        }
+    }
+    else {
+        #print "Insertion non visuelle\n";
+        $answer_ref = non_visual_insertion( $edit_ref, $ref, $initial_text, $pos, $replace, $search_ref, @lines );
+    }
+    if ( $display_should_be_done ) {
+        if ( defined $display_options ) {
+            if ( $display_options->[0] =~ /^line_(\d+)/ ) {
+                my $ref_line = $answer_ref->{'found'}{$1};
+                if ( $ref_line ) {
+                    display( $edit_ref, $ref_line, $display_options->[1] );
+                    $cursor_should_remain_visible = 0;
+                }
+                else {
+                    print STDERR "Can't find line_$1 for display call\n";
+                    # Displaying things the same way
+                    identical_display( $edit_ref );
+                }
+            }
+            else {
+                display( $edit_ref, @$display_options );
+                $cursor_should_remain_visible = 0;
+            }
+        }
+        else { # no $display_options but a display should be done
+            identical_display( $edit_ref );
+        }
+    }
+    # Vérification du curseur
+    if ( defined $cursor_options ) {
+        if ( ref $cursor_options ) {
+            if ( ref $cursor_options eq 'ARRAY' ) {
+                my $ref_line;
+                if ( $cursor_options->[0] =~ /^line_(\d+)/ ) {
+                    $ref_line = $answer_ref->{'found'}{$1};
+                    if ( ! $ref_line ) {
+                        print STDERR "Can't find line_$1 for setting cursor\n";
+                    }
+                }
+                else {
+                    $ref_line = $cursor_options->[0];
+                }
+                if ( $ref_line ) {
+                    my $position = $cursor_options->[1];
+                    if ( ! defined $position ) {
+                        $position = length( $edit_ref->[PARENT]->line_text( $ref_line ) );
+                    }
+                    cursor_set( $edit_ref, $position, $ref_line );
+                }
+                else {
+                    $cursor_options = 'at_end';
+                }
+            }
+            else {
+                print STDERR "Wrong reference type for cursor option in insert call|n";
+                $cursor_options = 'at_end';
+            }
+        }
+        elsif ( $cursor_options eq 'at_start' ) {
+            cursor_set( $edit_ref, $pos, $ref );
+        }
+        elsif ( $cursor_options ne 'at_end' ) {
+            print STDERR "Unknown cursor option $cursor_options during insert call\n";
+            $cursor_options = 'at_end';
+        }
+    }
+    elsif ( $insertion_point_is_given ) {
+        if ( $ref == $edit_ref->[CURSOR][LINE_REF][REF] ) {
+            if ( $initial_cursor_pos > $pos ) {
+                #print "Le curseur doit être positionné dans la première partie de la dernière ligne\n";
+                keep_cursor_position(
+                    $edit_ref,
+                    $initial_cursor_pos,
+                    $pos,
+                    $ref,
+                    $answer_ref->{'last'},
+                    $replace,
+                    $lines[0],
+                    $lines[$size_line - 1],
+               );
+            }
+        }
+        $cursor_options = 'no_move'; # useless but no warning (was undefined)
+    }
+    else {
+        $cursor_options = 'at_end';
+    }
+    if ( $cursor_options eq 'at_end' ) {
+        #print "Positionnement du curseur à la fin : cursor =", $edit_ref->[CURSOR], "\n";
+        if ( $size_line > 1 ) {
+            cursor_set( $edit_ref, length( $lines[$size_line - 1] ), $answer_ref->{'last'} ); 
+        }
+        else {
+            cursor_set( $edit_ref, $pos + length( $lines[0] ), $ref ); 
+        }
+    }
+    if ( $cursor_should_remain_visible ) {
+        #print "Il faut vérifier et éventuellement faire un display\n";
+        if ( ! cursor_visible( $edit_ref ) ) {
+            display( $edit_ref, $edit_ref->[CURSOR][LINE_REF][REF], {
+                'at' => 'bottom',
+                'from' => 'bottom',
+            } );
+        }
+    }
+    #print "Réponse reçue ", dump( $answer_ref ), "\n";
+    if ( $options_ref->{'assist'} ) {
+        assist_on_inserted_text( $edit_ref->[PARENT], $text,
+            $answer_ref->{'first_text'} );
+    }
+    
+    test_insert_events( $edit_ref, $text, $initial_text );
+
+    if ( wantarray ) {
+        return @{ $answer_ref->{'return'} };
+    }
+    else {
+        return $answer_ref->{'last'};
+    }
+}
+
+sub keep_cursor_position {
+    my ( $edit_ref, $cursor_pos, $insertion_pos, $insertion_line, $last_line, $replace, $text, $end_text ) = @_;
+    
+    print "Dans keep cursor position\n";
+    my $length = length( $text );
+    if ( $insertion_line == $last_line ) {
+        print "Lignes identiques\n";
+        if ( ! $replace ) {
+            print "Mode replace\n";
+            cursor_set( $edit_ref, $cursor_pos + $length, $insertion_line );
+        }
+        else {
+            cursor_set( $edit_ref, $cursor_pos, $insertion_line );
+        }
+        return;
+    }
+    if ( $replace and ( $cursor_pos - $insertion_pos ) < $length ) {
+        print "mode replace, longueur du texte importante\n";
+        cursor_set( $edit_ref, $cursor_pos, $insertion_line );
+        return;
+    }
+    if ( $replace ) {
+        print "Mode replace, longueur du texte faible\n";
+        cursor_set( $edit_ref, $cursor_pos - $length - $insertion_pos + length( $end_text ), $last_line );
+    }
+    else {
+        print "Mode insert, plus d'une ligne\n";
+        cursor_set( $edit_ref, $cursor_pos - $insertion_pos + length( $end_text ), $last_line );
+    }
+}
+
+sub identical_display {
+    my ( $edit_ref ) = @_;
+    
+    my $line_ref = $edit_ref->[SCREEN][FIRST];
+    my $ref = $line_ref->[REF];
+    my $top_ord = $line_ref->[ORD] - $line_ref->[HEIGHT];
+    display( $edit_ref, $ref, { 'at' => $top_ord } );
+}
+
+sub visual_insertion {
+    my ( $edit_ref, $ref, $line_ref, $pos, $replace, $search_ref, @lines ) = @_;
+    
+    #print "LINES = ", dump(@lines), "\n";
+    my $editor = $edit_ref->[PARENT];
+    
+    my ( $top_ord, $bottom_ord ) = get_line_ords( $line_ref );
     suppress_from_screen_line( $edit_ref, $line_ref );
-
     $line_ref = delete_text_in_line( $edit_ref, $line_ref );
-    my $initial_text = $line_ref->[TEXT];
+    position_bottom_tag_from( $edit_ref, $line_ref->[NEXT] );
+    
+    my $complete_text = $line_ref->[TEXT];
+    my $first = shift( @lines );
+    my $text = substr ( $complete_text, 0, $pos ) . $first;
 
-# On a ici tout ce qu'il faut : le texte complet de la ligne, la position dans cette ligne entière
-# La position du bas de la ligne pour le mode wrap et le mode "inser"
+    my $inserted = 0;
+    
+    my $first_line_done = 0;
+    my $bottom_line_ref;
 
-    ( $line_ref->[TEXT] ) = insert_text(
-        $edit_ref,
-        $initial_text, $text,
-        $edit_ref->[CURSOR][POSITION_IN_LINE],
-        $options_ref->{'insert'},
-        $line_ref->[REF],
-    );
+    my $answer_ref = {};
+    if ( scalar(@lines) ) {
+        #print "Modif de la ligne 1 avec ref $ref\n $text\n";
+        $editor->modify_line( $ref, $text );
+        $first_line_done = 1;
+        $line_ref->[TEXT] = $text;
+        create_text_in_line( $edit_ref, $line_ref );
+        $bottom_line_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord, 'no_cursor' );
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        $answer_ref->{'first_text'} = $text;
+        $text = pop( @lines );
+    }
+    if ( ! $replace ) {
+        $text .= substr ( $complete_text , $pos );
+    }
+    else {
+        my $new_pos = $pos + length( $first );
+        if ( length( $complete_text ) > $new_pos ) {
+            $text .= substr ( $complete_text , $new_pos );
+        }
+    }
+    if ( ! $first_line_done ) {
+        #print "Modif l'unique ligne $ref\n $text\n";
+        $editor->modify_line( $ref, $text );
+        $line_ref->[TEXT] = $text;
+        create_text_in_line( $edit_ref, $line_ref );
+        $bottom_line_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord, 'no_cursor' );
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        if ( $bottom_line_ref->[ORD] != $bottom_ord ) {
+            move_bottom( $edit_ref, $bottom_line_ref->[ORD] - $bottom_ord,
+                $bottom_line_ref );
+        }
+        $answer_ref->{'first_text'} = $text;
+        $answer_ref->{'found'} = $search_ref;
+        $answer_ref->{'last'} = $ref;
+        $answer_ref->{'return'} = [ $ref ];
+        return $answer_ref;
+    }
+    
+    my @return = ( $ref );
+    # Intermediate lines
+    while ( @lines ) {
+        #print "Ajout nouvelle ligne situé après $ref\n";
+        $top_ord = $bottom_line_ref->[ORD];
+        my $new_text = shift( @lines );
+        $ref = $editor->new_line( $ref, 'after', $new_text );
+        $inserted += 1;
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        push @return, $ref;
+        my $new_line_ref;
+        my $next_ref = $bottom_line_ref->[NEXT];
+        if ( defined $next_ref ) {
+            $new_line_ref->[NEXT] = $next_ref;
+            $next_ref->[PREVIOUS] = $new_line_ref;
+        }
+        $bottom_line_ref->[NEXT] = $new_line_ref;
+        $new_line_ref->[PREVIOUS] = $bottom_line_ref;
+        $new_line_ref->[REF] = $ref;
 
-    $edit_ref->[CURSOR][POSITION_IN_LINE] += length($text);
+        $new_line_ref->[TEXT] = $new_text;
+        create_text_in_line( $edit_ref, $new_line_ref );
+        $bottom_line_ref = display_line_from_top( $edit_ref, $new_line_ref, $top_ord, 'no_cursor' );
+    }
+    
+    # Last line
+    #print "Ajout dernière ligne après $ref\n $text\n";
+    $ref = $editor->new_line( $ref, 'after', $text );
+    $inserted += 1;
+    if ( defined $search_ref->{$inserted} ) {
+        $search_ref->{$inserted} = $ref;
+    }
+    push @return, $ref;
+    $top_ord = $bottom_line_ref->[ORD];
+    my $new_line_ref;
+    my $next_ref = $bottom_line_ref->[NEXT];
+    if ( defined $next_ref ) {
+        $next_ref->[PREVIOUS] = $new_line_ref;
+        $new_line_ref->[NEXT] = $next_ref;
+    }
+    $bottom_line_ref->[NEXT] = $new_line_ref;
+    $new_line_ref->[PREVIOUS] = $bottom_line_ref;
+    $new_line_ref->[REF] = $ref;
 
-    create_text_in_line( $edit_ref, $line_ref );
-
-    my $bottom_line_ref =
-      display_line_from_top( $edit_ref, $line_ref, $top_ord );
-    my ( $new_top_ord, $new_bottom_ord ) = get_line_ords($bottom_line_ref);
-
+    $new_line_ref->[TEXT] = $text;
+    create_text_in_line( $edit_ref, $new_line_ref );
+    $bottom_line_ref = display_line_from_top( $edit_ref, $new_line_ref, $top_ord, 'no_cursor' );
+    
     if ( $bottom_line_ref->[ORD] != $bottom_ord ) {
-
         #print "Move de ", $bottom_line_ref->[ORD] - $bottom_ord, "\n";
         move_bottom( $edit_ref, $bottom_line_ref->[ORD] - $bottom_ord,
             $bottom_line_ref );
     }
+    $answer_ref->{'found'} = $search_ref;
+    $answer_ref->{'last'} = $ref;
+    $answer_ref->{'return'} = \@return;
+    return $answer_ref;
+}
 
-#print "TOP dernière ligne =",  $bottom_line_ref->[ORD] - $bottom_line_ref->[HEIGHT], "\n";
-#print "bottom dernière ligne =",  $bottom_line_ref->[ORD] , "\n";
-    ( $new_top_ord, $new_bottom_ord ) = get_line_ords($bottom_line_ref);
+sub non_visual_insertion {
+    my ( $edit_ref, $ref, $complete_text, $pos, $replace, $search_ref, @lines ) = @_;
 
-# Assistance à la saisie # = évènement de fin de transfert, origin 'graphic' seulement
-    if ( $options_ref->{'assist'} ) {
-        assist_on_inserted_text( $edit_ref->[PARENT], $text,
-            $edit_ref->[CURSOR][LINE_REF][TEXT] );
+    my $editor = $edit_ref->[PARENT];
+
+    my $inserted = 0;
+    # FIRST LINE MODIFICATION
+    #my $complete_text = $editor->line_text( $ref );
+    my $first = shift( @lines );
+    my $text = substr ( $complete_text, 0, $pos ) . $first;
+    
+    my $answer_ref = {};
+    my $first_line_done = 0;
+    if ( @lines ) {
+        #print "Modification de la ligne avec ref $ref\n $text\n";
+        $editor->modify_line( $ref, $text );
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        $first_line_done = 1;
+        $answer_ref->{'first_text'} = $text;
+        $text = pop( @lines );
     }
-	
-	test_insert_events( $edit_ref, $text, $initial_text );
-
-# Optimisation des insertions 'programmé' à voir (un seul appel à la fin à faire... à voir)
-    cursor_make_visible($edit_ref) if ( $origin eq 'graphic' );
-
-# Gestion du code retour : attention, l'insertion ne modifie pas forcément la ligne
-    if ( $line_ref->[TEXT] eq $initial_text ) {
-        if (wantarray) {
-            return
-              ; # Aucune référence de ligne à renvoyer car aucune ligne modifiée
-        }
-        else {
-            return 0;    # Aucune ligne modifiée
-        }
+    if ( ! $replace ) {
+        $text .= substr ( $complete_text , $pos );
     }
     else {
-        if (wantarray) {
-            return ( $line_ref->[REF] );    # Référence de la ligne modifiée
-        }
-        else {
-            return 1;                       # 1 ligne modifiée
+        my $new_pos = $pos + length( $first );
+        if ( length( $complete_text ) > $new_pos ) {
+            $text .= substr ( $complete_text , $new_pos );
         }
     }
+    if ( ! $first_line_done ) {
+        #print "Modification de l'unique ligne $ref\n $text\n";
+        $editor->modify_line( $ref, $text );
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        $answer_ref->{'first_text'} = $text;
+        $answer_ref->{'found'} = $search_ref;
+        $answer_ref->{'last'} = $ref;
+        $answer_ref->{'return'} = [ $ref ];
+        return $answer_ref;
+    }
+
+    my @return = ( $ref );    
+    # Intermediate lines
+    while ( @lines ) {
+        $ref = $editor->new_line( $ref, 'after', shift( @lines ) );
+        $inserted += 1;
+        if ( defined $search_ref->{$inserted} ) {
+            $search_ref->{$inserted} = $ref;
+        }
+        push @return, $ref;
+    }
+    
+    # Last line
+    $ref = $editor->new_line( $ref, 'after', $text );
+    $inserted += 1;
+    if ( defined $search_ref->{$inserted} ) {
+        $search_ref->{$inserted} = $ref;
+    }
+    push @return, $ref;
+
+    $answer_ref->{'found'} = $search_ref;
+    $answer_ref->{'last'} = $ref;
+    $answer_ref->{'return'} = \@return;
+    return $answer_ref;
+}
+
+sub bloc_insertion {
+    my ( $edit_ref, $ref, $pos, $replace, $search_ref, $wantarray, @lines ) = @_;
+
+    my $editor = $edit_ref->[PARENT];
+    
+    # FIRST LINE MODIFICATION
+    my $complete_text = $editor->line_text( $ref );
+    my $first = shift( @lines );
+    my $text = substr ( $complete_text, 0, $pos ) . $first;
+    $editor->modify_line( $ref, $text );
+    if ( defined $search_ref->{'0'} ) {
+        $search_ref->{'0'} = $ref;
+    }
+    my $first_text = $text;
+
+    # LAST LINE MODIFICATION
+    $text = pop( @lines );
+    if ( ! $replace ) {
+        $text .= substr ( $complete_text , $pos );
+    }
+    else {
+        my $new_pos = $pos + length( $first );
+        if ( length( $complete_text ) > $new_pos ) {
+            $text .= substr ( $complete_text , $new_pos );
+        }
+    }
+    push @lines, $text;
+
+    # BLOC INSERTION
+
+    my %options_insert = (
+        'where' => $ref,
+        'how' => 'after',
+        'search' => $search_ref,
+    );
+    if ( $wantarray ) {
+        $options_insert{'force_create'} = 1;
+    }
+    my $answer_ref = $editor->insert_bloc( join( "\n", @lines ), \%options_insert );
+	$answer_ref->{'first_text'} = $first_text;
+	unshift @{ $answer_ref->{'return'} }, $ref;
+	return $answer_ref;
 }
 
 sub test_insert_events {
     my ( $edit_ref, $text, $initial_text ) = @_;
-		
+        
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'insert_last'} ) {
 
         # Redirection vers une fonction utilisateur
@@ -2392,232 +2880,6 @@ sub test_insert_events {
     }
 }
 
-sub bloc_insertion {
-    my ( $edit_ref, $options_ref, @lines ) = @_;
-    
-    #print "Dans bloc_insertion....@lines\n";
-    
-    # INSERTION POINT
-
-    my $cursor_ref = $edit_ref->[CURSOR];
-    my $line_ref = $cursor_ref->[LINE_REF];
-    my $ref = $line_ref->[REF];
-    my $start_position = $cursor_ref->[POSITION_IN_LINE];
-    
-    # FIRST LINE MODIFICATION
-    
-    my $complete_text = complete_line( $line_ref );
-    #$text .= pop @lines;
-    my $text = substr ( $complete_text, 0, $start_position ) . shift( @lines );
-    $edit_ref->[PARENT]->modify_line( $ref, $text );
-
-    # LAST LINE MODIFICATION
-        
-    $text = pop( @lines );
-	my $debug_text = $text;
-    my $position = length( $text );
-    $text .= substr ( $complete_text , $start_position );
-    push @lines, $text;
-
-    # BLOC INSERTION
-
-    my %options_insert = (
-        'where' => $ref,
-        'how' => 'after',
-    );
-    my $last_ref;
-    my @other_refs;
-    if ( wantarray ) {
-        $options_insert{'force_create'} = 1;
-       @other_refs = $edit_ref->[PARENT]->insert_bloc( join( "\n", @lines ), \%options_insert );
-	   $last_ref = pop @other_refs;
-    }
-    else {
-       $last_ref = $edit_ref->[PARENT]->insert_bloc( join( "\n", @lines ), \%options_insert );  
-    }
-
-    # NEW DISPLAY
-    
-    #print "La ligne est à l'écran (?), il faut la réafficher\n";
-    my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
-    my $display_options = $options_ref->{'display'};
-    if ( ! defined $display_options or ref $display_options ne 'ARRAY' ) {
-        $display_options = [ $ref, { 'at' => "ord_$top_ord", 'from' => 'top' } ];
-    }
-    display( $edit_ref, @$display_options );
-    
-    # CURSOR POSITION
-    
-    # Vérification de la visibilité du curseur
-    my $cursor_option = $options_ref->{'cursor'};
-    if ( ! defined $cursor_option or $cursor_option eq 'at_end' ) {
-        cursor_set( $edit_ref, $position, $last_ref );   
-    }
-    elsif ( $cursor_option eq 'at_start' ) {
-        cursor_set( $edit_ref, $start_position, $ref );
-    }
-    # else {} ==> 'motionless' option assumed : cursor unchanged
-    
-	# Events
-	test_insert_events( $edit_ref );
-	
-    # RETURN VALUE
-    if ( wantarray ) {
-		print "Dans bloc_insertion : je renvoie $ref|@other_refs|$last_ref\n";
-        return ( $ref, @other_refs, $last_ref );
-    }
-    return $last_ref;
-}
-
-
-sub insert_text {
-    my ( $self, $line_text, $text, $pos, $insert, $ref ) = @_;
-
-    my $start = substr( $line_text, 0, $pos );
-    my $end = substr( $line_text, $pos );
-    if ($insert) {
-        $line_text = $start . $text . $end;
-    }
-    else {
-        if ( length($end) > length($text) ) {
-            $line_text = $start . $text . substr( $end, length($text) );
-        }
-        else {
-            $line_text = $start . $text;
-        }
-    }
-
-    $self->[PARENT]->modify_line( $ref, $line_text );
-    return $line_text;
-}
-
-
-sub enter {                                 # <=> insert("\n")
-    my ( $edit_ref, $options_ref ) = @_;
-
-    cursor_make_visible($edit_ref) if ( $origin eq 'graphic' );
-
-    my $line_ref = $edit_ref->[CURSOR][LINE_REF];
-
-    # Pour repositionnement à la fin
-    my ( $top_ord, $bottom_ord ) = get_line_ords($line_ref);
-
-    # Suppression de la ligne ... écran ! ===> à corriger ?
-    suppress_from_screen_line( $edit_ref, $line_ref );
-    $line_ref = delete_text_in_line( $edit_ref, $line_ref );
-
-    # Optimisation
-    my $initial_text = $line_ref->[TEXT];
-    my $pos = $edit_ref->[CURSOR][POSITION_IN_DISPLAY];    # Ligne écran !!!
-    my $ref = $line_ref->[REF];
-
-# Pour assistance à la saisie (auto-indentation éventuelle après insertion du "\n")
-    my $initial_left_text = substr( $initial_text, 0, $pos );
-
-# Modification de l'ancienne ligne et création de la nouvelle pour l'objet éditeur
-    my ( $text, $new_text, $new_ref ) =
-      insert_return( $edit_ref, $initial_text, $pos, $ref, );
-
-#---------------------------------------------------------------------------------------
-# Affichage des 2 lignes (modifiée et créée)
-#---------------------------------------------------------------------------------------
-# Modification de la liste chaînée
-    my $new_line_ref;
-    $new_line_ref->[PREVIOUS] = $line_ref;
-    $new_line_ref->[TEXT]     = $new_text;
-    $new_line_ref->[NEXT]     = $line_ref->[NEXT];
-    $new_line_ref->[REF]      = $new_ref;
-
-    if ( $line_ref->[NEXT] ) {
-        $line_ref->[NEXT][PREVIOUS] = $new_line_ref;
-    }
-    $line_ref->[NEXT] = $new_line_ref;
-    $line_ref->[TEXT] = $text;
-
-    # Création des éléments texte dans les 2 lignes (coloration syntaxique)
-    create_text_in_line( $edit_ref, $line_ref );
-    create_text_in_line( $edit_ref, $new_line_ref );
-
-    # Affichage de la ligne modifiée
-    my $before_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord );
-
-    # Affichage de la ligne créée
-    my $after_ref =
-      display_line_from_top( $edit_ref, $new_line_ref, $before_ref->[ORD] );
-
-# Fin de l'affichage des 2 lignes (modifiée et créée)
-#---------------------------------------------------------------------------------------
-    if ( !$after_ref->[NEXT] ) {
-
- # Il n'y a rien après $after_ref ===> elle devient donc la dernière ligne écran
-        $edit_ref->[SCREEN][LAST] = $after_ref;
-    }
-
-    # Déplacement des lignes du bas
-    my $how_much = $after_ref->[ORD] - $bottom_ord;
-    move_bottom( $edit_ref, $how_much, $after_ref );
-
-# On déplace le curseur au début de la nouvelle ligne : optimisation possible : pas de réactualisation du tag 'bottom' nécessaire ... à faire
-    cursor_set( $edit_ref, 0, $new_ref );
-
-    # Aide à la saisie (si indentation automatique)
-    if ( defined( $options_ref->{'indent'} ) ) {
-        indent_on_return( $edit_ref, $initial_left_text );
-    }
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
-
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'origin'     => $origin,
-                'sub_origin' => $sub_origin,
-                'sub_sub_origin' => $sub_sub_origin,
-            }
-        );
-    }
-    cursor_make_visible($edit_ref) if ( $origin eq 'graphic' );
-
-    # Gestion du code retour
-    #if ( $text ne $initial_text ) {    # La première ligne a été modifiée
-    #    if (wantarray) {
-    #        return ( $ref, $new_ref );    # Référence de la ligne créée
-    #    }
-    #    else {
-    #        return 2;                     # 1 ligne modifiée, 1 ligne créée
-    #    }
-    #}
-    #else
-    #{    # La première ligne est intacte (on était à la fin lors de l'insertion)
-        if (wantarray) {
-            return ( $ref, $new_ref );
-        }
-        else {
-            return 1;    # 1 seule ligne créée
-        }
-    #}
-}
-
-sub insert_return {
-    my ( $self, $text, $pos, $ref ) = @_;
-
-    my ( $new_text, $new_ref );
-    
-    # Texte de la nouvelle ligne : c'est ce qu'il y a après le curseur
-    $new_text = substr( $text, $pos );
-    
-    # Texte de la ligne modifiée (ligne tronquée)
-    $text = substr( $text, 0, $pos );
-      
-    my $parent = $self->[PARENT];
-    $new_ref = $parent->new_line( $ref, "after", $new_text );
-
-    $parent->modify_line( $ref, $text );
-    return ( $text, $new_text, $new_ref );
-}
-
 # Valeurs de retour à gérer pour les 2 fonctions suivantes
 sub delete_return {
     my ($edit_ref) = @_;
@@ -2644,24 +2906,29 @@ sub delete_return {
 # line_ref est une ligne entière (mode wrap annulé provisoirement pour cette ligne)
 
     suppress_from_screen_line( $edit_ref, $line_ref->[NEXT] );
+    print "Avant appel delete_text_in_line...\n";
     $line_ref->[NEXT] = delete_text_in_line( $edit_ref, $line_ref->[NEXT] );
-    my ( $text, $concat ) =
-      $edit_ref->[PARENT]
-      ->delete_key( $line_ref->[TEXT], $edit_ref->[CURSOR][POSITION_IN_DISPLAY],
-        $line_ref->[REF], );
-    $line_ref->[TEXT] =
-      $text;    # Le texte vaut le cumul des 2 lignes (travail de delete_key)
+    
+    position_bottom_tag_from( $edit_ref, $line_ref->[NEXT][NEXT] );
+    
+    print "Avant appel delete_key...\n";
+    my ( $text, $concat ) = $edit_ref->[PARENT]->delete_key( 
+        $line_ref->[TEXT], 
+        $edit_ref->[CURSOR][POSITION_IN_DISPLAY],
+        $line_ref->[REF],
+    );
+    # Le texte vaut le cumul des 2 lignes (travail de delete_key)
+    $line_ref->[TEXT] = $text;
     die "Pas de concaténation sur suppression de \\n\n" if ( $concat ne "yes" );
 
-    $line_ref->[NEXT][TEXT] =
-      "";       # Le texte a déjà été concaténé par la procédure delete_key
-                # concat (modif liste chaînée) le ferai à nouveau
+    # Le texte a déjà été concaténé par la procédure delete_key
+    # concat (modif liste chaînée) le ferai à nouveau
+    $line_ref->[NEXT][TEXT] = "";
     concat( $edit_ref, $line_ref, 'bottom' );
 
     create_text_in_line( $edit_ref, $line_ref );
 
-    my $bottom_line_ref =
-      display_line_from_top( $edit_ref, $line_ref, $top_ord );
+    my $bottom_line_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord );
 
     # Déplacement des lignes du bas
     my $how_much = $bottom_line_ref->[ORD] - $bottom_ord;
@@ -2722,7 +2989,9 @@ sub erase {
 
     suppress_from_screen_line( $edit_ref, $line_ref );
     $line_ref = delete_text_in_line( $edit_ref, $line_ref );
-
+    
+    position_bottom_tag_from( $edit_ref, $line_ref->[NEXT] );
+    
     my $ref = $line_ref->[REF];
     my ($text) =
       $edit_ref->[PARENT]->erase_text( $number, $line_ref->[TEXT],
@@ -2765,14 +3034,21 @@ sub erase {
 sub display {
     my ( $edit_ref, $ref, $options_ref ) = @_;
 
-    $options_ref = {} if ( ! defined $options_ref );
+    if ( ! defined $options_ref ) {
+        $options_ref = {};
+    }
+    if ( ref $options_ref ne 'HASH' ) {
+        print STDERR "Second parameter of display method ignored : should be a hash\n";
+        $options_ref = {};
+    }
     my $at = $options_ref->{'at'};
     my $ord;
-    if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+    if ( defined $at and $at =~ /^(\d+)$/ ) {
         #print "Dans display , ord précisée : $1\n";
         $ord = $1;
     }
     elsif ( defined $at ) {
+        #print "dans display at = $at\n";
         if ( $at eq 'top' ) {
             $ord = 0;
         }
@@ -2799,7 +3075,10 @@ sub display {
     else {
         $top_line_ref = create_line_ref_from_ref( $edit_ref, $ref );
     }
-    return if ( !$top_line_ref );
+    if ( !$top_line_ref ) {
+        print STDERR "Can't create the line associated with ref $ref for display\n";
+        return;
+    }
 
 # Si on veut optimiser et ne pas tout supprimer, alors il ne faut pas appeler display
 # Pour être propre, il faudrait supprimer toutes les références utilisées actuellement
@@ -2807,7 +3086,7 @@ sub display {
 
     display_reference( $edit_ref, $ref, $ord, $options_ref->{'from'} );
 
-    #if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+    #if ( defined $at and $at =~ /^(\d+)$/ ) {
     #    my $line_ref = $edit_ref->[SCREEN][FIRST];
     #    while ( defined $line_ref ) {
         #    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
@@ -2824,7 +3103,7 @@ sub display {
     
     screen_check_borders ( $edit_ref ) unless ( $options_ref->{'no_check'} );
 
-    #if ( defined $at and $at =~ /^ord_(\d+)/ ) {
+    #if ( defined $at and $at =~ /^(\d+)/ ) {
     #    my $line_ref = $edit_ref->[SCREEN][FIRST];
     #    while ( defined $line_ref ) {
         #    print $line_ref->[ORD], ":$line_ref:", $line_ref->[TEXT], "\n";
@@ -2923,6 +3202,20 @@ sub cursor_position_in_text {
     return $self->[CURSOR][POSITION_IN_TEXT];
 }
 
+sub cursor_visible {
+   my ($self) = @_;
+
+   my $ref = $self->[CURSOR][LINE_REF][REF];
+   my $line_ref = $self->[SCREEN][FIRST];
+   while ( $line_ref ) {
+       if ( $line_ref->[REF] == $ref ) {
+           return 1; # Cursor visible
+       }
+       $line_ref = $line_ref->[NEXT];
+   }
+   return 0; # Cursor not visible
+}
+
 sub cursor_abs {
     my ($self) = @_;
 
@@ -2971,15 +3264,22 @@ sub cursor_set {
     if ( $type eq 'call' ) {
 
       #print STDERR "On n'a pas trouvé la ligne dans les lignes affichées...\n";
-        my ( $top, $bottom ) =
-          display( $edit_ref, $line_ref, { 'at' => 'middle' } );
+      # ===> on positionne quand même le curseur sur la ligne souhaitée, sans l'afficher
+        $edit_ref->[CURSOR][LINE_REF] = [];
+        $edit_ref->[CURSOR][LINE_REF][REF] = $ref;
+        if ( ref $options_ref ) {
+            $options_ref = 0;
+        }
+        $edit_ref->[CURSOR][POSITION_IN_LINE] = $options_ref;
+        #my ( $top, $bottom ) = display( $edit_ref, $line_ref, { 'at' => 'middle' } );
 
 # Attention, le positionnement peut planter si $ref est bidon ==> tester le code retour
-        return if ( !defined $top );
+        #return if ( !defined $top );
 
 #print "Réaffichage pour positionnement éloigné |$top|$bottom|\n";
 # Maintenant que la ligne est affiché, on peut positionner normalement (appel récursif)
-        return cursor_set( $edit_ref, $options_ref, $ref );
+        #return cursor_set( $edit_ref, $options_ref, $ref );
+        return;
     }
 
 # La ligne de positionnement et le type de positionnement sont connus ici (ordonnée 'y' connue)
@@ -3051,16 +3351,20 @@ sub search_line_ref_and_type {
     # ... dans les options
     if ( ref $options_ref eq 'HASH' and my $line = $options_ref->{'line'} ) {
         $line_ref = get_line_ref_from_ref( $edit_ref, $line );
-        return ( $line, 'call' )
-          if ( !$line_ref );    # La référence n'est pas à l'écran
+        if ( !$line_ref ) {
+            # La référence n'est pas à l'écran
+            return ( $ref, 'call' );
+        }
         return ( $line_ref, 'line' );
     }
 
     # ... dans la référence (3ème paramètre)
     if ( defined $ref and $ref =~ /^\d+$/ ) {
         $line_ref = get_line_ref_from_ref( $edit_ref, $ref );
-        return ( $ref, 'call' )
-          if ( !$line_ref );    # La référence n'est pas à l'écran
+        if ( !$line_ref ) {
+            # La référence n'est pas à l'écran
+            return ( $ref, 'call' );
+        }
         return ( $line_ref, 'line' );
     }
 
@@ -3181,7 +3485,7 @@ sub position_cursor_in_display {
     if ( !defined $keep_virtual or !$keep_virtual ) {
         $cursor_ref->[VIRTUAL_ABS] = $cursor_ref->[ABS];
     }
-
+    
     # Positionnement correct du tag "bottom'
     # ==>  Couteux : à ne faire que si la "hauteur" du curseur à changé
     if ( $line_ref != $previous_line_ref ) { #
@@ -3194,11 +3498,6 @@ sub position_cursor_in_display {
            "\t\$cursor_ref->[LINE_REF] = $cursor_ref->[LINE_REF]\n",
            "\t\$cursor_ref->[LINE_REF][TEXT] = $cursor_ref->[LINE_REF][TEXT]\n";
        }
-           
-        $edit_ref->[GRAPHIC]->position_bottom_tag_for_text_lower_than(
-            $cursor_ref->[LINE_REF][ORD],
-            $edit_ref->[SCREEN][LAST][ORD],
-        );
     }
     
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'cursor_set_last'} ) {
@@ -3449,29 +3748,20 @@ sub line_displayed {
     my ( $self, $ref ) = @_;
 
     #print "Dans line_displayed : $ref\n";
-    my $count = 0;
     my @ref;
     my $indice   = 1;
     my $line_ref = $self->[SCREEN][FIRST];
-    while ( $line_ref != $self->[SCREEN][LAST] ) {
+    while ( defined $line_ref and $line_ref != $self->[SCREEN][LAST] ) {
         if ( $line_ref->[REF] == $ref ) {
             push @ref, $ref . "_" . $indice++;
-            $count += 1;
         }
         $line_ref = $line_ref->[NEXT];
     }
     if ( $self->[SCREEN][LAST][REF] == $ref ) {
-        $count += 1;
         push @ref, $ref . "_" . $indice++;
     }
 
-    #print "COUNT $count, @ref\n";
-    if (wantarray) {
-        return @ref;
-    }
-    else {
-        return $count;
-    }
+    return @ref;
 }
 
 sub line_deselect {
@@ -3511,7 +3801,6 @@ sub line_set {
             }
     }
     if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
-
         # Redirection vers une fonction utilisateur
         #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
         $edit_ref->[PARENT]->redirect(
@@ -3524,6 +3813,7 @@ sub line_set {
             }
         );
     }    
+    return $ref;
 }
 
 sub line_select {
@@ -3531,28 +3821,45 @@ sub line_select {
 
     return if ( !defined $ref );
 
-    my ( $force, $color );
+    my ( $force, $color, $display );
     if ( defined $options_ref ) {
         if ( ref $options_ref ) {
             $force = $options_ref->{'force'};
             $color = $options_ref->{'color'};
+            $display = $options_ref->{'display'};
         }
         else {
             $color = $options_ref;
         }
     }
-    #print "In  line_select : $self|$ref|$first|$last|\n";
+    if ( ref $first eq 'HASH' ) {
+        $options_ref = $first;
+        $first   = $options_ref->{'first'};
+        $last    = $options_ref->{'last'};
+        $force   = $options_ref->{'force'};
+        $color   = $options_ref->{'color'};
+        $display = $options_ref->{'display'};       
+    }
     my $line_ref = get_line_ref_from_ref( $self, $ref );
-
     if ( !$line_ref )
     {    # La ligne fichier n'est pas à l'écran, on ne peut pas la sélectionner
         if ( ! $force ) {
-            print STDERR "Sélection impossible, ligne non à l'écran\n";
+            print STDERR "Line not on screen, selection not yet managed...\n";
             return;
         }
         else {
-            display( $self, $ref, { 'at' => $force } );
-            return line_select ( $self, $ref, $first, $last, $options_ref );
+            if ( defined $display ) {
+                display( $self, $ref, $display );
+            }
+            else {
+                display( $self, $ref, { 'at' => $force } );
+            }
+            $line_ref = get_line_ref_from_ref( $self, $ref );
+            if ( ! $line_ref ) {
+                print STDERR "Can't display line with reference $ref\n";
+                return;       
+            }
+            #return line_select ( $self, $ref, $first, $last, $options_ref );
         }
     }
     if ( !defined $first ) {
@@ -3685,7 +3992,7 @@ sub line_bottom_ord {
 }
 
 
-sub bind_key {
+sub bind_key { # instance call
     my ( $self, $hash_ref ) = @_;
 
     my $use = $hash_ref->{'use'};
@@ -3714,7 +4021,7 @@ sub bind_key {
     return;
 }
 
-sub bind_key_global {
+sub bind_key_global { # class call
     my ( $self, $hash_ref ) = @_;
 
     my $use = $hash_ref->{'use'};
@@ -3964,7 +4271,7 @@ sub display_select {
     $self->[GRAPHIC]->select( $left, $top, $right, $bottom, $mode, $line_ref->[REF] );
 }
 
-sub parent {
+sub parent { # for call from external module with the same thread
     my ($self) = @_;
 
     return $self->[PARENT];
@@ -4022,6 +4329,7 @@ sub display_bottom_of_the_screen
 
         if ($line_ref) {
            #print "Dans display_bottom_of_the_screen : avant display_line_from_top...\n";
+           $screen_ref->[LAST] = $line_ref;
             $last_ref =
               display_line_from_top( $edit_ref, $line_ref, $last_ref->[ORD] );
             $screen_ref->[LAST] = $last_ref;
@@ -4049,6 +4357,10 @@ sub display_top_of_the_screen
         my $line_ref = read_previous_line( $edit_ref, $first_ref );
 
         if ($line_ref) {
+            # L'instruction suivante réaffecte $screen_ref->[FIRST] mais elle peut avoir
+            # besoin d'une valeur actualisée si le curseur se trouve sur cette ligne...
+            $screen_ref->[FIRST] = $line_ref;
+            
             $first_ref =
               display_line_from_bottom( $edit_ref, $line_ref,
                 $first_ref->[ORD] - $first_ref->[HEIGHT] );
@@ -4063,7 +4375,7 @@ sub display_top_of_the_screen
 sub display_line_from_top {
 
     # ord est le bas de la ligne en-dessous de laquelle il faut écrire
-    my ( $edit_ref, $line_ref, $ord ) = @_;
+    my ( $edit_ref, $line_ref, $ord, $no_cursor ) = @_;
 
     my $graphic = $edit_ref->[GRAPHIC];
     $line_ref->[HEIGHT] = 0;
@@ -4091,7 +4403,9 @@ sub display_line_from_top {
     #            $overwrite_ref->[HEIGHT], "|", $overwrite_ref->[ORD], "|",
     #            $overwrite_ref->[TEXT], "\n";
     #print "Fin display_line_from_top \$line_ref : $line_ref\n\t\$line_ref->[ORD] = $line_ref->[ORD]\n";
-    check_cursor( $edit_ref, $line_ref );
+    
+    check_cursor( $edit_ref, $line_ref ) unless $no_cursor;
+    
     #print "Fin display_line_from_top \$overwrite_ref : $overwrite_ref\n\t\$overwrite_ref->[ORD] = $overwrite_ref->[ORD]\n";
     return $overwrite_ref;
 }
@@ -4945,61 +5259,6 @@ Prevent space to appear at the bottom (after the last line) or at the top (befor
 =head2 screen_number
 
 =head2 screen_set_height
-
-=head2 screen_set_width
-
-=head2 screen_set_wrap
-
-=head2 screen_set_x_corner
-
-=head2 screen_set_y_corner
-
-=head2 screen_unset_wrap
-
-=head2 screen_width
-
-=head2 screen_wrap
-
-=head2 screen_x_offset
-
-=head2 screen_y_offset
-
-=head2 scrollbar_move
-
-=head2 search_line_ref_and_type
-
-=head2 select_text_element
-
-=head2 start_line
-
-=head2 suppress_bottom_invisible_lines
-
-=head2 suppress_from_screen_complete_line
-
-=head2 suppress_from_screen_line
-
-=head2 suppress_text
-
-=head2 suppress_top_invisible_lines
-
-=head2 test
-
-=head2 test_suppress_indent
-
-=head2 trunc
-
-=head2 update_vertical_scrollbar
-
-=head2 verify_if_cursor_is_visible_horizontally
-
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright 2008 Sebastien Grommier, all rights reserved.
-
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
 
 =cut
 

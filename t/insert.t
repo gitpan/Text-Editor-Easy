@@ -12,6 +12,7 @@ BEGIN {
 
 use strict;
 
+use lib '../lib';
 use Text::Editor::Easy;
 
 Text::Editor::Easy->new({
@@ -69,7 +70,7 @@ END_PROGRAM
     chomp $program; # Due to split that ignore trailing...
     my @program = split (/\n/, $program);
 
-	my ( @ref ) = $editor->insert("$program");
+	my ( @ref ) = $editor->insert( $program );
 	#my ( @ref ) = $editor->insert( $program[0] );
 	is ( scalar(@ref), scalar(@program), "Number of modified/inserted lines");
 	
@@ -85,6 +86,7 @@ END_PROGRAM
 		if ( length($text) > $max_length ) {
 				$max_length = length($text);
 				$indice_of_max = $line - 1;
+				print "Indice $indice_of_max => longueur $max_length\n";
 		}
     }
 	
@@ -106,6 +108,8 @@ END_PROGRAM
 	}
     # Working and deleting the longuest line of the file
     if ( $max_length > 10 ) {
+		$ref[$indice_of_max]->display;
+		#print "Texte de la ligne la plus longue : ", $ref[$indice_of_max]->text, "\n";
 		$editor->cursor->set( 0, $ref[$indice_of_max]);
 		$editor->erase(4);
 
@@ -113,11 +117,11 @@ END_PROGRAM
         is ( $text, substr ( $program[$indice_of_max], 4), "Text of the longuest line after first truncature");		
 		
 		# Test of replacement option of insert
-	    $editor->insert( "HERE ", { "insert" => 0 } );		sleep 0;
+	    $editor->insert( "HERE ", { 'replace' => 1 } );		sleep 0;
 	    $text = $ref[$indice_of_max]->text;
         is ( $text, "HERE " . substr ( $program[$indice_of_max], 9), "Text of the longuest line after replacement");
 		
-	    $editor->insert( "INSERTED", { "insert" => 1 } );		sleep 0;
+	    $editor->insert( "INSERTED", { 'replace' => 0 } );		sleep 0;
 		$text = $ref[$indice_of_max]->text;
         is ( $text, "HERE INSERTED" . substr ( $program[$indice_of_max], 9), "Text of the longuest line after insertion");
 		
@@ -134,8 +138,8 @@ END_PROGRAM
     }
 	$editor->close;
 	close FIL;
-	if ( ! unlink $file ) {
-		print STDERR "Can't remove file $file : $!\n";
-    }
+	#if ( ! unlink $file ) {
+	#	print STDERR "Can't remove file $file : $!\n";
+    #}
     Text::Editor::Easy->exit(0);
 }

@@ -10,11 +10,11 @@ This module will replace "common parts" of the old "Screen.pm".
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "window_" puis reprennent
 # le nom de la méthode
@@ -64,7 +64,7 @@ sub AUTOLOAD {
 
     if ( !$method{$what} ) {
         print
-"La méthode $what n'est pas connue de l'objet ", __PACKAGE__ , "\n";
+"Method $what is unknown from object ", __PACKAGE__ , "\n";
         return;
     }
 

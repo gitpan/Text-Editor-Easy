@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 use Data::Dump qw(dump);
 
 sub left {
@@ -659,6 +659,7 @@ sub copy {
     $buffer .= substr ( $self->[PARENT]->line_text( $ref_line ), 0, $stop_pos );
     #print "========Debut buffer\n$buffer\n==========Fin buffer\n";
     Text::Editor::Easy->clipboard_set($buffer);
+    return $buffer;
     #$buffer = $self->cursor->line->text . "\n";
 }
 
@@ -712,11 +713,11 @@ sub delete_selection {
 
     my ( $at, $from );
     if ( Text::Editor::Easy::Abstract::line_displayed( $self, $ref_start_line ) ) {
-        $at = 'ord_' . Text::Editor::Easy::Abstract::line_top_ord ( $self, $ref_start_line );
+        $at = Text::Editor::Easy::Abstract::line_top_ord ( $self, $ref_start_line );
         $from = 'top';        
     }
     elsif ( Text::Editor::Easy::Abstract::line_displayed( $self, $ref_stop_line ) ) {
-        $at = 'ord_' . Text::Editor::Easy::Abstract::line_bottom_ord ( $self, $ref_stop_line );
+        $at = Text::Editor::Easy::Abstract::line_bottom_ord ( $self, $ref_stop_line );
         $from = 'bottom';
     }
     else { # Affichage au milieu des 2 lignes jointes
@@ -755,6 +756,7 @@ sub backspace {
     my ($self) = @_;
     
     if ( defined $self->[SELECTION] ) {
+		print "Avant delete_selection\n";
         delete_selection($self);
         return; # pour comportement le plus "standard"
     }
@@ -785,7 +787,8 @@ sub enter {
         Text::Editor::Easy::Abstract::Key::delete_selection($self);
     }
 
-    Text::Editor::Easy::Abstract::enter( $self, { 'indent' => 'auto' } );
+    #Text::Editor::Easy::Abstract::enter( $self, { 'indent' => 'auto' } );
+	Text::Editor::Easy::Abstract::insert( $self, "\n", { 'assist' => 1 } );
 }
 
 sub cut {

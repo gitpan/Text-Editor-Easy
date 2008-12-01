@@ -9,13 +9,13 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
-=head1 SYNOPSIS
+=head1 WHY ANOTHER EDITOR ?
 
 There are IDE (or editors) that are currently in active development in perl : for instance, Padre and Kephra. Let's be confident that these projects
 bring us good designing tools that will be, at last, written in perl.
@@ -32,38 +32,45 @@ be accessible during execution and should be modifiable. Programmers should help
 applications (a "programmer-oriented" application can still be used by a simple user). Have a look at L<http://sgrommier.free.fr/perl/> if you
 want more explanations about that.
 
-This module enables you to manipulate a highly multi-threaded graphical object. Several demos are provided
-with this module. To run them and have a glance at the capabilities of this module, launch the perl program
-"Editor.pl" which only use "Text::Editor::Easy" objects. See README file for installation instructions.
+This perl editor module comes with a perl editor program : 'Editor.pl' is an application that uses 'Text::Editor::Easy' instances to edit
+perl code.
 
-The demos (10 demos to be tested from the "Editor.pl" program) will show you examples of how to call this module.
+The module enables you to manipulate a highly multi-threaded graphical object. Several demos are provided
+with the program. To run them and have a glance at the capabilities of this module, launch the perl program
+"Editor.pl". See README file for installation instructions.
+
+=head1 SYNOPSIS
+
+The demos (10 demos to be tested from the "Editor.pl" program) will show you better examples of how to call this module.
 
     use Text::Editor::Easy;
 
     my $editor = Text::Editor::Easy->new();
     ...
 
-=head1 EXPORT
+=head1 WHY MULTI-THREAD ?
 
-This module is object-oriented. Once a instance is created, numerous methods are accessible (maybe too much, for now !).
+This module is object-oriented. Once an instance is created, numerous methods are accessible (maybe too much, for now !).
 New methods can be added on the fly with, why not, new threads associated with these new methods.
 
 Sometimes, you need to consume CPU to achieve your goal. But this shouldn't block the user who interactively
 use your graphical module : the interface of the module (especially, method "create_new_server") allows
-you to create threads as simply as you create a new variables. See module "Text::Editor::Easy::Comm" for the thread
+you to create threads as simply as you create a new variables. See module L<Text::Editor::Easy::Comm> for the thread
 mecanism.
 
 Threads are not only used for speed. With private variables, they allow you to partition your code. So you don't
 have a large program with a huge amount of data to manage but a lot of little threads, specialized in a much simpler
 task with fewer variables to manage.
-The only remaining problem is how to communicate with all these "working together threads" : the "Text::Editor::Easy::Comm"
+The only remaining problem is how to communicate with all these "working together threads" : the L<Text::Editor::Easy::Comm>
 provide the solution. All you have to do is define a new thread associated with your new methods. When the new methods
 are called (by any thread, the new created one or any other one), your new thread will be called automatically and the response will be automatically
-provided to the initial calling thread (in the context of the caller). Easy, isn't it ! Again, see module "Text::Editor::Easy::Comm" for the thread
+provided to the initial calling thread (in the context of the caller). Easy, isn't it ! Again, see module L<Text::Editor::Easy::Comm> for the thread
 mecanism.
 
-The graphical part of the module is handled mainly by "Text::Editor::Easy::Asbtract". The "Abstract" name has been given because,
-even if I use Tk for now, there is no Tk calls in all the Abstract module. Tk calls are concentrated in "Text::Editor::Easy::Graphic:Tk_Glue"
+=head1 GRAPHIC
+
+The graphical part of the module is handled mainly by L<Text::Editor::Easy::Asbtract>. The "Abstract" name has been given because,
+even if I use Tk for now, there is no Tk calls in all the Abstract module. Tk calls are concentrated in L<Text::Editor::Easy::Graphic::Tk_Glue>
 module : other "Graphic glue" modules are possible. I think of "Gtk", "Console", and why not "Qt" or "OpenGl" ? There is a limited 
 communicating object (a "Text::Editor::Easy::Graphic") between the Abstract module and the glue module : this is the interface.
 This interface may change a little in order to allow other "Glue module" to be written, but, of course, all graphic glue modules would
@@ -72,13 +79,220 @@ You can see the "Text::Editor::Easy" as a super graphical layer above other laye
 application in your preferred graphical user interface but the generated application could run (maybe in a limited way) in "Console mode".
 Constant re-use is the key to hyper-productivity.
 
-=head1 FUNCTIONS
+=head1 METHODS
+
+=head2 new
+
+    use Text::Editor::Easy;
+
+    my $editor = Text::Editor::Easy->new(
+        {
+            name_option1 => value_option1,
+            name_option2 => value_option2,
+            ...,
+        }
+    );
+    ...
+
+This function creates and returns a Text::Editor::Easy instance. A Text::Editor::Easy instance is a scalar reference so that you can't do anything
+with it... except call any object method.
+This function accepts either no parameter or a hash reference which defines the options for the creation. Here are these options :
+
+=head3 zone
+
+=head3 trace
+
+=head3 file
+
+=head3 growing_file
+
+=head3 save_info
+
+=head3 bloc
+
+=head3 focus
+
+=head3 sub
+
+=head3 Events management
+
+If you want to define a special behavior in response to user events you have to write special code and reference this code so that it can be
+executed. You can reference this code during the instance creation.
+
+To have more information about 'Events', look at L<Text::Editor::Easy::Event>.
+
+=head2 insert
+
+    $editor->insert("Hello");
+    my @lines = $editor->insert("\n\nA non empty line\nAnother non empty line\n\n");
+    my $last_line = $editor->insert("...adding data\nLast line", {
+        'line' => $lines[3],
+        'cursor' => 'at_start',
+    } );
+
+The insert method encapsulates horrible code for you (and believe me, my code is terrible !).
+It accepts one or 2 parameters : the first is the string to be inserted, the second, optional, is a hash reference that may change default behavior.
+
+The string can be a single character or several millions of them. Only, you should know that, from time to time, a carriage return (or line feed, 
+or both : just "\n" in perl) should separate your string in reasonably short lines. Perl has no limit except your memory, but the Text::Editor::Easy
+module would slow down badly if it had to display lines of several thousands characters.
+
+By default, the insertion is made at the cursor position and the cursor position is updated to the last character of the string you have inserted. If the
+cursor is visible before the insertion, the cursor remains visible at the end of the insertion (maybe at the bottom of the screen). Note that insert
+method may replace text too if the "Inser" key have been pressed (or set) for the editor instance, but this happens only for the first line.
+
+This method returns L<Text::Editor::Easy::Line> instance(s). In scalar context, only the last inserted line is returned. In list context, all
+inserted or changed lines are returned. If your string does not contain any "\n", then scalar and list context return the same thing as only one line
+is changed. You shouldn't use list context for huge string (the 'line' instance creation consumes memory and CPU).
+
+The hash reference, with its options, allows you to modify default behavior :
+
+=over
+
+=item insertion point before the insertion
+
+=item how to insert text
+
+=item cursor position after the insertion
+
+=item how to display things after the insertion
+
+=back
+
+Why have all these options been added to the basic 'insert' method ? Because an 'insert' call is all that : an insertion point is chosen, text is inserted in
+a precise way, cursor position is changed and, if text is long enough, your editor may look quite different.
+As all these things are done implicitly, it seems legitim that options let you define each step explicitly.
+
+=head3 insertion point, 'line' and 'pos' options
+
+By default, the insertion is made at the cursor position. You can change that using 'line' and 'pos' options. The 'line' option must specify
+a valid 'line' instance. The 'pos' option indicates the position of the insertion point in the line. You may use only one of these 2 options :
+
+=over
+
+=item if only the 'pos' option is provided, the line remains the line where the cursor was before insertion : you just change the position in that line.
+
+=item if only the 'line' option is provided, the default position is the end of the line you have given.
+
+=back
+
+Note that if you use an insertion point option (either 'pos' or 'line', or both), the cursor position is no more changed by default : it remains where it was
+before the insertion unless you specify a cursor position.
+
+=head3 how to insert text, 'replace' option
+
+    'replace' => 1, # will replace text (only in the first line)
+
+By default, the editor uses the current "insert" config to insert the text. The config is linked to the "Inser" key and if the user have pressed it.
+You can force your "insert" config using the 'replace' option. Set to 1 (or true), existing text will be replaced (only in the first line and according
+to the length of your first inserted line too). Set to 0 (or false), text will be inserted.
+
+=head3 cursor position, 'cursor' options
+
+This option tells where to set the cursor after the insertion has been made :
+
+ 'cursor' => 'at_start',
+
+will set the cursor before the first character that has been inserted. In fact, this option souldn't move the cursor unless you have used an insertion point.
+
+ 'cursor' => 'at_end',
+
+will set the cursor after the last character that has been inserted. This is the default behavior of insert method (only useful when you have changed the 
+default insertion point).
+
+You can also use a reference of array with 2 values (the second is optionnal) to set the cursor position.
+
+ 'cursor' => [ 'line_0', 3 ];      # will set the cursor at the position 3 in the first line modified by insert
+                                  # 'line_' is followed by the number of the inserted line
+ 'cursor' => [ 'line_2', 0 ];      # will position the cursor at the beginning of the 3rd inserted line
+ 'cursor' => [ 'line_2' ];         # will position the cursor at the end of the 3rd inserted line
+ 'cursor' => [ 'line_end', 0 ];    # will position the cursor at the beginning of the last inserted line
+ 'cursor' => [ $line, $number ];   # will position the cursor in line $line (line instance), position $number (integer)
+
+Thanks to B<line_$number> syntax, you can indicate cursor position on lines that do not exist before your call (because the call is creating them).
+You can still use an already existing line to set the cursor position (last example). In that case, you provide the L<'line' instance|Text::Editor::Easy::Line>
+in first position.
+With no second parameter, cursor will be set at the end of the line.
+Note that 'line_0' is not really useful as the first line always exists before insertion (it's either $editor->cursor->line or the insertion
+point you have chosen).
+
+=head3 displaying after insertion, 'display' option
+
+ 'display' => [ 'line_2', { 'at' => 20, 'from' => 'middle' } ]; # the reference line is the second inserted line
+ 'display' => [ $editor->number(10) ];  # It's the line number 10 before the call ! Insertion can change this order...
+
+Display option is an integrated call to the display method. As for the 'cursor' option, you may use a B<line_$number> syntax to give the reference
+line that will be used for the display. Otherwise, the syntax is the same as the original display method : as 2 parameters may be provided, the
+'display' option of the insert method is an array reference.
+
+=head3 other option
+
+There is an 'assist' option that can call specific sub to make special action each time a particular text have been inserted 
+(typically, adding other text...). But the interface of this option is not yet fixed. In the same way, there will be a way to inhibit the event management
+as, at present, there are 2 events generated by an insert ('change_last' and 'insert_last'). Maybe 'assist' option will be replaced by a generalized
+event management...
+
+=head2 display
+
+    $editor->display( 
+        $editor->number(23),
+        {
+            'at' => 'middle',
+            'from' => 'middle',
+        }
+    );
+
+The display method needs at least one parameter : the L<'line' instance|Text::Editor::Easy::Line> or L<'display' instance|Text::Editor::Easy::Display>.
+The second, a hash reference, is optionnal.
+
+If your editor is not visible because it's under another one (see L<Text::Editor::Easy::Zone>), you'll make it visible using L</focus> 
+or L</on_top> methods.
+The display method is used to show the editor in a precise way. Displaying an editor doesn't mean much if you don't take a reference. The reference
+is the first parameter which is a line or a part of it with wrap mode enabled ('display'). When you have defined this reference, you can add options
+to precise where to put this reference in the screen.
+
+By default (with no second parameter), the top of the 'line' (or 'display) will be at the 'middle of the top', that is, it's top ordinate will be one quarter 
+of the screen height.
+
+You can change where to display the reference line with 'at' and 'from' options.
+
+head3 'at' option
+
+This option gives the ordinate (which is, by default, one quarter of the screen height). You can use 'top', 'bottom' or 'middle' values or an integer.
+The integer value will position the line precisely in the screen. But you should have receveid the number you give
+by another method rather than having chosen it yourself : this integer is the number of pixels from the top for graphical interface but
+will be the line number in console mode (in console mode, you can't be more precise than a line height).
+
+    $editor->display( 
+        $editor->number(23), { 'at' => $my_ordinate } # $my_ordinate should be an integer (or 'bottom', 'middle' or 'top')
+    );
+
+head3 'from' option
+
+As lines have a height, displaying a line at a precise ordinate don't tell what part of the line will be located at this ordinate.
+By default, it's the top of the line. For the 'from' option, you can use 'top', 'middle' and 'bottom'. Note that this option may
+change things a lot if the reference line is a multi-line : wrap mode and several displays for this line.
+
+=head3 'no_check' option
+
+By default, there may be adjustments. If the first line of the editor is under the top, or the last line over the bottom with sufficient lines to fill the screen,
+your precise positioning will be changed. You can avoid adjustments by setting the 'no_check' option to true.
+
+=head2 focus
+
+Set the focus to the editor. It will be placed on top of the screen to be visible and will have the 'focus'. Any pressed key will be redirected to it : if
+the cursor belongs to a line that is displayed, it should be visible.
+
+=head2 on_top
+
+Place the editor on top of the screen to make it visible. No action is made if editor was already on top or had the focus.
 
 =cut
 
 use Scalar::Util qw(refaddr);
 use Data::Dump qw(dump);
 use threads;
+use threads::shared;
 
 use Text::Editor::Easy::Comm;
 
@@ -89,7 +303,7 @@ use Text::Editor::Easy::Cursor;
 use Text::Editor::Easy::Screen;
 use Text::Editor::Easy::Window;
 
-my $main_loop_launched;
+my $main_loop_launched : shared;
 
 sub new {
     my ( $classe, $hash_ref ) = @_;
@@ -115,7 +329,7 @@ sub new {
 
     Text::Editor::Easy::Comm::verify_motion_thread( $ref, $hash_ref );
 
-    Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor, $ref );
+    Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor );
 
     #if ( defined $hash_ref->{'growing_file'} ) {
     #    print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
@@ -148,8 +362,8 @@ sub new {
                 'get_line_number_from_ref',
                 'get_ref_for_empty_structure',
                 'line_seek_start',
-				'line_set_info',
-				'line_get_info',
+                'line_set_info',
+                'line_get_info',
                 'empty_internal',
                 'save_info',
                 'load_info',
@@ -189,18 +403,31 @@ sub new {
         $editor->focus($hash_ref);
     }
 
+    my $tid = threads->tid;
     if ( $hash_ref->{sub} ) {
 
         # On demande la création d'un thread supplémentaire
         my $thread = $editor->create_client_thread( $hash_ref->{sub} );
         #$editor->set_synchronize();
-        if ( threads->tid == 0 and ! $main_loop_launched) {
+        if ( $tid == 0 and ! $main_loop_launched) {
             $main_loop_launched = 1;
             #print "Appel de la main loop (méthode new)\n";
             Text::Editor::Easy->manage_event;
             #print "Fin de la main loop (méthode new)\n";
             Text::Editor::Easy::Comm::untie_print;
             return $editor;
+        }
+    }
+    
+    if ( $tid == 0 and ! $hash_ref->{'sub'} and ! $main_loop_launched ) {
+        # Initialisations to allow the normal use of the interface with the object returned
+        my $height = $hash_ref->{'height'};
+        my $width = $hash_ref->{'width'};
+        if ( defined $height and defined $width ) {
+            $editor->resize( $width, $height );
+        }
+        else { # Il faut vérifier la taille de la zone éventuellement donnée
+            $editor->resize( 1, 1 );
         }
     }
 
@@ -531,6 +758,7 @@ sub delete_key {
 
         $self->modify_line( $ref, $text );
 
+        print "Avant appel delete_line, next_ref = $next_ref\n";
         $self->delete_line($next_ref);
         my $concat = "yes";
         return ( $text, $concat );
@@ -611,19 +839,50 @@ sub window {
 
 # Méthode insert : renvoi d'objets "Line" au lieu de références numériques (cas du wantarray)
 sub insert {
-    my ( $self, @param ) = @_;
+    my ( $self, $text, $options_ref ) = @_;
 
-    my $ref = refaddr $self;
+    if ( defined $options_ref ) {
+        if ( my $line = $options_ref->{'line'} ) {
+            if ( ref $line eq 'Text::Editor::Easy::Line' ) {
+                $options_ref->{'line'} = $line->ref
+            }
+        }
+        if ( my $cursor_ref = $options_ref->{'cursor'} ) {
+            if ( ref $cursor_ref eq 'ARRAY' ) {
+                my $line = $cursor_ref->[0];
+                if ( $line =~ /^(\d+)$/ ) {
+                    $line = "line_$1";
+                }
+                elsif ( ref $line eq 'Text::Editor::Easy::Line' ) {
+                    $line = $line->ref;
+                }
+                $options_ref->{'cursor'}[0] = $line;
+            }
+        }
+        if ( my $display_ref = $options_ref->{'display'} ) {
+            if ( ref $display_ref eq 'ARRAY' ) {
+                my $line = $display_ref->[0];
+                if ( $line =~ /^(\d+)$/ ) {
+                    $line = "line_$1";
+                }
+                elsif ( ref $line eq 'Text::Editor::Easy::Line' ) {
+                    $line = $line->ref;
+                }
+                $options_ref->{'display'}[0] = $line;
+            }
+        }
+    }
 
     if ( !wantarray ) {
-        return $self->ask2( 'insert', @param );
+        my $ref_last =  $self->ask2( 'insert', $text, $options_ref );
+        return Text::Editor::Easy::Line->new( $self, $ref_last );
     }
     elsif ( ref($self) eq 'Text::Editor::Easy::Async' )
     {    # Appel asynchrone, insert ne renvoie pas une référence de ligne
-        return $self->ask2( 'insert', @param );
+        return $self->ask2( 'insert', $text, $options_ref );
     }
     else {
-        my @refs = $self->ask2( 'insert', @param );
+        my @refs = $self->ask2( 'insert', $text, $options_ref );
         my @lines;
         for (@refs) {
 
@@ -792,14 +1051,6 @@ if it is found. Undef otherwise :
 
 =head2 get_line_number_from_ref
 
-=head2 insert
-
-As "display" method, this sub makes substitution of Line objects. Here, this substitution is made for the return value.
-If the calling context is a list context, the insert method returns the Line objects that represents the lines that have
-been inserted. But as Line objects are scalar references (for encapsulation), each thread must have its own addresses
-of scalar references (the substitution is done by the calling thread but the "insert execution" is done by the graphical 
-thread and the "File_manager" thread).
-
 =head2 last
 
 =head2 last_current
@@ -809,8 +1060,6 @@ Class method : returns the editor instance who had the focus when ctrl-f was pre
 =head2 manage_event
 
 =head2 name
-
-=head2 new
 
 =head2 next_search
 
@@ -890,6 +1139,3 @@ under the same terms as Perl itself.
 =cut
 
 1;
-
-
-

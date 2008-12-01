@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
@@ -211,11 +211,11 @@ sub get_info_for_eval_display {
 
     while ( $to_calc ) {
         my ( $start, $end, $length ) = split ( /,/, $seek_start[$indice] );
-		if ( ! defined $length ) {
-		    print STDERR "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
-			print DBG "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
-			last;
-	    }
+        if ( ! defined $length ) {
+            print STDERR "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
+            print DBG "No information for following eval display : ", $editor->line_text( $ref_line ), "\n";
+            last;
+        }
         print DBG "\tSEEK_START $start de la position ", $current_length, " à la position ", $current_length + $length, "\n";
         if ( $pos_in_line <= $current_length + $length - ( $end - $start ) ) {
             print DBG "C'est ce seek_start $start qu'il faut renvoyer :\n";

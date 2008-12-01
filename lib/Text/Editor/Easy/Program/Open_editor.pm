@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 
@@ -121,7 +121,7 @@ sub open {
         $open_editor->insert( $bloc, {
             'at_line' => $first_line,
             'display' => [
-                $first_line->ref,
+                $first_line,
                 {'at' => 'top' },
             ],
             'cursor' => 'at_start',

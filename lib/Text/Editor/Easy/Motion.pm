@@ -9,21 +9,15 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use threads;
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
-
-my $self_global;
-
-sub return_self {
-    return $self_global;
-}
 
 my %ref_init;
 my %referenced;
@@ -258,11 +252,11 @@ sub move_over_out_editor {
     }
     chomp $string_to_insert;
     my $first_line = $show_calls_editor->first;
-    #$display_options = [ $ref, { 'at' => "ord_$top_ord", 'from' => 'top' } ];
+    #$display_options = [ $ref, { 'at' => $top_ord, 'from' => 'top' } ];
     $show_calls_editor->insert($string_to_insert, { 
         'cursor' => 'at_start',
         'display' => [
-            $first_line->ref,
+            $first_line,
             { 'at' => 'top', 'from' => 'top' },
         ]
     } );

@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -444,14 +444,37 @@ sub create_font {
 }
 
 sub clipboard_get {
-        my ( $self ) = @_;
+    my ( $self ) = @_;
         
-        my $string = $self->[TOP_LEVEL]->SelectionGet( 
-            -selection => "CLIPBOARD" ,
-            -type => "STRING"
-        );
-        $string =~ s/\x00.*$//;
-        return $string;
+    my $string = $self->[TOP_LEVEL]->SelectionGet( 
+        -selection => "CLIPBOARD" ,
+        -type => "STRING"
+    );
+    
+    # Null character not managed by Tk (?)
+    # My former regular exp didn't work ===> s/x00.*$//
+    my @lines = split( /\n/, $string, -1 );
+    my $buffer = q{};
+    my $line = shift( @lines );
+    for my $indice ( 0..length($line)-1 ) {
+        my $char = substr( $line, $indice, 1 );
+        if ( ord($char) == 0 ) {
+            return $buffer;
+        }
+        $buffer .= $char;
+    }
+
+    CONCAT: for my $line ( @lines ) {
+        $buffer .= "\n";
+        for my $indice ( 0..length($line)-1 ) {
+            my $char = substr( $line, $indice, 1 );
+            if ( ord($char) == 0 ) {
+                return $buffer;
+            }
+            $buffer .= $char;
+        }
+    }
+    return $buffer;
 }
 
 sub clipboard_set {
@@ -462,7 +485,7 @@ sub clipboard_set {
     $self->[TOP_LEVEL]->clipboardClear;
 
     $self->[TOP_LEVEL]->clipboardAppend('--', $string);
-    return 1; # OK
+    return 1;
 }
 
 sub manage_event {
@@ -766,18 +789,6 @@ sub key_release {
     }
 }
 
-sub position_bottom_tag_for_text_lower_than {
-    my ( $self, $top, $bottom ) = @_;
-
-    # D'abord supprimer le tag 'bottom'
-    $self->[CANVA]->dtag( 'bottom', 'bottom' );
-    return if ( $bottom <= $top );
-
-    #print "Tag bottom à positionner entre $top et $bottom\n"; 
-    #print "Dans position_bottom tk_glue : \$top = $top, bottom = $bottom\n";
-    $self->[CANVA]->addtag( 'bottom', 'enclosed', 0, $top - 4, 1000, $bottom + 17 );
-}
-
 sub move_bottom {
     my ( $self, $how_much ) = @_;
 
@@ -898,3 +909,19 @@ under the same terms as Perl itself.
 =cut
 
 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

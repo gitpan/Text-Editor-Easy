@@ -19,7 +19,7 @@ Text::Editor::Easy::Syntax::perl_assist -- Automatic indentation, addition of ch
 
 =head1 VERSION
 
-Version 0.42
+Version 0.43
 
 =cut
 
@@ -39,6 +39,10 @@ my %verif_indent = (
 
 sub assist_on_inserted_text {
     my ( $edit_ref, $inserted_text, $text_of_line ) = @_;
+    if ( $inserted_text eq "\n" ) {
+        indent_on_return( $edit_ref, $text_of_line );
+        return;
+    }
     if ( $inserted_text =~ / $/ ) {
         if ( $text_of_line =~ /^(\s*)(\w+) +$/ ) {
             my $pos = length($1) + length($2) + 1;
@@ -73,7 +77,7 @@ sub if {
 
     # Attention, ici on suppose une indentation à 4 : à paramétrer
     my ($ref) = $self->insert("(  ) {\n$indent    \n$indent}");
-    print "REF TEXT = |", $ref->text, "|\n";
+    #print "REF TEXT = |", $ref->text, "|\n";
     $self->cursor->set( $pos + 2, $ref );
 }
 
@@ -113,11 +117,11 @@ sub indent_on_return {
     #print "$text\nINDENT |", length($indent), "| last |$last|\n";
     # Attention, aussi bien $indent que $last peuvent être indéfinis
     if ( $last and $indent{$last} ) {
-        $self->insert( " " x length($indent) . "    ", { 'insert' => 1 } );
+        $self->insert( " " x length($indent) . "    ", { 'replace' => 0 } );
     }
     elsif ($indent)
     { # A essayer de faire, l'indentation retour en cas de cassure d'une ligne juste avant ), ] ou }
-        $self->insert( " " x length($indent), { 'insert' => 1 } );
+        $self->insert( " " x length($indent), { 'replace' => 0 } );
     }
 }
 
@@ -132,3 +136,4 @@ under the same terms as Perl itself.
 =cut
 
 1;
+

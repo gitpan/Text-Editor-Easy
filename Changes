@@ -1,6 +1,11 @@
 Revision history for Text-Editor-Easy
 
 --------------------------+
+0.43  : 1 December 2008   !
+--------------------------+
+        - insert enhancement. Documentation of insert and display methods.
+
+--------------------------+
 0.42  : 25 October 2008   !
 --------------------------+
         - bloc insertion, start of insert optimisation...

@@ -17,13 +17,18 @@ use lib 'lib';
 
 use Text::Editor::Easy;
 
-Text::Editor::Easy->new(
+my $editor = Text::Editor::Easy->new(
     {
         'focus'    => 'yes',
-        'trace' => { 'all' => 'tmp/' },
     }
 );
 
+my @lines = $editor->insert("This text is inserted\nafter instance creation ...\n\n...but before being displayed");
+
+print "The content of the second line is ==> ", $lines[1]->text, "\n";
+
+
+# To "run" graphic and have things displayed
 Text::Editor::Easy->manage_event;
 
 print "The user have closed the window\n";
@@ -33,3 +38,5 @@ print "The user have closed the window\n";
 # created. Still, the program seems
 # to dispose of none.
 #
+
+
