@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 =head1 SYNOPSIS
 
@@ -73,6 +73,9 @@ use Text::Editor::Easy::Abstract::Key;
 # Communication
 use Text::Editor::Easy::Comm
   qw(anything_for_me get_task_to_do execute_this_task reference_event_conditions);
+
+# Evènements
+use Text::Editor::Easy::Events qw(execute_events);
 
 use Data::Dump qw(dump);
 use Scalar::Util qw(refaddr);
@@ -174,6 +177,7 @@ use constant {
     H_FONT => 17,
     SELECTION => 18,
     AT_END => 19,
+    EVENTS => 20,
 };
 
 use Text::Editor::Easy::Key;
@@ -294,7 +298,6 @@ sub new {
         $hash_ref->{'destroy'} = \&window_destroy;
     }
 
-    $abstract{$unique_ref} = $edit_ref;
 
     #$edit_ref->[QUEUE] = $hash_ref->{graphic_queue};
     $edit_ref->[INSER] = 1;
@@ -304,6 +307,16 @@ sub new {
     }
 
     #print "Création dans abstract growing = ", $hash_ref->{'growing'}, "\n";
+
+    my $events = $hash_ref->{'events'};
+    $edit_ref->[EVENTS] = {};
+    if ( $events ) {
+         my $hash_returned = Text::Editor::Easy::Events::reference_events($unique_ref, $events);
+         return if ( ! ref $hash_returned );
+         $edit_ref->[EVENTS] = $hash_returned;
+    }
+
+    $abstract{$unique_ref} = $edit_ref;
 
     # Affectation des fonctions de redirection
     for my $redirect ( keys %redirect ) {
@@ -1157,70 +1170,124 @@ sub suppress_text {
 }
 
 sub clic {
-    my ( $edit_ref, $x, $y, $key ) = @_;
+    my ( $edit_ref, $x, $y, $meta_hash, $meta ) = @_;
+
+    #print "Dans clic : meta = $meta\n";
+    my $editor = $edit_ref->[PARENT];
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'clic';
     }
 
-    my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;    
-    if ( $shape =~ /^sb/ ) {
-        if ( $shape eq 'sb_h_double_arrow' ) {
-            if ( $x < 5 ) {
-                $edit_ref->[CURSOR][RESIZE] = [ 'left', $key ];
-            }
-            else {
-                $edit_ref->[CURSOR][RESIZE] = [ 'right', $key ];
-            }
-        }
-        else {
-            if ( $y < 5 ) {
-                $edit_ref->[CURSOR][RESIZE] = [ 'top', $key ];
-            }
-            else {
-                $edit_ref->[CURSOR][RESIZE] = [ 'bottom', $key ];
-            }
-        }
-        return;
+    my $event_ref = $edit_ref->[EVENTS];
+    my $label = q{}; # Avoid warning when testing undef value
+    my $info_ref = {
+        'x' => $x,
+        'y' => $y,
+        'meta_hash' => $meta_hash,
+        'meta' => $meta,
+    };
+
+    my $step = 'any_hard_clic';
+    if ( my $event = $event_ref->{$step} ) {
+        ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+        return if ( ! defined $info_ref );
     }
 
-    my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
-
-    #my $display_ref = get_display_ref_from_ord($edit_ref, $y);
-    my $display_ref = get_display_ref_from($line_ref);
-    my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $x );
-    my $ref_under_cursor = $line_ref->[REF];
-
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_replace'} ) {
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'line'        => $ref_under_cursor,
-                'display'     => $display_ref,
-                'display_pos' => $pos,
-            }
-        );
+    $step = "${meta}hard_clic";
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+        }
     }
-    else {
-        cursor_set( $edit_ref, { 'x' => $x, 'y' => $y } );
+
+    # Default 'hard_clic' management
+    if ( ( ! $label and ! $meta ) or $label eq 'hard_clic' ){
+        $label = q{};
+        my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;    
+        if ( defined $shape and $shape =~ /^sb/ ) {
+            # start of drag sequence for resize according to cursor shape
+            if ( $shape eq 'sb_h_double_arrow' ) {
+                if ( $info_ref->{'x'} < 5 ) {
+                    $edit_ref->[CURSOR][RESIZE] = 'left';
+                }
+                else {
+                    $edit_ref->[CURSOR][RESIZE] = 'right';
+                }
+            }
+            else {
+                if ( $info_ref->{'y'} < 5 ) {
+                    $edit_ref->[CURSOR][RESIZE] = 'top';
+                }
+                else {
+                    $edit_ref->[CURSOR][RESIZE] = 'bottom';
+                }
+            }
+            return;
+        }
+    }
+    
+    # Computing new info_ref ...
+    # ... unless info_ref is already provided by a jump in a former event
+    if ( ! $label or $label eq $step ) {
+        # Changing info_ref content
+        $label = q{};
+        my $line_ref = get_line_ref_from_ord( $edit_ref, $info_ref->{'y'} );
+
+        my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $info_ref->{'x'} );
+        my $ref_under_cursor = $line_ref->[REF];
+        while ( $line_ref->[PREVIOUS_SAME] ) {
+            $line_ref = $line_ref->[PREVIOUS];
+            $pos += length ( $line_ref->[TEXT] );
+        }
+
+        $info_ref = {
+            'line'     => $ref_under_cursor,
+            'pos'      => $pos,
+            'meta'     => $meta,
+            'meta_hash'=> $meta_hash,
+        };
+    }
+    
+    $step = 'any_clic';
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+        }
+    }
+
+    $step = "${meta}clic";
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+        }
+    }
+
+    # Default clic management
+    if ( ( ! $label and ! $meta ) or $label eq 'clic' ){
+        $label = q{};
+        cursor_set( $edit_ref, $info_ref->{'pos'}, $info_ref->{'line'} );
         $edit_ref->[GRAPHIC]->canva_focus;
         Text::Editor::Easy::Abstract::Key::delete_start_selection_point ( $edit_ref );
         cursor_make_visible($edit_ref);
     }
     
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'clic_last'} ) {
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'line'        => $ref_under_cursor,
-                'display'     => $display_ref,
-                'display_pos' => $pos,
-                'x' => $x,
-                'y' => $y,
-            }
-        );
+    $step = 'any_after_clic';
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+        }
+    }
+
+    $step = "${meta}after_clic";
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            execute_events( $event, $editor, $info_ref );
+        }
     }
 }
 
@@ -1319,7 +1386,7 @@ sub b1_motion {
         'Text::Editor::Easy::Motion::zone_resize',
         'Motion',
         $edit_ref->[GRAPHIC]->get_zone,
-        $edit_ref->[CURSOR][RESIZE][0],
+        $edit_ref->[CURSOR][RESIZE],
         $options_ref,
     );
 }
@@ -2838,9 +2905,9 @@ sub bloc_insertion {
         $options_insert{'force_create'} = 1;
     }
     my $answer_ref = $editor->insert_bloc( join( "\n", @lines ), \%options_insert );
-	$answer_ref->{'first_text'} = $first_text;
-	unshift @{ $answer_ref->{'return'} }, $ref;
-	return $answer_ref;
+    $answer_ref->{'first_text'} = $first_text;
+    unshift @{ $answer_ref->{'return'} }, $ref;
+    return $answer_ref;
 }
 
 sub test_insert_events {
@@ -3580,6 +3647,12 @@ sub screen_height {
     return $self->[SCREEN][HEIGHT];
 }
 
+sub height {
+    my ($self) = @_;
+
+    return $self->[SCREEN][HEIGHT];
+}
+
 sub screen_x_offset {
     my ($self) = @_;
 
@@ -3599,6 +3672,12 @@ sub screen_margin {
 }
 
 sub screen_width {
+    my ($self) = @_;
+
+    return $self->[SCREEN][WIDTH];
+}
+
+sub width {
     my ($self) = @_;
 
     return $self->[SCREEN][WIDTH];
@@ -4667,6 +4746,11 @@ sub abstract_size {
     print "=> Taille totale : $total\n";
 }
 
+sub abstract_number {
+    my @total = keys %abstract;
+    return scalar @total;
+}
+
 sub increase_line_space {
     my ($self) = values %abstract;
 
@@ -5259,6 +5343,13 @@ Prevent space to appear at the bottom (after the last line) or at the top (befor
 =head2 screen_number
 
 =head2 screen_set_height
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
 
 =cut
 

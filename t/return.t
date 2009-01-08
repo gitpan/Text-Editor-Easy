@@ -4,10 +4,6 @@ BEGIN {
       print("1..0 # Skipped: Perl not compiled with 'useithreads'\n");
       exit(0);
   }
-  if (! -f 'tk_is_ok' ) {
-      print("1..0 # Skipped: Tk can't work : graphical environment is out of order\n");
-      exit(0);
-  }
 }
 
 use strict;
@@ -15,33 +11,17 @@ use strict;
 use lib '../lib';
 use Text::Editor::Easy;
 
-Text::Editor::Easy->new({
-    'sub' => 'main',
-        #'trace' => {
-           # 'all' => 'tmp/',
+my $editor = Text::Editor::Easy->new;
 
-            #    'Text::Editor::Easy::Data' => undef,
-            #     'Text::Editor::Easy::Data' => 'tmp/',
-            #'trace_print' => 'full',
-        #},
 
-});
+use Test::More qw( no_plan );
+is ( ref($editor), 'Text::Editor::Easy', 'Object type');
 
-sub main {
-	my ( $editor ) = @_;
-		
+test_string ( $editor, "No return at end of test file" . "\n" x 16 . "end");
 
-    use Test::More qw( no_plan );
-	is ( ref($editor), 'Text::Editor::Easy', 'Object type');
+$editor->empty;
 
-    test_string ( $editor, "No return at end of test file" . "\n" x 16 . "end");
-	   
-	$editor->empty;
-	
-	test_string ( $editor, "Returns at end of test file" . "\n" x 16);
-	
-    Text::Editor::Easy->exit(0);
-}
+test_string ( $editor, "Returns at end of test file" . "\n" x 16);
 
 
 sub test_string {

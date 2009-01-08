@@ -1,6 +1,11 @@
 Revision history for Text-Editor-Easy
 
 --------------------------+
+0.44  : 8 January 2009    !
+--------------------------+
+        - start of event documentation, start of event enhancement : clic test
+
+--------------------------+
 0.43  : 1 December 2008   !
 --------------------------+
         - insert enhancement. Documentation of insert and display methods.

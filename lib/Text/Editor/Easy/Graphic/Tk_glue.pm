@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -140,22 +140,70 @@ sub initialize {
     #$mw->bind('Tk::text', <KeyPress>, sub {}) ;
 
     $canva->CanvasBind( '<Button-1>',
-        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y') ] );
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'), {}, '' ] );
     $canva->CanvasBind( '<Shift-Button-1>',
         [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
             {
                 'ctrl'  => 0,
                 'alt'   => 0,
                 'shift' => 1,
-            }
+            },
+            'shift_',
          ] );
+    $canva->CanvasBind( '<Alt-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 0,
+                'alt'   => 1,
+                'shift' => 0,
+            },
+            'alt_',
+         ] );
+    $canva->CanvasBind( '<Control-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 1,
+                'alt'   => 0,
+                'shift' => 0,
+            },
+            'ctrl_',
+         ] );
+
     $canva->CanvasBind( '<Shift-Control-Button-1>',
         [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
             {
                 'ctrl'  => 1,
                 'alt'   => 0,
                 'shift' => 1,
-            }
+            },
+            'ctrl_shift_',
+         ] );
+    $canva->CanvasBind( '<Shift-Alt-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 0,
+                'alt'   => 1,
+                'shift' => 1,
+            },
+            'alt_shift_',
+         ] );
+    $canva->CanvasBind( '<Alt-Control-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 1,
+                'alt'   => 1,
+                'shift' => 0,
+            },
+            'alt_ctrl_',
+         ] );
+    $canva->CanvasBind( '<Alt-Control-Shift-Button-1>',
+        [ \&redirect, $hash_ref->{clic}, Ev('x'), Ev('y'),
+            {
+                'ctrl'  => 1,
+                'alt'   => 1,
+                'shift' => 1,
+            },
+            'alt_ctrl_shift_',
          ] );
 
     $canva->CanvasBind( '<Configure>',
@@ -900,15 +948,15 @@ sub put_on_top {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
-
 =cut
 
 1;
+
 
 
 

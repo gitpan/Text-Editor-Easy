@@ -10,11 +10,11 @@ wrap mode, you can have several displays for a single line on a file.
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 # Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
 # pas dans les hachages gérés par AUTOLOAD de Text::Editor::Easy) car susceptibles de changer
@@ -151,17 +151,15 @@ sub DESTROY {
 }
 
 my %sub = (
-    'text' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_text ],
-    'next_is_same' =>
-      [ 'graphic', \&Text::Editor::Easy::Abstract::display_next_is_same ],
-    'previous_is_same' =>
-      [ 'graphic', \&Text::Editor::Easy::Abstract::display_previous_is_same ],
-    'ord'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_ord ],
-    'height' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_height ],
-    'middle_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_middle_ord ],
-    'number' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_number ],
-    'abs'    => [ 'graphic', \&Text::Editor::Easy::Abstract::display_abs ],
-    'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::display_select ],
+    'text' => 1,
+    'next_is_same' => 1,
+    'previous_is_same' => 1,
+    'ord'    => 1,
+    'height' => 1,
+    'middle_ord' => 1,
+    'number' => 1,
+    'abs'    => 1,
+    'select' => 1,
 );
 
 sub AUTOLOAD {
@@ -214,7 +212,7 @@ sub count {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

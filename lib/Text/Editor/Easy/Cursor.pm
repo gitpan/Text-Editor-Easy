@@ -9,11 +9,11 @@ Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed b
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode
@@ -176,7 +176,7 @@ Gives the line object and position in this line of the current cursor position.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

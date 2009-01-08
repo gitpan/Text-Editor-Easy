@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions 
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Text::Editor::Easy::Comm;
 use threads;    # Pour debug
@@ -76,7 +76,11 @@ sub idle_eval_exec {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
+
+=cut
+
+1;

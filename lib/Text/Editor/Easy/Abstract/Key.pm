@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 use Data::Dump qw(dump);
 
 sub left {
@@ -756,7 +756,7 @@ sub backspace {
     my ($self) = @_;
     
     if ( defined $self->[SELECTION] ) {
-		print "Avant delete_selection\n";
+        print "Avant delete_selection\n";
         delete_selection($self);
         return; # pour comportement le plus "standard"
     }
@@ -788,7 +788,7 @@ sub enter {
     }
 
     #Text::Editor::Easy::Abstract::enter( $self, { 'indent' => 'auto' } );
-	Text::Editor::Easy::Abstract::insert( $self, "\n", { 'assist' => 1 } );
+    Text::Editor::Easy::Abstract::insert( $self, "\n", { 'assist' => 1 } );
 }
 
 sub cut {
@@ -901,11 +901,10 @@ sub motion_select {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 

@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 =head1 SYNOPSIS
 
@@ -1115,8 +1115,7 @@ sub verify_graphic {
     if ( $tid == 0 ) {
         if ( $get_tid_from_instance_method{'insert'} ) {
             #print "Pas de double création, serveur graphique déjà créé\n";
-                #$editor->async->ask_thread(
-                ask_thread( $editor,
+                return ask_thread( $editor,
                     'add_thread_object',
                     0,
                     {
@@ -1135,9 +1134,8 @@ sub verify_graphic {
                     'Text::Editor::Easy::Abstract::new',
                     'Text::Editor::Easy::Abstract',
                     $hash_ref, $editor, $ref
-                ]
-                ,
-                 # Multi-plexed ('put_tid' option useless because no 'name' option)
+                ],
+                'name' => 'Graphic',
                 'put_tid' => 1,
                 
                 'do_not_create' => 1,
@@ -1160,6 +1158,8 @@ sub verify_graphic {
                     'save_search',
                     'focus',
                     'on_top',
+                    'width',
+                    'height',
 
                     #    'reference_zone_event', class method
                     'abstract_size',
@@ -1283,10 +1283,15 @@ sub verify_graphic {
             }
         );
         }
+        # Permet de renvoyer 0 si pas de création (suite à problème)
+        return Text::Editor::Easy->ask_thread(
+            'Text::Editor::Easy::Abstract::abstract_number',
+            0,
+        );
     }
     else {
         print "Appel de add_thread_object par le thread ", threads->tid, " pour l'instance $ref\n";
-        $editor->ask_thread(
+        return $editor->ask_thread(
             'add_thread_object',
             0,
             {
@@ -1463,7 +1468,8 @@ sub verify_motion_thread {
 
             #print DBG "$event est un évènement !\n";
             my $event_ref = $hash_ref->{$event};
-            if ( $event_ref->{'mode'} eq 'async' ) {
+            my $mode = $event_ref->{'mode'};
+            if ( defined $mode and $mode eq 'async' ) {
 
                 #print DBG "Il est asynchrone !!!\n";
                 $motion_thread_useful = 1;
@@ -1637,7 +1643,7 @@ sub init_server_thread {
     my $use = $options_ref->{'use'};
     my $package = $options_ref->{'package'} || 'main';
     for my $method ( @{ $options_ref->{'methods'} } ) {
-        print DBG "Ajout dans \%ref_method de $method (", threads->tid, ")\n";
+        print DBG "Ajout dans \%ref_method de $method (", threads->tid, ") : package $package\n";
         $ref_method{$method}[USE]     = $use;
         $ref_method{$method}[PACKAGE] = $package;
         $ref_method{$method}[SUB]     = $method;
@@ -1681,15 +1687,15 @@ sub init_server_thread {
     else {
 
         # Shared thread
-        print DBG "SHARED THREAD : SELF caller $self_caller|",
-          ref $self_caller, "|$self_server\n";
+        #print DBG "SHARED THREAD : SELF caller $self_caller|",
+        #  ref $self_caller, "|$self_server\n";
         $self_caller = 'Text::Editor::Easy'
           if ( $self_caller eq 'Text::Editor::Easy::Async' );
         $initial_reference = $self_caller;
     }
     $thread_knowledge{'instance'}{$initial_reference} = $self_server;
-    print DBG "On met $self_server dans thread_knowledge de instance (tid ",
-      threads->tid, ") de $initial_reference\n";
+    #print DBG "On met $self_server dans thread_knowledge de instance (tid ",
+    #  threads->tid, ") de $initial_reference\n";
     $thread_knowledge{'self_server'} = $self_server;
 
     return $self_server;
@@ -1893,13 +1899,14 @@ sub add_thread_object {    # Permet de rendre un thread multi-plexed
     }
     if ( my $object = $options_ref->{'object'} ) {
         $initial_instance_ref->{$reference} = $object;
-        return;
+        return $object;
     }
     if ( my $new_ref = $options_ref->{'new'} ) {
         my ( $sub_name, @param ) = @$new_ref;
         my $sub_ref = eval "\\&$sub_name";
-        $initial_instance_ref->{$reference} = $sub_ref->(@param);
-        return;
+        my $object = $sub_ref->(@param);
+        $initial_instance_ref->{$reference} = $object;
+        return $object;
     }
 }
 
@@ -2059,9 +2066,9 @@ sub create_new_server {
                 'package' => $package,
                 'methods' => $tab_methods_ref,
                 'use'     => $options_ref->{'use'},
-                'new'     =>
-                  $options_ref->{'new'},    # $self_server vaut peut être undef
-                'object' => $options_ref->{'object'},
+                # $self_server vaut peut être undef
+                'new'     => $options_ref->{'new'},
+                'object'  => $options_ref->{'object'},
             }
         );
     }
@@ -2143,6 +2150,42 @@ sub get_tid {
     return threads->tid;
 }
 
+sub get_tid_from_name_and_instance {
+    my ( $unique_ref, $name ) = @_;
+        
+    if ( $unique_ref eq 'Text::Editor::Easy' or $unique_ref eq 'Text::Editor::Easy::Async' )
+    {    # Appel d'une méthode de classe
+        $unique_ref = '';
+    }
+    elsif ( ref $unique_ref ) {
+        $unique_ref = $com_unique{ refaddr $unique_ref };
+
+        if ( !defined $unique_ref ) {
+            print STDERR "get_tid_from_name_and_instance : no reference found for object $unique_ref\n";
+            return;
+        }
+    }
+
+    my $hash_ref = $get_tid_from_thread_name{$name};
+    my $server_tid = $hash_ref->{$unique_ref};
+    if ( defined $server_tid ) {
+        return $server_tid;
+    }
+    if ( defined $unique_ref ) {
+        $server_tid = $hash_ref->{''};
+    }
+    return $server_tid;
+}
+
+sub use_module {
+    my ( $self_server, $reference, $module ) = @_;
+    
+    eval "use $module";
+    if ( $@ ) {
+        # Lire les lignes et ajouter une origine supplémentaire (les lignes du module responsable du message)
+        print STDERR "Wrong code for module $module :\n$@\n";
+    }
+}
 
 =head1 FUNCTIONS
 
@@ -2263,7 +2306,7 @@ deadlocks for now, but not really much : I often use asynchronous calls to avoid
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

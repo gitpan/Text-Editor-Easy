@@ -10,13 +10,14 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
+use threads;
 
 sub syntax { 
         # Pas encore de gestion d'un affichage avec "filtre"
@@ -38,6 +39,7 @@ sub syntax {
 my $open_editor;
 
 sub open {
+    print "Dans open de Open_editor tid = ", threads->tid, "\n";
     
     my $dir;
     if ( ! defined $open_editor ) {
@@ -66,7 +68,7 @@ sub open {
     # ==> un peu long
     #open (TMP, ">tmp/open_editor.tmp") or print STDERR "Can't open open_editor.tmp : $!\n";
     my $bloc;
-    print TMP "$dir\n";
+    #print TMP "$dir\n";
     for ( sort @dirs ) {
         next if ( $_ eq '.' );
         #print TMP "D - $_\n";
@@ -102,12 +104,12 @@ sub open {
                 'sub'     => 'cursor_set_last',
            #     'mode'    => 'async',
             },
-            'clic_last' => {
-                'use'     => 'Text::Editor::Easy::Program::Open_editor',
-                'package' => 'Text::Editor::Easy::Program::Open_editor',
-                'sub'     => 'clic_last',
-                'mode'    => 'async',
-            },
+			'events' => {
+                'after_clic' => {
+                    'use'     => 'Text::Editor::Easy::Program::Open_editor',
+                    'sub'     => 'after_clic',
+                }
+		    },
         }
         );
         $open_editor->save_info($dir, 'dir');
@@ -250,25 +252,25 @@ sub cursor_set_last {
     $hash_ref->{'line'}->select;
 }
 
-sub clic_last {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+sub after_clic {
+    my ( $editor, $hash_ref ) = @_;
     
+	print "Dans after clic de Open_editor\n";
     enter ( $editor );
+	print "Dans after clic de Open_editor, après enter\n";
     $editor->motion( $hash_ref->{'x'}, $hash_ref->{'y'} );
+	print "Dans after clic de Open_editor, après motion\n";
 }
 
 
 =head1 FUNCTIONS
 
-=head2 syntax
-
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
 
 =cut
 

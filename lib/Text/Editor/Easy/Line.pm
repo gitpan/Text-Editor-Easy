@@ -10,11 +10,11 @@ and "Text::Editor::Easy::File_manager").
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 =head1 SYNOPSIS
 
@@ -58,7 +58,7 @@ is the pixel number from the top with a graphical user interface but will be the
     print "Bottom ordinate of line $line is : ", $line->bottom_ord, "\n"; # Should return 32...
 
 This method accepts only one optional parameter which is a hash reference. The options that this hash may contain are described 
-in L<Text::Editor::Easy/display> as the second parameter.
+in L<'editor display method'|Text::Editor::Easy/DISPLAY> as the second parameter.
 
 To display an editor, you have to take a reference which is a line of this editor. When you call display method with a line instance, this
 reference is contained in the caller. When you call display method with an editor instance, you have to set the line in a mandatory parameter.
@@ -289,11 +289,11 @@ sub display {
 
 
 my %sub = (
-    'select' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_select ], 
-    'deselect' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_deselect ],
-    'top_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_top_ord ],
-    'bottom_ord' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_bottom_ord ],
-    'set' => [ 'graphic', \&Text::Editor::Easy::Abstract::line_set ],
+    'select' => 1,
+    'deselect' => 1,
+    'top_ord' => 1,
+    'bottom_ord' => 1,
+    'set' => 1,
     'add_seek_start' => 1,
     'get_info' => 1,
     'set_info' => 1,
@@ -359,7 +359,7 @@ This is the only common value (it's an auto-incrementing integer chosen by 'File
 if 2 lines (belonging to the same editor) have the same 'ref' in 2 different threads, they are pointing at the same line. But of course, as each thread
 has its own memory, scalar references and, then, line instances are different.
 
-head2 editor
+=head2 editor
 
 Returns the 'editor' instance the line belongs to. Should be useless (?).
 
@@ -379,7 +379,7 @@ Retrieve 'info' associated to the 'line' object thanks to 'set_info' method.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.43
+Version 0.44
 
 =cut
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 =head1 SYNOPSIS
 
@@ -142,6 +142,7 @@ sub init_file_manager {
             $file_manager_ref->[FILE_DESC] = $file_desc;
             $file_manager_ref->[SEEK_END]  = $seek_end;
             $file_manager_ref->[LAST_MODIF] = ( stat $file_desc )[9];
+            print "LAST MODIF = ", $file_manager_ref->[LAST_MODIF], "\n";
         }
         else {
             print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
@@ -547,6 +548,7 @@ sub save_internal {
     my $time_start = time;
     print DBG "Début save internal : absolute time start $time_start, soit ", scalar(localtime($time_start)), "\n";
     
+    my $test_last_modif = 1;
     
     if ( ! $file_name ) {
         if ( ! $self->[ROOT][FILE_NAME] ) {
@@ -555,6 +557,9 @@ sub save_internal {
             return;
         }
         $file_name = $self->[ROOT][FILE_NAME];
+    }
+    else {
+        $test_last_modif = 0;
     }
 
     my $report_file_name = $file_name;
@@ -583,14 +588,16 @@ sub save_internal {
         print DBG "Taille initiale : $size_before\n";
     }
     my $last_modif = (stat($file_name))[9];
-    if ( defined $self->[LAST_MODIF] and defined $last_modif and $self->[LAST_MODIF] != $last_modif ) {
-        print DBG "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
-        print "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
-        print "==>force to quit during save of file $file_name, done by thread ", threads->tid, "\n";
-        Text::Editor::Easy->exit(1);
-    }
-    elsif (defined $last_modif ){
-        print DBG "LAst modif = $last_modif : ", scalar(localtime($last_modif)), "\n";
+    if ( $test_last_modif ) {
+        if ( defined $self->[LAST_MODIF] and defined $last_modif and $self->[LAST_MODIF] != $last_modif ) {
+            print DBG "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
+            print "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
+            print "==>force to quit during save of file $file_name, done by thread ", threads->tid, "\n";
+            Text::Editor::Easy->exit(1);
+        }
+        elsif (defined $last_modif ){
+            print DBG "LAst modif = $last_modif : ", scalar(localtime($last_modif)), "\n";
+        }
     }
 
     my ( $errors_in_dump, $total_refs ) = dump_file_manager ( $self );
@@ -2122,7 +2129,7 @@ Return the line of a Text::Editor::Easy instance and the position (start and end
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008 Sebastien Grommier, all rights reserved.
+Copyright 2008 - 2009 Sebastien Grommier, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
