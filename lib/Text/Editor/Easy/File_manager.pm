@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 =head1 SYNOPSIS
 
@@ -145,7 +145,7 @@ sub init_file_manager {
             print "LAST MODIF = ", $file_manager_ref->[LAST_MODIF], "\n";
         }
         else {
-            print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
+            #print STDERR "From thread file_manager with tid ", threads->tid, " : can't open file $file_name : $!\n";
             $file_name =~ s{\\}{\/}g;
             if ( open( $file_desc, $file_name ) ) {
 
@@ -592,8 +592,14 @@ sub save_internal {
         if ( defined $self->[LAST_MODIF] and defined $last_modif and $self->[LAST_MODIF] != $last_modif ) {
             print DBG "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
             print "\n\nDANGER : LAST_MODIF = $self->[LAST_MODIF], last modif stat file_name = $last_modif\n\n\n";
-            print "==>force to quit during save of file $file_name, done by thread ", threads->tid, "\n";
-            Text::Editor::Easy->exit(1);
+            if ( compare_ko( $self, $file_name ) ) {
+                print "==>force to quit during save of file $file_name, done by thread ", threads->tid, "\n";
+                Text::Editor::Easy->exit(1);
+            }
+            else {
+                print "Fausse alerte, mise à jour de LAST_MODIF\n";
+                $self->[LAST_MODIF] = $last_modif;
+            }
         }
         elsif (defined $last_modif ){
             print DBG "LAst modif = $last_modif : ", scalar(localtime($last_modif)), "\n";
@@ -729,6 +735,30 @@ sub save_internal {
 
     return 1;    # OK
 }
+
+sub compare_ko {
+    my ( $self, $file_name ) = @_;
+    
+    my $file = $self->[PARENT]->slurp;
+    my @lines = split ( /\n/, $file );
+    open ( LEC, $file_name ) or die "Impossible d'ouvrir $file_name dans compare_ko : $!\n";
+    while ( <LEC> ) {
+        chomp;
+        my $line = shift @lines;
+        if ( $line  ne $_ ) {
+            print "Différence en ligne $. : \n==>$line\n==>$_\n";
+            CORE::close( LEC );
+            return 1;
+        }
+    }
+    CORE::close( LEC );
+    if ( scalar(@lines) ) {
+        print "Plus de lignes dans le fichier de file_namager que sur le disque\n";
+        return 1;
+    }
+    return;
+}
+
 
 sub revert_internal {
     my ($self) = @_;
@@ -1534,7 +1564,7 @@ sub load_info {
             return $self->[SAVED_INFO]{$key};
         }
         else {
-            print STDERR "Saved_info in File_manager is not a hash\n";
+            print STDERR "Saved_info in File_manager is not a hash, key wanted : $key\n===\n", dump( $self->[SAVED_INFO] ), "\n====\n";
             return;
         }
     }

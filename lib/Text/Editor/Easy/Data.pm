@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Data::Dump qw(dump);
 use threads;
@@ -47,6 +47,7 @@ use constant {
     ZONE           => 14,
     CURRENT => 15,
     SEARCH => 16,
+    ZONE => 17,
 
     #------------------------------------
     # LEVEL 2 : $self->[TOTAL][???]
@@ -115,6 +116,7 @@ sub reference_editor {
             $zone = $zone_ref;
         }
     }
+    $self->[ZONE]{$ref} = $zone;
 
     #print "...suite reference de Data : |$zone|\n";
     # Bogue à voir
@@ -149,6 +151,13 @@ sub reference_editor {
  
     $self->[ZONE_ORDER]{$zone} += 1;    # Valeur de retour, ordre dans la zone
     #return data_file_name ( $self, $ref );
+}
+
+
+sub data_zone {
+    my ( $self, $ref ) = @_;
+    
+    return $self->[ZONE]{$ref};
 }
 
 sub data_file_name {

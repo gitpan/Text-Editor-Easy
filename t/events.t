@@ -13,7 +13,13 @@ use Text::Editor::Easy;
 use Text::Editor::Easy::Comm;
 
 my $editor = Text::Editor::Easy->new({
-#    'sub' => 'main',
+    #'trace' => {
+    #    'all' => 'tmp/',
+    #    'trace_print' => 'full',
+    #},
+
+    #'sub' => 'main',
+    
 	'bloc' => "use Text::Editor::Easy::Comm;\nmy \$editor = Text::Editor::Easy->new\n",
 	'focus' => 'yes',
     'events' => {
@@ -22,6 +28,7 @@ my $editor = Text::Editor::Easy->new({
 				'action' => 'change',
 				'thread' => 'Graphic',
 				'create' => 'warning',
+				'init' => [ 'main::init_any_hard', "Bonjour" ],
         },    
         'hard_clic' => [
 		    { 
@@ -37,7 +44,13 @@ my $editor = Text::Editor::Easy->new({
 				#'sync' => 'false',
 				'create' => 'warning',
             },
-        ]
+        ],
+		'drag' => {
+				'sub' => 'drag',
+		},
+        'cursor_set' => {
+            'sub' => 'cursor_set',
+        }
     }
 });
 
@@ -51,7 +64,12 @@ is ( ref($editor), "Text::Editor::Easy", "Object type");
 
 print "EDITOR height = ", $editor->height, "\n";
 
-$editor->clic(1,1, {}, 'ctrl_');
+$editor->clic( {
+    'x' => 1,
+    'y' => 1, 
+    'meta_hash' => {}, 
+    'meta' => 'ctrl_',
+});
 
 # 'Graphic' thread is the current client thread and not a server one (manage_event not called ) :
 # have to make server actions 'manually'
@@ -106,4 +124,14 @@ sub my_hard_clic_sub {
 		 'meta_hash' => $info_ref->{'meta_hash'},
      );
      return [ 'clic', \%new_info ];                      # jump to 'clic' label, providing the hash required
+}
+
+sub init_any_hard {
+		my ( undef, $reference, $text ) = @_;
+		
+		print "Dans init_any_hard : $reference, $text\n";
+}
+
+sub cursor_set {
+    print "Bonjour de la part de cursor_set\n";
 }

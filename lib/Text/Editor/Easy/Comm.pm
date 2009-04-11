@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 =head1 SYNOPSIS
 
@@ -279,9 +279,9 @@ use strict;
 require Exporter;
 our @ISA = ("Exporter");
 
-#  qw ( execute_this_task anything_for_me get_task_to_do ask2 verify_model_thread respond simple_context_call verify_graphic verify_motion_thread reference_event_conditions have_task_done);
+#  qw ( execute_this_task anything_for_me get_task_to_do ask2 verify_model_thread respond simple_context_call verify_graphic have_task_done);
 our @EXPORT =
-  qw ( execute_this_task anything_for_me anything_for ask2 get_task_to_do reference_event_conditions have_task_done);
+  qw ( execute_this_task anything_for_me anything_for ask2 get_task_to_do have_task_done);
 
 our @EXPORT_OK =
   qw(ask_named_thread)
@@ -642,7 +642,7 @@ sub ask2 {
 
         if ( !defined $sub ) {
              print DBG "Impossible de trouver la sub pour la méthode $method...\n";
-             print STDERR "Can't handle method $method for object $self ($unique_ref)\n";
+             #print STDERR "Can't handle method $method for object $self ($unique_ref)\n";
              return;
         }
     }
@@ -946,8 +946,6 @@ sub verify_model_thread {
         $method{'get_ref'}              = ('get_ref');
         $method{'set_synchronize'}  = ('set_synchronize');
         $method{'get_synchronized'} = ('get_synchronized');
-        $method{'redirect'}         = ('redirect');
-        $method{'transform_hash'}   = ('transform_hash');
         $method{'set_ref'}          = ('set_ref');
 
         $method{'create_thread'} = ('shared_thread:Text::Editor::Easy::Comm');
@@ -1085,6 +1083,7 @@ sub create_data_thread {
                 'trace_end_of_user_event',
                 'trace_eval',
                 'tell_length_slash_n',
+                'data_zone',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data'],
@@ -1225,6 +1224,7 @@ sub verify_graphic {
                     'growing_check',
                     'set_at_end',
                     'unset_at_end',
+                    #'zone',
 
                     # Event generation
                     'key_press',
@@ -1447,185 +1447,6 @@ sub get_synchronized {
     my $unique_ref = $com_unique{ refaddr $self };
     while ( !$synchronize{$unique_ref} ) {
     }
-}
-
-my %redirect = do "Text/Editor/Easy/Data/Events.pm";
-
-my $motion_thread : shared;
-
-sub verify_motion_thread {
-    my ( $unique_ref, $hash_ref ) = @_;
-
-    my $motion_thread_useful = 0;
-    my %event                = ();
-
-    #print "DANS VERIFY MOTION THREAD...$unique_ref|$motion_ref\n";
-    #print DBG "Taille de \%event $unique_ref 0 :", scalar(%event), "\n";
-    for my $event ( keys %$hash_ref ) {
-
-        #print DBG "HASH_REF pour : $event ...\n";
-        if ( $redirect{$event} ) {
-
-            #print DBG "$event est un évènement !\n";
-            my $event_ref = $hash_ref->{$event};
-            my $mode = $event_ref->{'mode'};
-            if ( defined $mode and $mode eq 'async' ) {
-
-                #print DBG "Il est asynchrone !!!\n";
-                $motion_thread_useful = 1;
-                $event{$event} = $event_ref;
-
-                #print DBG "Event trouvé pour $unique_ref : $event ...\n";
-            }
-
-            #print "COND CREATION $event $event_ref->{'only'} \n";
-            #$redirect_condition{$event}{$unique_ref} = $event_ref->{'only'};
-        }
-    }
-
-    #print DBG "Taille de \%event $unique_ref :", scalar(%event), "\n";
-    
-    #if ( !defined $motion_thread and $motion_thread_useful ) {
-    if ( ! defined $motion_thread ) {
-        #print "Je crée le motion thread\n";
-
-        my $tid = Text::Editor::Easy->create_new_server(
-            {
-                'use'     => 'Text::Editor::Easy::Motion',
-                'package' => 'Text::Editor::Easy::Motion',
-                'methods' => [ 'reference_event', 'manage_events' ],
-                'object'  => {},
-                'name' => 'Motion',
-            }
-        );
-
-        my $queue = $server_queue_by_tid{$tid};
-        while ( !$queue ) {
-            $queue = $server_queue_by_tid{$tid};
-        }
-
-        # Création multi-thread possible : on n'est pas seul...
-        $motion_thread = $tid if ( !defined $motion_thread );
-        
-        if ( $motion_thread != $tid ) {
-    # Le motion_thread a été créé par un autre éditeur, il faut éliminer le notre
-            my $message = dump (undef);
-            $queue->enqueue($message);
-
-            threads->object($tid)->join();
-
-            # Suppression des queue (ou recyclage ?) à faire
-        }
-    }
-
-# Demande asynchrone de prise en compte de sub motion : cette demande ne devrait pas être asynchrone !!
-#print "TID DU MOTION THREAD $motion_thread\n";
-#print DBG "Taille de \%event $unique_ref 2 :", scalar(%event), "\n";
-    for my $event ( keys %event ) {
-
-        print DBG "Avant call de reference event $unique_ref : $event ...\n";
-
-     #Text::Editor::Easy::Async->ask2( 'reference_event' . ' ' . $motion_thread,
-     #    $event, $unique_ref, $event{$event} );
-
-        Text::Editor::Easy->reference_event( $event, $unique_ref,
-            $event{$event} );
-    }
-}
-
-my %redirect_condition;
-
-sub reference_event_conditions {    # Toujours exécuté dans le thread 0
-    my ( $unique_ref, $hash_ref ) = @_;
-
-    my %event;
-    my $motion_thread_useful;
-
-    #print "DANS VERIFY MOTION THREAD...$unique_ref|$motion_ref\n";
-    for my $event ( keys %$hash_ref ) {
-        if ( $redirect{$event} ) {
-            my $event_ref = $hash_ref->{$event};
-            if ( $event_ref->{'mode'} eq 'async' ) {
-                $motion_thread_useful = 1;
-                $event{$event} = $event_ref;
-            }
-
-            #print "COND CREATION $event $event_ref->{'only'} \n";
-            $redirect_condition{$event}{$unique_ref} = $event_ref->{'only'};
-        }
-    }
-}
-
-sub redirect {
-    my ( $self, $method, $abstract_ref, $hash_ref ) = @_;
-
-    my $ref = $com_unique{ refaddr $self};
-    if ( ref($method) ne 'CODE' ) {
-
-        print DBG "Appel asynchrone avec la méthode $method, $ref...\n";
-        if ( my $condition = $redirect_condition{$method}{$ref} ) {
-            my $origin     = $hash_ref->{'origin'};
-            my $sub_origin = $hash_ref->{'sub_origin'};
-
-            print DBG "CONDITION : $condition\n\t$origin\n\t$sub_origin\n";
-            if ( eval "$condition" ) {
-
-                print DBG "\tCondition positive : $@\n";
-
-                print( "dans REDIRECT de cOMM : zone = ",
-                    $hash_ref->{'zone'}, "\n" )
-                  if ( defined $hash_ref->{'zone'} );
-
-                Text::Editor::Easy::Async->manage_events( $method, $ref,
-                    $hash_ref );
-
-                return;    # Garder un context Void sur "manage_events"
-            }
-            else {
-
-                print DBG "\tFAUX (condition) : $@\n";
-            }
-        }
-        else {             # Pas de condition, on exécute tout le temps
-            return if ( !defined $motion_thread );
-
-            #Text::Editor::Easy::Async->ask2( 'manage_events ' . $motion_thread,
-            #    $method, $ref, $hash_ref );
-
-            Text::Editor::Easy::Async->manage_events( $method, $ref,
-                $hash_ref );
-
-            return;    # Garder un context Void sur "manage_events"
-        }
-    }
-    else {
-        eval {
-            $method->(
-                $self, transform_hash( $self, $abstract_ref, $hash_ref )
-            );
-        };
-        print DBG $@ if ($@);
-    }
-}
-
-sub transform_hash {
-    my ( $editor, $abstract_ref, $hash_ref ) = @_;
-
-    my $ref_line = $hash_ref->{'line'};
-    if ( defined $ref_line ) {
-        my $line = Text::Editor::Easy::Line->new( $editor, $ref_line, );
-        $hash_ref->{'line'} = $line;
-    }
-    my $ref_display = $hash_ref->{'display'};
-    if ( defined $ref_display ) {
-        my $display =
-          Text::Editor::Easy::Display->new( $editor, $ref_display, );
-        $hash_ref->{'display'} = $display;
-    }
-
-    #print "Dans transform hash\n";
-    #print "Fin de line size\n";
-    return $hash_ref;
 }
 
 sub init_server_thread {
@@ -1953,10 +1774,12 @@ sub create_new_server {
     my $tab_methods_ref = $options_ref->{'methods'};
     my $self_server     = $options_ref->{'object'};
 
-    #print DBG "Dans create_new_server $package $self_server\n";
+    #print DBG "Début create_new_server \$self $self, méthodes : ", @$tab_methods_ref, "\n";
 
-    my $unique_ref;
+    my $unique_ref = undef;
     if ( defined $self and ref($self) ) {
+        #print DBG "Dans create_new_server, thread d'instance 1 : ref \$self = ", ref($self), "\n";
+        
         my $ref = refaddr $self;
         $unique_ref = $com_unique{$ref};
 
@@ -1979,8 +1802,7 @@ sub create_new_server {
     {
         my $key;
         my $name     = $options_ref->{'name'};
-        if ($unique_ref) {       # Appel d'instance ($self est un objet)
-
+        if ( $unique_ref ) {       # Appel d'instance ($self est un objet)
             my $class    = ref $self;
             
             my $name_tid = $name || $tid;
@@ -2253,11 +2075,7 @@ thread communication.
 Quick mecanism to display or to hide debug information from a package / thread. Don't need to remove
 all the "print DBG" everywhere.
 
-=head2 redirect
-
 =head2 ref
-
-=head2 reference_event_conditions
 
 =head2 respond
 
@@ -2277,15 +2095,11 @@ all the "print DBG" everywhere.
 
 Every AUTOLOAD calls are traced. Still some important methods (instance creation, thread creation, ...) are not yet traced. To be done.
 
-=head2 transform_hash
-
 =head2 untie_print
 
 =head2 verify_graphic
 
 =head2 verify_model_thread
-
-=head2 verify_motion_thread
 
 =head2 verify_server_queue_and_wait
 

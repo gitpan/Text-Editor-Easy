@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 =head1 SYNOPSIS
 
@@ -57,7 +57,7 @@ entirely on "File_manager" to memorize what should be.
 This trick has a big advantage. In fact, with my module, you can Edit text file of unlimited size with the same
 speed as little file. Not much Editors can do that. For huge file, my perl Editor is still usable whereas most C
 Editors are not. Of course, you could develop a C Editor with the same principle, ... good luck. With
-perl, it's just funny. In C, it's pure work.
+perl, it's just funny. In C, it's hard work.
 
 =cut
 
@@ -72,10 +72,13 @@ use Text::Editor::Easy::Abstract::Key;
 
 # Communication
 use Text::Editor::Easy::Comm
-  qw(anything_for_me get_task_to_do execute_this_task reference_event_conditions);
+  qw(anything_for_me get_task_to_do execute_this_task );
 
 # Evènements
 use Text::Editor::Easy::Events qw(execute_events);
+
+# Provisoire
+use Text::Editor::Easy::Motion;
 
 use Data::Dump qw(dump);
 use Scalar::Util qw(refaddr);
@@ -279,9 +282,6 @@ my $window_destroyed;
 # A une référence d'éditeur unique, on fait correspondre un objet Abstract
 my %abstract;
 
-# Redirection
-my %redirect = do "Text/Editor/Easy/Data/Events.pm";
-
 my %event_zone;
 my %use;
 
@@ -317,63 +317,6 @@ sub new {
     }
 
     $abstract{$unique_ref} = $edit_ref;
-
-    # Affectation des fonctions de redirection
-    for my $redirect ( keys %redirect ) {
-        my $redirect_ref = $hash_ref->{$redirect};
-        if ( defined $redirect_ref ) {
-            if ( $redirect_ref->{'mode'} eq 'async' ) {
-
-                #print "Redirection de $redirect asynchrone...\n";
-                $edit_ref->[REDIRECT]{$redirect} = $redirect;
-            }
-            else {
-                my $use = $redirect_ref->{'use'};
-                if ( defined $use and !$use{$use} ) {
-                    eval "use $use";
-
-                    #print "EVAL use $use en erreur\n$@\n" if ($@);
-                    $use{$use} = 1;
-                }
-                my $package = $redirect_ref->{'package'};
-                $package = 'main' if ( !defined $package );
-                if ( my $sub = $redirect_ref->{'sub'} ) {
-                    my $string = "\\&" . $package . "::$sub";
-
-                    #print "STRING $string|$package\n";
-                    $edit_ref->[REDIRECT]{$redirect} =
-                      eval "\\&${package}::$sub";
-
-                    #$edit_ref->[REDIRECT]{$redirect} = eval $string;
-                }
-                if ( my $init_ref = $redirect_ref->{'init'} ) {
-                    my @init   = @$init_ref;
-                    my $string = "\\&" . $package . "::" . shift(@init);
-
-                   #print "STRING $string|$package\n";
-                   #$edit_ref->[REDIRECT]{$redirect} = eval "\\&$package::$sub";
-                    my $sub_ref = eval $string;
-                    $sub_ref->( $editor, @init );
-                }
-            }
-        }
-        elsif ( $redirect eq 'motion_last' ) {
-                    $hash_ref->{'motion_last'} = {
-                            'use'     => 'Text::Editor::Easy::Motion',
-                            'package' => 'Text::Editor::Easy::Motion',
-                            'sub'     => 'nop',
-                            'mode'    => 'async',
-                        },
-                $edit_ref->[REDIRECT]{$redirect} = $redirect;
-                Text::Editor::Easy::Async->reference_event( 
-                    'motion_last', 
-                    $unique_ref,
-                    $hash_ref->{'motion_last'}
-                );
-
-        }
-    }
-    reference_event_conditions( $unique_ref, $hash_ref );
 
     #$edit_ref->[FILE] = $ARGV[0] || "../test.hst";
     $edit_ref->[FILE] = $hash_ref->{file} || '*buffer*';
@@ -430,6 +373,7 @@ sub new {
             'background'                  => 'light grey',
             'clic'                        => \&clic,
             'motion'                  => \&motion,
+            'drag'                     => \&drag,
             'resize'                      => \&resize,
             'key_press'                   => \&key_press,
             'mouse_wheel_event'           => \&mouse_wheel_event,
@@ -778,12 +722,10 @@ sub create_text_in_line {
 
     my @text_element;
     if ( $edit_ref->[SUB_REF] ) {
-
 # Une procédure de gestion de la coloration syntaxique a été donnée : on l'appelle
         @text_element = $edit_ref->[SUB_REF]->( $line_ref->[TEXT] );
     }
     else {
-
     # Pas de procédure de coloration syntaxique récupérée :
     # il n'y aura qu'un seul élément texte sur la ligne avec la police "default"
         $text_element[0] = [ $line_ref->[TEXT], 'default' ];
@@ -1169,43 +1111,80 @@ sub suppress_text {
     }
 }
 
-sub clic {
-    my ( $edit_ref, $x, $y, $meta_hash, $meta ) = @_;
+# Event management
 
-    #print "Dans clic : meta = $meta\n";
-    my $editor = $edit_ref->[PARENT];
+# Hash of default labels
+
+my %label = (
+    'calc_line_pos' => \&calc_line_pos,
+    'init_resize'   => \&init_resize,
+    'zone_resize'   => \&zone_resize,
+    'select'        => \&drag_select,
+);
+
+sub calc_line_pos {
+   my ( $edit_ref, $info_ref ) = @_;
+
+    my $line_ref = get_line_ref_from_ord( $edit_ref, $info_ref->{'y'} );
+    my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $info_ref->{'x'} );
+    while ( $line_ref->[PREVIOUS_SAME] ) {
+        $line_ref = $line_ref->[PREVIOUS];
+        $pos += length ( $line_ref->[TEXT] );
+    }
+    $info_ref->{'line'} = $line_ref->[REF];
+    $info_ref->{'pos'} = $pos;
+    return ( $info_ref, q{} );
+}
+
+sub clic {
+    my ( $edit_ref, $info_ref ) = @_;
+
+    my $x     = $info_ref->{'x'};
+    my $y     = $info_ref->{'y'};
+    my $meta = $info_ref->{'meta'};
+    
+    $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[UNIQUE], 
+        "User clicked at X = $x and Y = $y", {
+            'x' => $x,
+            'y' => $y,
+            'meta' => $meta,
+        }
+    );
+
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'clic';
     }
 
+    my $editor = $edit_ref->[PARENT];
     my $event_ref = $edit_ref->[EVENTS];
     my $label = q{}; # Avoid warning when testing undef value
-    my $info_ref = {
-        'x' => $x,
-        'y' => $y,
-        'meta_hash' => $meta_hash,
-        'meta' => $meta,
-    };
 
     my $step = 'any_hard_clic';
     if ( my $event = $event_ref->{$step} ) {
         ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
         return if ( ! defined $info_ref );
-    }
+        $meta = $info_ref->{'meta'};
+    } 
 
     $step = "${meta}hard_clic";
     if ( ! $label or $label eq $step ) {
         if ( my $event = $event_ref->{$step} ) {
             ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
             return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
         }
     }
+
+    $x = $info_ref->{'x'};
+    $y = $info_ref->{'y'};
 
     # Default 'hard_clic' management
     if ( ( ! $label and ! $meta ) or $label eq 'hard_clic' ){
         $label = q{};
-        my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;    
+        my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;
+
         if ( defined $shape and $shape =~ /^sb/ ) {
             # start of drag sequence for resize according to cursor shape
             if ( $shape eq 'sb_h_double_arrow' ) {
@@ -1234,20 +1213,13 @@ sub clic {
         # Changing info_ref content
         $label = q{};
         my $line_ref = get_line_ref_from_ord( $edit_ref, $info_ref->{'y'} );
-
         my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $info_ref->{'x'} );
-        my $ref_under_cursor = $line_ref->[REF];
         while ( $line_ref->[PREVIOUS_SAME] ) {
             $line_ref = $line_ref->[PREVIOUS];
             $pos += length ( $line_ref->[TEXT] );
         }
-
-        $info_ref = {
-            'line'     => $ref_under_cursor,
-            'pos'      => $pos,
-            'meta'     => $meta,
-            'meta_hash'=> $meta_hash,
-        };
+        $info_ref->{'line'} = $line_ref->[REF];
+        $info_ref->{'pos'} = $pos;
     }
     
     $step = 'any_clic';
@@ -1255,6 +1227,7 @@ sub clic {
         if ( my $event = $event_ref->{$step} ) {
             ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
             return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
         }
     }
 
@@ -1263,6 +1236,7 @@ sub clic {
         if ( my $event = $event_ref->{$step} ) {
             ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
             return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
         }
     }
 
@@ -1280,6 +1254,7 @@ sub clic {
         if ( my $event = $event_ref->{$step} ) {
             ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
             return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
         }
     }
 
@@ -1292,44 +1267,56 @@ sub clic {
 }
 
 sub motion {
-    my ( $edit_ref, $x, $y, $key ) = @_;
+    my ( $edit_ref, $info_ref ) = @_;
     
-    Text::Editor::Easy->trace_user_event( 
+    my $x     = $info_ref->{'x'};
+    my $y     = $info_ref->{'y'};
+    my $meta = $info_ref->{'meta'};
+    
+    $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
         $edit_ref->[UNIQUE], 
-        "User moved mouse at X = $x and Y = $y", {
+        "User moved mouse to X = $x and Y = $y", {
             'x' => $x,
             'y' => $y,
-            'key' => $key,
+            'meta' => $meta,
         }
     );
 
-    if ( $origin eq 'graphic' and !$sub_origin ) {
+    if ( $origin eq 'graphic' and ! $sub_origin ) {
         $sub_origin = 'motion';
-        #print "Move text : $x|$y|\n";
     }
 
-    my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
+    my $editor = $edit_ref->[PARENT];
+    my $event_ref = $edit_ref->[EVENTS];
+    my $label = q{}; # Avoid warning when testing undef value
 
-    #my $display_ref = get_display_ref_from_ord($edit_ref, $y);
-    my $display_ref = get_display_ref_from($line_ref);
-    my $display_pos =
-      get_position_from_line_and_abs( $edit_ref, $line_ref, $x );
-    my $line_pos = $display_pos;
-    while ( $line_ref->[PREVIOUS_SAME] ) {
-        $line_ref = $line_ref->[PREVIOUS];
-        $line_pos += length( $line_ref->[TEXT] );
+    my $step = 'any_hard_motion';
+    if ( my $event = $event_ref->{$step} ) {
+        ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+        return if ( ! defined $info_ref );
+        $meta = $info_ref->{'meta'};
     }
 
-    my $ref_under_cursor = $line_ref->[REF];
-
-# La redirection n'est pas forcément référencée dans le thread Motion
-# Cela aura pour effet d'arrêter l'exécution d'une procédure que l'utilisateur souhaite abandonner (effet souhaité)
-    my $event = 'motion_last';
-    if ( defined $key ) {
-        $event = $key . '_motion_last' ;
-        #print "Génération de l'évènement $event\n";
+    if ( ! $label or $label eq 'any_hard_motion' ){
+        editor_make_visible( $edit_ref );
     }
-    else {
+
+    $meta = $info_ref->{'meta'};
+    $step =  $meta . 'hard_motion';
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
+        }
+    }
+
+    $x = $info_ref->{'x'};
+    $y = $info_ref->{'y'};
+
+    # Default 'hard_motion' management
+    if ( ( ! $label and ! $meta ) or $label eq 'hard_motion' ){
+        $label = q{};
         if ( $x < 5 or $x > ( $edit_ref->[SCREEN][WIDTH] - 5 ) ) {
             #print "Il faut changer le curseur\n";
             cursor_set_shape ( $edit_ref, 'sb_h_double_arrow' );
@@ -1341,54 +1328,137 @@ sub motion {
             cursor_set_shape ( $edit_ref, 'arrow' );
         }
     }
-    
-    
-    if ( $event eq 'b1_motion_last' ) {
-        b1_motion ( $edit_ref, {
-            'x' => $x,
-            'y' => $y,
-            'line_ref' => $line_ref,
-            'display_pos' => $display_pos,
-            'line_pos' => $line_pos,
-            'line' => $ref_under_cursor,
-        } );
+
+    # Computing new info_ref ...
+    # ... unless info_ref is already provided by a jump in a former event
+    if ( ! $label or $label eq $step ) {
+        # Changing info_ref content
+        $label = q{};
+
+        my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
+        my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $x );
+        while ( $line_ref->[PREVIOUS_SAME] ) {
+            $line_ref = $line_ref->[PREVIOUS];
+            $pos += length( $line_ref->[TEXT] );
+        }
+
+        $info_ref->{'line'} = $line_ref->[REF];
+        $info_ref->{'pos'} = $pos;
     }
 
-    if ( $edit_ref->[REDIRECT]{$event} ) {
-        #print "Motion $event\n";
-        $edit_ref->[PARENT]->redirect(
-            $event,
-            $edit_ref,
-            {
-                'line'        => $ref_under_cursor,
-                'display'     => $display_ref,
-                'display_pos' => $display_pos,
-                'line_pos'    => $line_pos,
-            }
-        );
+    $step = 'any_motion';
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
+        }
     }
-    #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+
+    $step = "${meta}motion";
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            execute_events( $event, $editor, $info_ref );
+        }
+    }
+
     return 'motion';
 }
 
-sub b1_motion {
-    my ( $edit_ref, $options_ref ) = @_;
+sub drag {
+    my ( $edit_ref, $info_ref ) = @_;
 
-    my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;
+    $info_ref->{'shape'} = $edit_ref->[GRAPHIC]->cursor_get_shape;    
+    my $x     = $info_ref->{'x'};
+    my $y     = $info_ref->{'y'};
     
-    if ( $shape !~ /^sb/ ) {
-        # Sélection de texte (curseur standard)
-        Text::Editor::Easy::Abstract::Key::motion_select( $edit_ref, $options_ref );
-        return;
-    }
-    # Redimensionnement de zone (curseur double flèche)
-    Text::Editor::Easy::Async->ask_named_thread (
-        'Text::Editor::Easy::Motion::zone_resize',
-        'Motion',
-        $edit_ref->[GRAPHIC]->get_zone,
-        $edit_ref->[CURSOR][RESIZE],
-        $options_ref,
+    my $meta = $info_ref->{'meta'};
+    ( $info_ref ) = calc_line_pos ( $edit_ref, $info_ref );
+
+    $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[UNIQUE], 
+        "User 'dragged' to X = $x and Y = $y", {
+            'x' => $x,
+            'y' => $y,
+            'meta' => $meta,
+        }
     );
+
+    my $editor = $edit_ref->[PARENT];
+    my $event_ref = $edit_ref->[EVENTS];
+    my $label = q{}; # Avoid warning when testing undef value
+    
+    my $step = 'any_drag';
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
+        }
+    }
+
+    $step = "${meta}drag";
+    if ( ! $label or $label eq $step ) {
+        if ( my $event = $event_ref->{$step} ) {
+            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+            return if ( ! defined $info_ref );
+            $meta = $info_ref->{'meta'};
+        }
+    }
+
+    my @labels;
+    if ( ! ref $label and ! $meta ) {
+        @labels = ( 'zone_resize', 'select' );
+    }
+    
+    if ( ref $label ) {
+        if ( ref $label ne 'ARRAY' ) {
+            print STDERR "Label should be an array reference, drag event aborted\n";
+            return;
+        }
+        @labels = @$label;
+    }
+
+    for my $step ( @labels ) {
+        next if ( $label and $label ne $step );
+        $label = q{};
+        if ( $step =~ /drag$/ ) {
+            ( $info_ref, $label ) = test_events ( $edit_ref, $info_ref, $step );
+        }
+        else {
+            ( $info_ref, $label ) = $label{$step}->( $edit_ref, $info_ref );
+        }
+    }
+}
+
+sub zone_resize {
+    my ( $edit_ref, $info_ref ) = @_;
+
+    #print "Dans zone resize : x = $info_ref->{'x'}, y = $info_ref->{'y'}\n";
+
+    if ( $info_ref->{'shape'} =~ /^sb/ ) {
+        Text::Editor::Easy::Motion::zone_resize(
+            $edit_ref->[GRAPHIC]->get_zone,
+            $edit_ref->[CURSOR][RESIZE],
+            $info_ref,
+        );
+    }
+    
+    return ( $info_ref, q{} );
+}
+
+#sub zone {
+#    my ( $edit_ref ) = @_;
+#    
+#    return $edit_ref->[GRAPHIC]->get_zone;
+#}
+
+sub drag_select {
+    my ( $edit_ref, $info_ref ) = @_;
+   
+    if ( $info_ref->{'shape'} !~ /^sb/ ) {
+        Text::Editor::Easy::Abstract::Key::motion_select( $edit_ref, $info_ref );
+    }
 }
 
 sub deselect {
@@ -2912,39 +2982,15 @@ sub bloc_insertion {
 
 sub test_insert_events {
     my ( $edit_ref, $text, $initial_text ) = @_;
-        
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'insert_last'} ) {
+    
+    my $editor = $edit_ref->[PARENT];
+    my $event_ref = $edit_ref->[EVENTS];
+    my $label = q{}; # Avoid warning when testing undef value
 
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'line'       => $edit_ref->[CURSOR][LINE_REF][REF],
-                'line_pos'   => $edit_ref->[CURSOR][POSITION_IN_LINE],
-                'text'       => $text,
-                'initial'    => $initial_text,
-                'origin'     => $origin,
-                'sub_origin' => $sub_origin,
-                'sub_sub_origin' => $sub_sub_origin,
-            }
-        );
-    }
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
-
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'origin'     => $origin,
-                'sub_origin' => $sub_origin,
-                'sub_sub_origin' => $sub_sub_origin,
-            }
-        );
-    }
+    my $step = 'change';
+    if ( my $event = $event_ref->{$step} ) {
+        ( undef, $label ) = execute_events( $event, $editor, {} );
+    } 
 }
 
 # Valeurs de retour à gérer pour les 2 fonctions suivantes
@@ -3035,20 +3081,14 @@ sub erase {
                 $number = 0;
             }
         }
-            if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
+        my $editor = $edit_ref->[PARENT];
+        my $event_ref = $edit_ref->[EVENTS];
+        my $label = q{}; # Avoid warning when testing undef value
 
-                # Redirection vers une fonction utilisateur
-                #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-                $edit_ref->[PARENT]->redirect(
-                    $sub_ref,
-                    $edit_ref,
-                    {
-                        'origin'     => $origin,
-                        'sub_origin' => $sub_origin,
-                        'sub_sub_origin' => $sub_sub_origin,
-                    }
-                );
-            }
+        my $step = 'change';
+        if ( my $event = $event_ref->{$step} ) {
+            ( undef, $label ) = execute_events( $event, $editor, {} );
+        }
         return;
     }
 
@@ -3075,19 +3115,17 @@ sub erase {
     my $how_much = $bottom_line_ref->[ORD] - $bottom_ord;
     move_bottom( $edit_ref, $how_much, $bottom_line_ref );
 
-    if ( ! $no_event_management and my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
 
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'origin'     => $origin,
-                'sub_origin' => $sub_origin,
-                'sub_sub_origin' => $sub_sub_origin,
-            }
-        );
+    if ( ! $no_event_management ) {
+
+        my $editor = $edit_ref->[PARENT];
+        my $event_ref = $edit_ref->[EVENTS];
+        my $label = q{}; # Avoid warning when testing undef value
+
+        my $step = 'change';
+        if ( my $event = $event_ref->{$step} ) {
+            ( undef, $label ) = execute_events( $event, $editor, {} );
+        }
     }
 
     if (wantarray) {
@@ -3566,27 +3604,23 @@ sub position_cursor_in_display {
            "\t\$cursor_ref->[LINE_REF][TEXT] = $cursor_ref->[LINE_REF][TEXT]\n";
        }
     }
-    
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'cursor_set_last'} ) {
 
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        return $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'line'        => $line_ref->[REF],
-                'display'     => get_display_ref_from($line_ref),
-                'display_pos' => $cursor_ref->[POSITION_IN_DISPLAY],
-                'line_pos'    => $cursor_ref->[POSITION_IN_LINE],
-                'origin'      => $origin,
-                'sub_origin'  => $sub_origin,
-            }
-        );
+    my $editor = $edit_ref->[PARENT];
+    my $event_ref = $edit_ref->[EVENTS];    
+    my $step = 'cursor_set';
+    if ( my $event = $event_ref->{$step} ) {
+        my $info_ref = {
+            'line'        => $line_ref->[REF],
+            'display'     => get_display_ref_from($line_ref),
+            'pos'    => $cursor_ref->[POSITION_IN_LINE],
+            'origin'      => $origin,
+            'sub_origin'  => $sub_origin,
+        };
+
+        execute_events( $event, $editor, $info_ref );
     }
 
-    # On renvoie toujours la position dans la ligne fichier
-    elsif (wantarray) {
+    if ( wantarray ) {
         my $ref = $line_ref->[REF];
         return ( $ref, $cursor_ref->[POSITION_IN_LINE] );
     }
@@ -3879,19 +3913,16 @@ sub line_set {
                     $bottom_line_ref );
             }
     }
-    if ( my $sub_ref = $edit_ref->[REDIRECT]{'change_last'} ) {
-        # Redirection vers une fonction utilisateur
-        #$sub_ref = 'cursor_set_last' if ( $sub_ref eq '1' ); # Asynchrone
-        $edit_ref->[PARENT]->redirect(
-            $sub_ref,
-            $edit_ref,
-            {
-                'origin'     => $origin,
-                'sub_origin' => $sub_origin,
-                'sub_sub_origin' => $sub_sub_origin,
-            }
-        );
-    }    
+    
+    my $editor = $edit_ref->[PARENT];
+    my $event_ref = $edit_ref->[EVENTS];
+    my $label = q{}; # Avoid warning when testing undef value
+
+    my $step = 'change';
+    if ( my $event = $event_ref->{$step} ) {
+        ( undef, $label ) = execute_events( $event, $editor, {} );
+    }
+
     return $ref;
 }
 
@@ -4640,7 +4671,7 @@ sub on_top_ref_editor {
 }
 
 sub on_top {
-    my ( $self, $hash_ref ) = @_;    # hash_ref n'est défini qu'en création
+    my ( $self ) = @_;
     my $zone = $self->[GRAPHIC]->get_zone;
 
     #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
@@ -4662,26 +4693,17 @@ sub on_top {
     }
     $self->[GRAPHIC]->on_top;
 
-# Recherche de tous les éditeurs qui ont "on_top" comme évènements : à revoir (un peu long)
-# Appel en asynchrone (modification pour pourvoir partager des variables compliquées dans Tab.pm)
-#for my $abstract_ref ( values %abstract ) {
-#        if ( my $sub_ref = $abstract_ref->[REDIRECT]{'on_top_last'} ) {
-#                $abstract_ref->[PARENT]->redirect( $sub_ref, $abstract_ref, {
-#                        'editor' => $self->[UNIQUE],
-#                        'zone' => $zone,
-#                        }
-#                );
-#        }
-#}
-
     #print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
-    return if ( !defined $zone );
+    return if ( ! defined $zone );
     my $event_ref = $event_zone{$zone};
     if ( defined $event_ref
         and my $data_ref = $event_ref->{'on_top_editor_change'} )
     {
-        #$data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $call_id );
-        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
+        my $editor = $self->[PARENT];
+        my $hash_ref = $editor->load_info('conf');
+        $hash_ref = {} if ( ! defined $hash_ref );
+        $data_ref->{'sub_ref'}->( $editor, $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
+        print "Après évènement on_top_editor_change\n";
     }
 }
 

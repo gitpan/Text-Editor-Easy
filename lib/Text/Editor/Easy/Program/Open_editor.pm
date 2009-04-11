@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 use threads;
@@ -81,8 +81,7 @@ sub open {
     #close TMP;
     
     if ( ! defined $open_editor ) {
-            $open_editor = Text::Editor::Easy->new(
-        {
+        $open_editor = Text::Editor::Easy->new( {
             'zone'        => 'zone2',
             'focus'      => 'yes',
             'name'        => 'Open',
@@ -92,26 +91,24 @@ sub open {
                 'package' => 'Text::Editor::Easy::Program::Open_editor',
                 'sub'     => 'syntax',
             },
-            'motion_last' => {
-                'use'     => 'Text::Editor::Easy::Program::Open_editor',
-                'package' => 'Text::Editor::Easy::Program::Open_editor',
-                'sub'     => 'motion_last',
-                'mode'    => 'async',
-            },
-            'cursor_set_last' => {
-                'use'     => 'Text::Editor::Easy::Program::Open_editor',
-                'package' => 'Text::Editor::Easy::Program::Open_editor',
-                'sub'     => 'cursor_set_last',
-           #     'mode'    => 'async',
-            },
 			'events' => {
+                'motion' => {
+                    'use'     => 'Text::Editor::Easy::Program::Open_editor',
+                    'package' => 'Text::Editor::Easy::Program::Open_editor',
+                    'sub'     => 'motion_last',
+                    'thread'    => 'Motion',
+                },
+                'cursor_set' => {
+                    'use'     => 'Text::Editor::Easy::Program::Open_editor',
+                    'package' => 'Text::Editor::Easy::Program::Open_editor',
+                    'sub'     => 'cursor_set_last',
+                },
                 'after_clic' => {
                     'use'     => 'Text::Editor::Easy::Program::Open_editor',
                     'sub'     => 'after_clic',
-                }
+                },
 		    },
-        }
-        );
+        } );
         $open_editor->save_info($dir, 'dir');
         $open_editor->bind_key({ 'package' => 'Text::Editor::Easy::Program::Open_editor', 'sub' => 'up', 'key' => 'Up' } );
         $open_editor->bind_key({ 'package' => 'Text::Editor::Easy::Program::Open_editor', 'sub' => 'down', 'key' => 'Down' } );

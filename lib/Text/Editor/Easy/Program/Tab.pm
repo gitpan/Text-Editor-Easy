@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Text::Editor::Easy::Comm;
 
@@ -36,7 +36,7 @@ sub on_top_editor_change {
 #print "Nom du nouveau fichier on_top : |", $new_on_top_editor->file_name, "|\n";
     my $tab_editor = $tab_object{$tab_ref};
     if ( !$tab_editor ) {
-        #print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
+        print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
         $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
         Text::Editor::Easy::Comm::set_ref( $tab_editor, $tab_ref);
         $tab_object{$tab_ref} = $tab_editor;
@@ -45,7 +45,7 @@ sub on_top_editor_change {
     }
     if ( defined $old_on_top_editor ) {
         my $name = $old_on_top_editor->name;
-        #print "\n\nDans on_top_editor_change de Tab : old_editor => $name\n";
+        print "\n\nDans on_top_editor_change de Tab : old_editor => $name\n";
         Text::Editor::Easy::Async->update_conf ( $old_on_top_editor->get_ref, $conf_ref, $name );
     }
 
@@ -70,9 +70,9 @@ sub on_top_editor_change {
 }
 
 sub motion_over_tab {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor, $hash_ref ) = @_;
 
- #print "Dans motion_over_tab $unique_ref|$editor|", $hash_ref->{'line'}, "|\n";
+    #print "Dans motion_over_tab $editor|", $hash_ref->{'line'}, "|\n";
   # Vérification que l'on est bien sur la première ligne
     return if ( anything_for_me() );
 
@@ -84,7 +84,7 @@ sub motion_over_tab {
     my $pointed_line = $hash_ref->{'line'};
     return if ( $first_line != $pointed_line );
 
-    my $pos = $hash_ref->{'line_pos'};
+    my $pos = $hash_ref->{'pos'};
 
     return if ( anything_for_me() );
     my $info_ref = $editor->load_info;
@@ -139,7 +139,12 @@ sub new_on_top {
    #print "Création d'un éditeur par motion sur tab : ", dump ($file_ref), "\n";
         return if ( !$file_ref->{'zone'} );
         $file_ref->{'focus'} = 'yes';
-
+        $file_ref->{'events'} = {
+            'motion' => { 
+                'action' => 'nop',
+                'thread' => 'Motion',
+            },
+        };
         #$new_on_top = Text::Editor::Easy->new($file_ref);
 
 # Appel asynchrone obligatoire : la création d'un éditeur peut obliger le thread 0 à appeler le thread motion
@@ -252,12 +257,15 @@ sub select_new_on_top_thread_0 {
         $hash_ref->{'full_absolute'} = $full_absolute;
         $hash_ref->{'file'} = $full_relative if ( defined $full_relative );
         $hash_ref->{'name'} = $name;
-        push @$file_list_ref, $hash_ref;
-        #print "Dans select_new_on_top : Ajout d'un nouvel éditeur : zone => ", $hash_ref->{'zone'}, "\n";
         my $zone_ref = $hash_ref->{'zone'};
         if ( ref $zone_ref ) {
             $hash_ref->{'zone'} = $zone_ref->{'name'};
-        }
+        }        
+        #print "Dans select_new_on_top : Ajout d'un nouvel éditeur : zone => ", $hash_ref->{'zone'}, "\n";
+        #print "Avant sauvegarder par save_info, highlight = \n", dump ( $hash_ref->{'highlight'} ),
+        #    "\nEVENTS = \n", dump ( $hash_ref->{'events'} ), "\n";
+        push @$file_list_ref, $hash_ref;
+        
         $info_ref->{'selected'} = scalar (@$file_list_ref) - 1;
     }
     #print "DUMP\n", dump ($file_list_ref), "FIN DUMP\n";
@@ -284,8 +292,10 @@ sub update_conf {
     #    "\$info_old_editor_ref->{'first_line_ref'} = ", $info_old_editor_ref->{'first_line_ref'},
     #    "\n\$info_old_editor_ref->{'cursor_line_ref'} = ", $info_old_editor_ref->{'cursor_line_ref'}, "\n";
     my $load_info_ref = Text::Editor::Easy::File_manager::load_info( $self );
+    #print "Load info de Tab = \n", dump( $load_info_ref ), "\n";
     my $file_list_ref = $load_info_ref->{'file_list'};
     my ( $text, $indice, $start, $end ) = search_position ( $file_list_ref, $old_name );
+    #print "Dans update_conf : texte = $text, indice = $indice, start = $start, end = $end\n";
     if ( defined $indice ) {
         my $info_ref = $file_list_ref->[$indice];
         my ( $absolute_path, $file_name, $relative_path, $full_absolute, $full_relative, $name )
@@ -295,17 +305,19 @@ sub update_conf {
             $info_ref->{'absolute_path'} = $absolute_path;
             $info_ref->{'full_relative'} = $full_relative;
             $info_ref->{'full_absolute'} = $full_absolute;
-			if ( defined $full_relative ) {
+            if ( defined $full_relative ) {
                 $info_ref->{'file'} = $full_relative;
-		    }
-			elsif ( defined $full_absolute ) {
-				$info_ref->{'file'} = $full_absolute;
-		    }
-			else {
-				$info_ref->{'file'} = $file_name;
-		    }
+            }
+            elsif ( defined $full_absolute ) {
+                $info_ref->{'file'} = $full_absolute;
+            }
+            else {
+                $info_ref->{'file'} = $file_name;
+            }
         }
         $info_ref->{'config'} = $info_old_editor_ref;
+        print "Avant appel méthode zone\n";
+        $info_ref->{'zone'} = $old_editor->zone;
     }
     return $load_info_ref;
 }
@@ -364,7 +376,7 @@ sub select_new_on_top {
         $hash_ref->{'file'} = $full_relative || $full_absolute;
         $hash_ref->{'name'} = $name;
         push @$file_list_ref, $hash_ref;
-        print "Dans select_new_on_top : Ajout d'un nouvel éditeur : zone => ", $hash_ref->{'zone'}, "\n";
+        #print "Dans select_new_on_top : Ajout d'un nouvel éditeur : zone => ", $hash_ref->{'zone'}, "\n";
         my $zone_ref = $hash_ref->{'zone'};
         if ( ref $zone_ref ) {
             $hash_ref->{'zone'} = $zone_ref->{'name'};

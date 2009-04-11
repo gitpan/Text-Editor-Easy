@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions 
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Text::Editor::Easy::Comm;
 use threads;    # Pour debug
@@ -22,16 +22,12 @@ use Data::Dump qw(dump);
 Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 
 sub exec_eval {
-    my ( $self, $program, $hash_ref ) = @_;
+    my ( $self, $program ) = @_;
 
 # Ajout d'une instruction "return if anything_for_me;" entre chaque ligne pour réactivité maximum
 
     $program =~ s/;\n/;return if ( anything_for_me() );\n/g;
     print DBG "Dans exec_eval(", threads->tid, ") : \n$program\n\n";
-    print DBG "origin     = ", $hash_ref->{'origin'}, "\n";
-    print DBG "sub_origin = ", $hash_ref->{'sub_origin'}, "\n";
-    my $sub_sub_origin = $hash_ref->{'sub_sub_origin'};
-    print DBG "sub_sub_origin = ", $hash_ref->{'sub_sub_origin'}, "\n";
 
     #print substr ( $program, 0, 150 ), "\n\n";
     my $call_id = Text::Editor::Easy->trace_eval ( $program, threads->tid, __FILE__, __PACKAGE__, __LINE__ + 1 );
@@ -56,6 +52,7 @@ sub exec_eval {
         'package' => __PACKAGE__,
         'call_id' => $call_id,
     );
+    Text::Editor::Easy->whose_name('Eval')->on_top;
     Text::Editor::Easy->trace_print( $hash_dump, $message );
     #print STDERR $message;
 }
@@ -67,6 +64,8 @@ sub idle_eval_exec {
         Text::Editor::Easy->empty_queue($eval_print);
     }
 }
+
+print "Fin de l'évaluation de Program::Exec...\n";
 
 =head1 FUNCTIONS
 

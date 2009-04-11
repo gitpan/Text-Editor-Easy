@@ -10,11 +10,11 @@ But only one "Text::Editor::Easy" object can be on the top of its zone. So , in 
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use threads; # debug
 use Scalar::Util qw(refaddr);
@@ -82,6 +82,7 @@ sub on_top_editor {
     my ( $self ) = @_;
     
     print "Dans on_top_editor de Zone ", $self->{'name'}, "\n";
+    
     my $ref = Text::Editor::Easy->on_top_ref_editor($self);
     print "Dans on_top_editor de Zone ", $self->{'name'}, ", ref = $ref\n";
     my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
@@ -114,7 +115,7 @@ sub resize {
 sub resize_right {
     my ( $self, $how_many_ref, @coordinates ) = @_;
     # Seul "x" de $options_ref nous intéresse
-    print "x vaut $how_many_ref->{'x'}\n";
+    #print "x vaut $how_many_ref->{'x'}\n";
     my $new_zone_ref = {
         'name' => $self->{'name'},
         'size' => {

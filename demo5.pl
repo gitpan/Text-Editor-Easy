@@ -22,16 +22,6 @@ use Text::Editor::Easy;
 use File::Basename;
 my ($file_name, $file_path ) = fileparse($0);
 
-Text::Editor::Easy->new(
-    {
-        'file'      => "${file_path}expenses.cpt",
-        'highlight' => { 'sub' => 'highlight', },
-		'font_size' => 10,
-		'width' => 500,
-		'height' => 400,
-    }
-);
-
 my %compte = (
     "ASV" => 1,
     "TAH" => 1,
@@ -67,6 +57,16 @@ my %compte = (
     "DIT" => 1,
     "CEX" => 1,
     "ASL" => 1
+);
+
+Text::Editor::Easy->new(
+    {
+        'file'      => "${file_path}expenses.cpt",
+        'highlight' => { 'sub' => 'highlight', },
+        'font_size' => 10,
+        'width' => 500,
+        'height' => 400,
+    }
 );
 
 Text::Editor::Easy->manage_event;

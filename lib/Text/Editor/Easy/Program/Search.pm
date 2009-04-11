@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Text::Editor::Easy::Comm;
 
@@ -23,8 +23,10 @@ my $eval_thread;
 my $eval_print;
 
 sub init_eval {
-    my ( $self, $reference, $other_ref, $unique_ref ) = @_;
-    #print "============>INIT de Search .. $self, $unique_ref\n";
+    my ( $self, $reference, $unique_ref ) = @_;
+    
+    print "Dans init_eval de Search.pm .. $self, $unique_ref\n";
+    
     $out = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref( $out, $unique_ref);
 
@@ -39,7 +41,10 @@ sub init_eval {
         }
     );
 
-    #print "EVAL _TJREAD = $eval_thread\n";
+    print "EVAL _TJREAD = $eval_thread\n";
+    #print "Appel idle_eval_exec en asynchrone...\n";
+    #Text::Editor::Easy::Async->idle_eval_exec("toto");
+    #print "Appel exec_eval en synchrone ...\n";
     #Text::Editor::Easy->exec_eval('Bonjour');
 
     $eval_print = Text::Editor::Easy->create_new_server(
@@ -68,10 +73,11 @@ sub init_eval {
 }
 
 sub modify_pattern {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor ) = @_;
+
+    print "Dans modify_pattern de Search.pm\n";
 
     #return;
-    #print "Dans modify_pattern...$hash_ref->{'text'}\n";
     Text::Editor::Easy::Async->idle_eval_exec($eval_print);
     return if ( anything_for_me() );
     my $line = $editor->first;
@@ -104,8 +110,9 @@ sub modify_pattern {
     $out->empty;
     return if ( anything_for_me() );
 
-    $out->async->on_top;
-    Text::Editor::Easy::Async->exec_eval($program, $hash_ref);
+    #$out->async->on_top;
+    $out->async->make_visible;
+    Text::Editor::Easy::Async->exec_eval($program);
     return;
 }
 

@@ -18,7 +18,7 @@ WriteMakefile(
 	'Time::HiRes' => 0,
 	'File::Basename' => 0,
 	'Tk' => 0,
-	'Syntax::Highlight::Perl' => 0,
+	'Syntax::Highlight::Perl::Improved' => 0,
 	'Fcntl' => 0,
 	'SDBM_File' => 0,
     'File::Spec' => 0,

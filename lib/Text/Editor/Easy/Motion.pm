@@ -9,94 +9,23 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use threads;
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
 
-my %ref_init;
-my %referenced;
-
-sub reference_event {
-    my ( $self, $event, $unique_ref, $motion_ref ) = @_;
-
-    #print "Dans reference de Motion : $event\n";
-    #print "USE $motion_ref->{use}\n";
-    #print "PACKAGE $motion_ref->{package}\n";
-    #print "SUB $motion_ref->{sub}";
-    #print "toto";
-    #print "mimi\n\nmama\nmomo\ntres";
-    #print "zaza\n";
-    #print "INIT $motion_ref->{init}\n";
-    eval "use $motion_ref->{use}";
-    my $init_ref = $motion_ref->{'init'};
-
-    if ( defined $init_ref ) {
-        my $what = $init_ref->[0];
-
-        #print "WHAT $what\n";
-        $ref_init{$what}{$unique_ref} = eval "\\&$motion_ref->{package}::$what";
-
-        #async_call (threads->tid, @$init_ref );
-        my ( $false_method, @param ) = @$init_ref;
-        #print "FALSE METHOD ", $false_method . ' ' . threads->tid,
-        #  "|$unique_ref|", join( "|", @param ), "\n";
-
-        #Text::Editor::Easy::Async->ask2( 'init ' . threads->tid,
-        #    $false_method, $unique_ref, @param );
-        Text::Editor::Easy::Async->ask_thread( "$motion_ref->{package}::$what",
-            threads->tid, $unique_ref, @param );
-    }
-    $referenced{$event}{$unique_ref} =
-      eval "\\&$motion_ref->{package}::$motion_ref->{sub}";
-}
-
-sub init {
-    my ( $self, $what, $unique_ref, @param ) = @_;
-
-    print "Dans init de motion : $what|@param\n";
-
-    $ref_init{$what}{$unique_ref}->( $self, $unique_ref, @param );
-}
-
-sub manage_events {
-    my ( $self, $what, @param ) = @_;
-
-    if ( $referenced{$what} ) {
-
-        #print "Evènement $what référencé size ", total_size($self), "\n";
-        my ( $ref_editor, $hash_ref, @other ) = @param;
-        if ( !defined $referenced{$what}{$ref_editor} ) {
-            print STDERR
-"L'évènement $what n'a pas été référencé pour l'éditeur $ref_editor\n";
-            return;
-        }
-
-        #print "OK ===> $what référencé pour $ref_editor\n";
-        my $editor = $self->{$ref_editor};
-        if ( !defined $editor ) {
-            $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-            Text::Editor::Easy::Comm::set_ref( $editor, $ref_editor);
-            $self->{$ref_editor} = $editor;
-        }
-        $editor->transform_hash( undef, $hash_ref );
-        $referenced{$what}{$ref_editor}
-          ->( $ref_editor, $editor, $hash_ref, @other );
-    }
-}
-
 my $show_calls_editor;
 my $display_zone;
 
 sub init_move {
-    my ( $self, $reference, $unique_ref, $ref_editor, $zone ) = @_;
+    my ( $self, $reference, $ref_editor, $zone ) = @_;
 
-    #print "DANS INIT_MOVE $self, $unique_ref, $ref_editor, $zone\n";
+    print "DANS INIT_MOVE $self, $ref_editor, $zone\n";
     $show_calls_editor = bless \do { my $anonymous_scalar },
       "Text::Editor::Easy";
     Text::Editor::Easy::Comm::set_ref( $show_calls_editor, $ref_editor);
@@ -115,21 +44,24 @@ my @selected;       # Ligne sélectionnée de la sortie
 my %line_number;    # Sauvegarde des recherches, fuite mémoire pas important ici
 
 sub move_over_eval_editor {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor, $hash_ref ) = @_;
+
+    print "Dans move_over_eval_editor\n";
     
+    my $unique_ref = $editor->get_ref;
     $hash_ref->{'editor'} = 'eval';
-    move_over_out_editor ( $unique_ref, $editor, $hash_ref );
+    move_over_out_editor ( $editor, $hash_ref );
 }
 
 sub move_over_external_editor {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor, $hash_ref ) = @_;
     
     $hash_ref->{'editor'} = 'external';
-    move_over_out_editor ( $unique_ref, $editor, $hash_ref );
+    move_over_out_editor ( $editor, $hash_ref );
 }
 
 sub move_over_out_editor {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor, $hash_ref ) = @_;
 
     return if (anything_for_me);
     
@@ -144,7 +76,7 @@ sub move_over_out_editor {
     return if (anything_for_me);
 
     #print "Avant appel get_info:  $seek_start\n";
-    my $pos = $hash_ref->{'line_pos'};
+    my $pos = $hash_ref->{'pos'};
 
     my ( $first, $last, @enreg, $ref_first, $pos_first, $ref_last, $pos_last);
     if ( my $type = $hash_ref->{'editor'} ) {
@@ -280,6 +212,7 @@ sub manage_eval {
     
     my @code = Text::Editor::Easy->get_code_for_eval( $1 );
     #print "Gestion de l'eval dans motion : reçu ", join ("\n", @code), "\n";
+    return if ( anything_for_me );
     my $new_editor = $editor{''};
     if ( ! $new_editor ) {
             $new_editor = Text::Editor::Easy->new(
@@ -291,17 +224,27 @@ sub manage_eval {
                         'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
                         'sub'     => 'syntax',
                     },
+                    'events' => {
+                        'motion' => {
+                            'action' => 'nop',
+                            'thread' => 'Motion',
+                        }
+                    },
+                    'focus' => 'no',
                 }
             );
         $editor{''} = $new_editor;
     }
     else {
-        $new_editor->on_top;
+        $new_editor->empty;
     }
-    $new_editor->empty;
+    return if ( anything_for_me );
+
     for ( @code ) {
         $new_editor->insert( "$_\n" );
     }
+    return if ( anything_for_me );
+    
     my $line = $new_editor->number($number);
     return if ( ! defined $line );
     return ( $new_editor, $line );
@@ -315,26 +258,42 @@ sub manage_file {
     my $line;
     if ( !$new_editor ) {
         $new_editor = Text::Editor::Easy->whose_file_name($file);
+        return if ( anything_for_me );
         if ( !$new_editor ) {
-            $new_editor = Text::Editor::Easy->new(
-                {
-                    'file'      => $file,
-                    'zone'      => $display_zone,
-                    'highlight' => {
-                        'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
-                        'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
-                        'sub'     => 'syntax',
-                    },
-                    'config' => {
-                        'first_line_number' => $number,
-                        'first_line_at' => 'middle',
-                    },
-                }
-            );
+            my $conf_ref = {
+                'file'      => $file,
+                'zone'      => $display_zone,
+                'highlight' => {
+                    'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
+                    'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
+                    'sub'     => 'syntax',
+                },
+                'config' => {
+                    'first_line_number' => $number,
+                    'first_line_at' => 'middle',
+                },
+                'events' => {
+                    'motion' => {
+                        'action' => 'nop',
+                        'thread' => 'Motion',
+                    }
+                },
+                'focus' => 'no',
+            };
+
+            $new_editor = Text::Editor::Easy->new( $conf_ref );
+            $new_editor->save_info($conf_ref, 'conf');
         }
+        
+        # Peut-on être sûr que la liste "file_list_ref" sauvegardée dans 'info' du thread File_manager du Tab est mise à jour ?
+        
         $editor{$file} = $new_editor;
-        $line = $new_editor->number($number);
-        return if ( ! defined $line );
+        return if ( anything_for_me );
+        $line = $new_editor->number($number, {
+            'lazy' => threads->tid,
+            'check_every' => 20,
+        });
+        return if ( ! defined $line or ref $line ne 'Text::Editor::Easy::Line' );
         $line_number{$file}{$number} = $line;
     }
     else {
@@ -353,21 +312,20 @@ sub manage_file {
         $line_number{$file}{$number} = $line;
 
         # Bloquant maintenant
-        $new_editor->on_top;
         $new_editor->async->display( $line, { 'at' => 'middle' } );
     }
     return ( $new_editor, $line );
 }
 
 sub init_set {
-    my ( $self, $reference, $unique_ref, $zone ) = @_;
+    my ( $self, $reference, $zone ) = @_;
 
-    #print "Dans init_set $self, $zone\n";
+    print "Dans init_set $self, $zone\n";
     $display_zone = $zone->{'name'};
 }
 
 sub cursor_set_on_who_file {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $editor, $hash_ref ) = @_;
 
     return if (anything_for_me);
     $editor->async->make_visible;
@@ -382,6 +340,8 @@ sub cursor_set_on_who_file {
     my ( $file, $number, $package ) = ( $1, $2, $3 );
 
     my ( $new_editor, $line );
+    print "Dans cursor_set_on_who_file : avant manage_..., thread", threads->tid, "\n";
+    return if (anything_for_me);    # Abandonne si autre chose à faire
     if ( ! -f $file ) {
         # gestion de l'eval...
         ( $new_editor, $line ) = manage_eval ( $file, $number );
@@ -389,23 +349,22 @@ sub cursor_set_on_who_file {
     else {
         ( $new_editor, $line ) = manage_file ( $file, $number );        
     }
-       
+
     return if ( ! defined $new_editor );
-        
+
+    print "Appel on top pour new_editor ", $new_editor->name, "\n";
+    $new_editor->on_top;
+    print "Fin appel on top pour new_editor\n";
     $line->select( undef, undef, 'white' );
     $editor->deselect;
     $hash_ref->{'line'}->select( undef, undef, 'orange' );
 }
 
 sub zone_resize {
-    my ( $self, $zone_name, $where, $options_ref ) = @_;
+    my ( $zone_name, $where, $options_ref ) = @_;
     
-    print "Dans zone resize de $zone_name, tid = ", threads->tid, " - where = $where|$options_ref\n";
     my $zone = Text::Editor::Easy::Zone->whose_name( $zone_name );
-    return if ( anything_for_me );
-    print "Objet zone ? : $zone\n";
     my @zone_coord = $zone->coordinates;
-    return if ( anything_for_me );
 #    print "Appel de zone resize...\n";
     $zone->resize( 
         $where,
@@ -452,6 +411,20 @@ under the same terms as Perl itself.
 
 
 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -26,9 +26,9 @@ Text::Editor::Easy->new(
     {
         'file'      => "${file_path}account.hst",
         'highlight' => { 'sub' => 'highlight', },
-		'font_size' => 10,
-		'width' => 600,
-		'height' => 400,
+        'font_size' => 10,
+        'width' => 600,
+        'height' => 400,
     }
 );
 

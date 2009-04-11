@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 use Data::Dump qw(dump);
 
 sub left {
@@ -830,10 +830,10 @@ sub motion_select {
         $self->[SELECTION] = $select_ref;
     }
     $select_ref->{'stop_line'} = $options_ref->{'line'};
-    $select_ref->{'stop_pos'} = $options_ref->{'line_pos'};
+    $select_ref->{'stop_pos'} = $options_ref->{'pos'};
     #print "START LINE $select_ref->{'start_line'}\n";
     #print "OPTIO LINE $options_ref->{'line'}\n";
-    #print "LINE   POS $options_ref->{'line_pos'}\n";
+    #print "LINE   POS $options_ref->{'pos'}\n";
     if ( $select_ref->{'start_line'} eq $options_ref->{'line'} ) {
         if ( $select_ref->{'stop_pos'} > $select_ref->{'start_pos'} ) {
             $select_ref->{'mode'} = '+';
@@ -844,7 +844,7 @@ sub motion_select {
         Text::Editor::Easy::Abstract::area_select (
             $self,
             [ $select_ref->{'start_line'}, $select_ref->{'start_pos'} ],
-            [ $select_ref->{'start_line'}, $options_ref->{'line_pos'} ]
+            [ $select_ref->{'start_line'}, $options_ref->{'pos'} ]
         );
         Text::Editor::Easy::Abstract::cursor_set ( 
             $self,
@@ -862,17 +862,17 @@ sub motion_select {
     if ( ! defined $last ) {
         if ( $select_ref->{'mode'} eq '+' ) {
             $first_ref = 'top';
-            $last_ref = [ $options_ref->{'line'}, $options_ref->{'line_pos'} ];
+            $last_ref = [ $options_ref->{'line'}, $options_ref->{'pos'} ];
         }
         else {
-            $first_ref = [ $options_ref->{'line'}, $options_ref->{'line_pos'} ];
+            $first_ref = [ $options_ref->{'line'}, $options_ref->{'pos'} ];
             $last_ref = [ 'bottom' ];
         }
     }
     else {
         my $area_ref;
         $area_ref->{ $select_ref->{'start_line'} } = $select_ref->{'start_pos'};
-        $area_ref->{ $options_ref->{'line'} } = $options_ref->{'line_pos'};
+        $area_ref->{ $options_ref->{'line'} } = $options_ref->{'pos'};
 
         $first_ref = [ $first, $area_ref->{$first} ];
         $last_ref = [ $last, $area_ref->{$last} ];

@@ -39,4 +39,3 @@ print "The user have closed the window\n";
 # to dispose of none.
 #
 
-

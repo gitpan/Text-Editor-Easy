@@ -8,11 +8,15 @@ use strict;
 Text::Editor::Easy::Program::Save - This module makes regular saves of the entire "Text::Editor::Easy" tree under developpement.
 
 This is a temporary module to replace the annulation functionnality which is not yet implemented.
-The process of regular save is launched only if the Editor.pl program finds a "../save" directory.
+The process of regular save is launched only if the Editor.pl program finds a "../../save" directory.
 
 =head1 VERSION
 
+Version 0.45
+
 =cut
+
+our $VERSION = '0.45';
 
 use Text::Editor::Easy;
 use Text::Editor::Easy::Comm;
@@ -30,9 +34,9 @@ sub init {
     my ( $self ) = @_;
     #print "Dans le thread ", threads->tid, " : exécution de l'ajout de méthode...\n";
     
-    $self->{'current'} = "../save/current_list.txt";
-    $self->{'old'} = "../save/old_list.txt";
-    $self->{'dirs_to_clean'} = "../save/old_dirs_list.txt";
+    $self->{'current'} = "../../save/regular/current_list.txt";
+    $self->{'old'} = "../../save/regular/old_list.txt";
+    $self->{'dirs_to_clean'} = "../../save/regular/old_dirs_list.txt";
     
     Text::Editor::Easy->repeat_class_method( 10, 'save_arbo');
     
@@ -42,7 +46,6 @@ sub init {
 
 
 my @month = qw( Janvier Fevrier Mars Avril Mai Juin Juillet Aout Septembre Octobre Novembre Decembre );
-
 # find ne renvoie pas toujours la liste des fichiers dans le même ordre
 # et en plus, sa fonction "wanted" n'accepte ni paramètre et n'en renvoie pas non plus
 my $tab_ref;
@@ -205,7 +208,7 @@ sub give_dirs_and_archive_name {
     
     my $num_mon = sprintf("%02d", $mon + 1);
     
-    my $short_dir = "../save/$year/${num_mon}__$month[$mon]/$mday/${hour}_h/${min}_min";
+    my $short_dir = "../../save/regular/$year/${num_mon}__$month[$mon]/$mday/${hour}_h/${min}_min";
     my $long_dir = $short_dir . "/${sec}_sec";
     
     return ( 

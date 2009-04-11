@@ -1,7 +1,10 @@
 .cvsignore
 Changes
 Editor.pl
+MANIFEST
+META.yml
 Makefile.PL
+README
 account.hst
 demo1.pl
 demo10.pl
@@ -23,7 +26,6 @@ lib/Text/Editor/Easy/Abstract/Key.pm
 lib/Text/Editor/Easy/Comm.pm
 lib/Text/Editor/Easy/Cursor.pm
 lib/Text/Editor/Easy/Data.pm
-lib/Text/Editor/Easy/Data/Events.pm
 lib/Text/Editor/Easy/Display.pm
 lib/Text/Editor/Easy/Events.pm
 lib/Text/Editor/Easy/File_manager.pm
@@ -48,11 +50,8 @@ lib/Text/Editor/Easy/Test/Test3.pm
 lib/Text/Editor/Easy/Trace/Full.pm
 lib/Text/Editor/Easy/Window.pm
 lib/Text/Editor/Easy/Zone.pm
-MANIFEST
-META.yml
 prove.bat
 prove.sh
-README
 t/00-load.t
 t/boilerplate.t
 t/class_thread_add_method.t

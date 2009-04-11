@@ -1,6 +1,6 @@
 Text-Editor-Easy
 
-Version 0.44.
+Version 0.45.
 Pure perl editor module and program. 10 demos in the program,
 but still not usable.
 
@@ -22,7 +22,7 @@ Uncompress, untar...
 Now install the following modules from where you should, according to
 your system (you shoud already have most of them) :
         - Tk
-        - Syntax::Highlight::Perl
+        - Syntax::Highlight::Perl::Improved
         - Data::Dump
         - Time::HiRes
         - IO::File

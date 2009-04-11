@@ -9,11 +9,11 @@ Text::Editor::Easy::Events - Manage events linked to user code : specific code i
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 =head1 INTRODUCTION
 
@@ -98,15 +98,27 @@ name of the events :
 
 =item *
 
-'clic'
+'clic', modifier keys (alt, ctrl and/or shift) can be used
 
 =item *
 
-'motion' is not yet integrated in this new management !
+'motion', mouse move, modifier keys can be used
+
+=item *
+
+'drag', mouse move with left mouse button pressed, modifier keys can be used
+
+=item *
+
+'change', happens when the text of the editor is changed (text added, deleted or replaced).
+
+=item *
+
+'cursor_set', happens when the cursor position is changed.
 
 =back
 
-For complex things, L<here is the complete list|EVENT LIST> but read first L<EVENT NAMES AND LABELS>.
+For complex things, L<here is the complete list|/EVENT LIST> but read first L</EVENT NAMES AND LABELS>.
 
 =head2 'sub', 'use' and 'package' options of  one particular event in 'events' option
 
@@ -175,7 +187,7 @@ A hash reference that contains information relative to the event.
 =back
 
 Of course, you can't expect the information to be the same for a key press and for a mouse motion. The number and names of the hash keys 
-will then depend on the event itself. L<All keys are explained for each event here|EVENT LIST>. But it's easier to see all the possibilities for
+will then depend on the event itself. L<All keys are explained for each event here|/EVENT LIST>. But it's easier to see all the possibilities for
 the keys and guess what you'll get for your event :
 
 =over 4
@@ -217,10 +229,10 @@ But if you want you sub to be the last thing to be done in response to the event
     );
 
 In this case, your sub will B<always> be the last executed action. Sometimes, you would like to decide, according to the event information (so
-dynamically), if you want to go on or not. See here for L<dynamic exit|MORE ON 'ACTION' OPTION>.
+dynamically), if you want to go on or not. See here for L<dynamic exit|/MORE ON 'ACTION' OPTION>.
 
 In a more vicious way, you may want to change the values of the event information in order to change the data on which the default management
-will work. Again, the L<'action' option|MORE ON 'ACTION' OPTION> gives you the power to lie.
+will work. Again, the L<'action' option|/MORE ON 'ACTION' OPTION> gives you the power to lie.
 
 A good easy thing would be that if 'action' option (with 'exit value) is present without the 'sub' option, then nothing is executed, just an exit is made :
 
@@ -235,7 +247,7 @@ As you see, 'sub' option is, in fact, not mandatory.
 =head2 easy things conclusion
 
 Nothing has been said about threads and dynamic event linking, but this is quite normal for the easy part of the interface.
-Still you can do most of what has been introduced at L<the beginning|INTRODUCTION>.
+Still you can do most of what has been introduced at L<the beginning|/INTRODUCTION>.
 
 In an easy way, all events are done synchronously by the 'Graphic' thread : the 'Graphic' thread will have to complete your sub. So you may
 feel desperate if you have a huge task to do in response to a user event and if you still want your application to remain responsive : which seems
@@ -345,7 +357,7 @@ We've seen the 'exit' value of 'action' option that ends the event management. T
 
 =item *
 
-'jump' to go straight to a precise L<event label|EVENT NAMES AND LABELS>
+'jump' to go straight to a precise L<event label|/EVENT NAMES AND LABELS>
 
 =back
 
@@ -439,7 +451,7 @@ can be saved as dynamic configuration and inquired later. Keeping 'jump' with 'c
 
 =head3 smallest possible 'jump'
 
-As you may L<link more than one sub|'MULTI-SUB' DECLARATION> to one event, the smallest possible jump is done when you give the label
+As you may L<link more than one sub|/'MULTI-SUB' DECLARATION> to one event, the smallest possible jump is done when you give the label
 following your own one (here the information hash should contain the same keys as those you have received). In this case, what you have jumped
 are the possible other subs that were linked to the same label event as yours, these subs should have been done after your own one (if no jump has
 been made).
@@ -509,7 +521,7 @@ but doesn't wait for its response.
 
 =head2 'create' option
 
-In the L<'thread' option example|'thread' option>, the thread had already been created, but if you use 'thread' option with a name that is unknown, a new thread
+In the L<'thread' option example|/'thread' option>, the thread had already been created, but if you use 'thread' option with a name that is unknown, a new thread
 will be created on the fly and will be named accordingly.
 
 On the contrary, if you have written a bad name by mistake, you may want to prevent this auto-creation. The 'create' options has 3 possible values :
@@ -549,10 +561,10 @@ So you don't have to use the 'create' option if you want an auto-creation and th
 Well, the benefit of threads seems to be brought only by asynchronous calls, but there is a reason why you could wish a synchronous call.
 You may want to initialize data in your thread while changing values for the default event management. And the initialized data will be used
 after the default management in an asynchronous way. So you don't have to share variables between threads just because you want some
-events to be synchronous : variable 'scope' can then be limited. Read carefully the L<deadlock possibility|deadlocks, 'pseudo' value for 'sync' option>
+events to be synchronous : variable 'scope' can then be limited. Read carefully the L<deadlock possibility|/deadlocks, 'pseudo' value for 'sync' option>
 if you use this option.
 
-This point is easier to understand when you know that, for instance, for a single mouse clic, you can L<manage up to 3 different events|EVENT NAMES AND LABELS>.
+This point is easier to understand when you know that, for instance, for a single mouse clic, you can L<manage up to 3 different events|/EVENT NAMES AND LABELS>.
 
 Now what about the 'sync' option with a 'false' value ?
 Well, you will force an asynchronous call and this could be used ... for the 'Graphic' thread ! This trick won't prevent you from freezing the user
@@ -676,7 +688,7 @@ the line you were expecting to work on !).
 =head1 'MULTI-SUB' DECLARATION
 
 You can link more than one sub to a single event. This can be interesting if you want to mix 
-L<synchronous and asynchronous responses|THREADS CONTRIBUTION> or just if you
+L<synchronous and asynchronous responses|/THREADS CONTRIBUTION> or just if you
 have 2 very different things to do and don't want to hide them in a bad named sub.
 
  my $editor = Text::Editor::Easy->new( 
@@ -774,10 +786,10 @@ alt_ctrl_shift_ (applications designed for pianists only !)
 
 =back
 
-The suffix is associated to a precise moment in the clic sequence, the prefix to the meta keys pressed during the clic. Here are 3 examples of
+The suffix is associated to a precise moment in the clic sequence, the prefix to the modifier keys pressed during the clic. Here are 3 examples of
 event label among the 27 possible :
 
-=over *
+=over 4
 
 =item *
 
@@ -793,7 +805,7 @@ alt_ctrl_after_clic
 
 =back
 
-A true mouse clic event generates 6 events as explained in L<EVENT NAMES AND LABELS>. In fact, if we include the default actions,
+A true mouse clic event generates 6 events as explained in L</EVENT NAMES AND LABELS>. In fact, if we include the default actions,
 there are 9 steps in a complete clic sequence :
 
 =over 4
@@ -808,7 +820,7 @@ there are 9 steps in a complete clic sequence :
 
 =item *
 
-'hard_clic' default management (if no meta key pressed or if label is 'hard_clic') : drag initiation for resize management
+'hard_clic' default management (if no modifier key pressed or if label is 'hard_clic') : drag initiation for resize management
 
 =item *
 
@@ -824,7 +836,7 @@ there are 9 steps in a complete clic sequence :
 
 =item *
 
-'clic' default management (if no meta key pressed or if label is 'clic') : set cursor position
+'clic' default management (if no modifier key pressed or if label is 'clic') : set cursor position
 
 =item *
 
@@ -836,17 +848,17 @@ there are 9 steps in a complete clic sequence :
 
 =back
 
-These 9 steps should be understood if you plan to use L<a 'jump' action|'jump' value>. For instance, if you are in a "${meta}hard_clic" event sub, the smallest
-jump you could do would be to give the label 'hard_clic' (you will have the default 'hard_clic' management executed even if a meta key is
+These 9 steps should be understood if you plan to use L<a 'jump' action|/'jump' value>. For instance, if you are in a "${meta}hard_clic" event sub, the smallest
+jump you could do would be to give the label 'hard_clic' (you will have the default 'hard_clic' management executed even if a modifier key is
 pressed). But you could end your sub giving the same label of your event, "${meta}hard_clic" : in this case, the default 'hard_clic' management 
-will be done as usual (that is, only if no meta key was pressed), then the default ${meta}hard_clic transformation will be done, followed by 'any_clic'
+will be done as usual (that is, only if no modifier key was pressed), then the default ${meta}hard_clic transformation will be done, followed by 'any_clic'
 events and so on...
 
 Parameters received by your specific sub and needed at specific labels depends only on the suffix. So only suffixes are described.
 
 =head3 'hard_clic' suffix
 
-First couple of events generated in the 'clic' sequence. There is a default management (when no meta key is pressed) which initiates a drag 
+First couple of events generated in the 'clic' sequence. There is a default management (when no modifier key is pressed) which initiates a drag 
 sequence if the cursor shape is a resize arrow (in this particular case, nothing is done afterwards : no 'clic' and 'after_clic' management).
 
 The information received by your sub is a hash containing the following keys :
@@ -863,11 +875,11 @@ The information received by your sub is a hash containing the following keys :
 
 =item *
 
-'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding meta key was pressed.
+'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding modifier key was pressed.
 
 =item *
 
-'meta', string containing the meta key combination ('', 'shift_', 'alt_ctrl_', ...)
+'meta', string containing the modifier key combination ('', 'shift_', 'alt_ctrl_', ...)
 
 =back
 
@@ -877,7 +889,7 @@ The information received by your sub is a hash containing the following keys :
     {
         'file'   => 'my_file.t3d',
         'events' => {
-            'any_hard_clic' => {              # hard_clic for any meta key combination
+            'any_hard_clic' => {              # hard_clic for any modifier key combination
                 'sub'    => 'my_hard_clic_sub',
             },                         
         }                                     # end of events declaration
@@ -897,7 +909,7 @@ The information received by your sub is a hash containing the following keys :
 
 =head3 'clic' suffix
 
-Second couple of events generated in the 'clic' sequence. There is a default management  (when no meta key is pressed) which makes the 
+Second couple of events generated in the 'clic' sequence. There is a default management  (when no modifier key is pressed) which makes the 
 following actions :
 
 =over 4
@@ -934,11 +946,11 @@ The information received by your sub is a hash containing the following keys :
 
 =item *
 
-'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding meta key was pressed : interesting for 'any_clic' event
+'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding modifier key was pressed : interesting for 'any_clic' event
 
 =item *
 
-'meta', string containing the meta key combination ('', 'shift_', 'alt_ctrl_', ...) :  interesting for 'any_clic' event
+'meta', string containing the modifier key combination ('', 'shift_', 'alt_ctrl_', ...) :  interesting for 'any_clic' event
 
 =back
 
@@ -959,15 +971,30 @@ The information received by your sub is a hash containing the following keys (th
 
 =item *
 
-'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding meta key was pressed (for 'any_after_clic')
+'meta_hash', hash containing the keys 'alt', 'ctrl' and 'shift' : values are true if the corresponding modifier key was pressed (for 'any_after_clic')
 
 =item *
 
-'meta', string containing the meta key combination ('', 'shift_', 'alt_ctrl_', ...),  for 'any_after_clic'
+'meta', string containing the modifier key combination ('', 'shift_', 'alt_ctrl_', ...),  for 'any_after_clic'
 
 =back
 
 =head2 'motion' subset
+
+=head1 EVENTS LINKED TO A ZONE INSTANCE
+
+Events can be linked to a L<'zone' instance|Text::Editor::Easy::Zone> rather than to a 
+'Text::Editor::Easy' instance.
+
+At least, 1 event will be acessible for a 'zone' instance :
+
+=over 4
+
+=item *
+
+top_editor_change : will happen each time a new 'editor' instance is on top.
+
+=back
 
 =head1 CONCLUSION
 
@@ -1060,6 +1087,7 @@ my %possible_action = (
     'exit'    => 1,
     'change' => 1,
     'jump'    => 1,
+    'nop'      => 1,
 );
 
 my %possible_sync = (
@@ -1073,7 +1101,7 @@ sub reference_event {
     my ( $unique_ref, $event_ref ) = @_;
     
     my $package = 'main';
-    #print "REF de event_ref : ", ref $event_ref, "\n";
+    print "REF de event_ref : ", ref $event_ref, "\n";
     my $use = $event_ref->{'use'};
     my $thread = $event_ref->{'thread'};
     if ( $use ) {
@@ -1086,22 +1114,31 @@ sub reference_event {
         }
     }
     my $action = $event_ref->{'action'};
-    if ( defined $action and ! $possible_action{$action} ) {
-        print STDERR "Unkown action value $action, instance not created\n";
-        return 'error';
+    if ( defined $action ) {
+        print "Action définie à $action pour event_ref = $event_ref\n";
+        if ( ! $possible_action{$action} ) {
+            print STDERR "Unknown action value $action, instance not created\n";
+            return 'error';
+        }
     }
     my $sync = $event_ref->{'sync'};
     if ( defined $sync and ! $possible_sync{$sync} ) {
-        print STDERR "Unkown sync value $sync, instance not created\n";
+        print STDERR "Unknown sync value $sync, instance not created\n";
         return 'error';
     }
 
+    if ( ! defined $event_ref->{'package'} ) {
+        $event_ref->{'package'} = $package;
+    }
+    else { # A supprimer
+        $package = $event_ref->{'package'};
+    }
     if ( defined $thread ) {
-        my $answer_ref = thread_use( $unique_ref, $thread, $use, $event_ref->{'create'} );
+        my $answer_ref = thread_use( $unique_ref, $thread, $use, $event_ref->{'create'}, $event_ref->{'init'}, $package );
         return $answer_ref if ( ! ref $answer_ref );
         $event_ref->{'tid'} = $answer_ref->{'tid'};
         if ( $action ) {
-            if ( $action ne 'exit' ) {
+            if ( $action ne 'exit' and $action ne 'nop' ) {
                 if ( ! defined $sync or $sync eq 'false' ) {
                     print STDERR "Action $action forbidden with asynchronous call to thread $thread\n";
                     delete $event_ref->{'action'};
@@ -1109,20 +1146,33 @@ sub reference_event {
             }
         }
     }
-    if ( ! defined $event_ref->{'package'} ) {
-        $event_ref->{'package'} = $package;
+    
+    my $sub = $event_ref->{'sub'};
+    return $event_ref if ( defined $sub );
+    if ( ! defined $action ) {
+        print STDERR "No action defined and no sub provided, event cancelled\n";
+        return 'unlink';
+    }
+    return $event_ref if ( $action eq 'exit' );
+    if ( $action ne 'nop' ) {
+        print STDERR "Action $action not correct when no sub is provided, event cancelled\n";
+        return 'unlink';
+    }
+    if ( ! defined $thread ) {
+        print STDERR "Action nop should be linked with a thread option, event cancelled\n";
+        return;
     }
     #print "Pour event $event_ref package = $package\n";
     return $event_ref;
 }
 
 sub thread_use {
-    my ( $unique_ref, $thread, $use, $create ) = @_;
+    my ( $unique_ref, $thread, $use, $create, $init, $package ) = @_;
 
     my $tid = $thread;
     if ( $thread =~ /\D/ ) {
         $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $unique_ref, $thread );
-		$tid = 0 if ( $thread eq 'Graphic' );
+        $tid = 0 if ( $thread eq 'Graphic' );
         if ( ! defined $tid and $thread ne 'File_manager' ) {
             if ( defined $create ) {
                 if ( $create eq 'warning' ) {
@@ -1145,9 +1195,15 @@ sub thread_use {
         }
     }
     if ( defined $tid ) {
-        Text::Editor::Easy->ask_thread( 'use_module', $tid, 'Text::Editor::Easy::Events' );
+        Text::Editor::Easy::Async->ask_thread( 'use_module', $tid, 'Text::Editor::Easy::Events' );
         if ( defined $use ) {
-            Text::Editor::Easy->ask_thread( 'use_module', $tid, $use );
+            Text::Editor::Easy::Async->ask_thread( 'use_module', $tid, $use );
+        }
+        if ( defined $init and ref $init eq 'ARRAY' ) {
+            my @init = @$init;
+            my $sub = shift @init;
+            #print "Avant appel $sub : package = $package\n";
+            Text::Editor::Easy::Async->ask_thread( $sub, $tid, @init );
         }
     }
     return { 'tid' => $tid }; # $tid maybe undef
@@ -1173,9 +1229,17 @@ sub execute_events {
     
     EVENT: for my $event ( @$events_list_ref ) {
         my $action = $event->{'action'};
+        #print "Event $event\n";
+        #if ( ! defined $action ) {
+        #    print "    ... action non définie pour editor = ", $editor->name, "\n";
+        #}
+        #else {
+        #    print "    ... action $action\n";
+        #}
         my $new_info_ref = execute_event($event, $editor, $info_ref);
-        next EVENT if ( ! defined $action );
+        next EVENT if ( ! defined $action or $action eq 'nop' );
         return if ( $action eq 'exit' );
+
         #print "Dans execute_events action = $action\n";
         #print "   ...ref de new_info_ref : ", ref( $new_info_ref ), "\n";
         if ( ! defined $new_info_ref or ! ref $new_info_ref ) {
@@ -1205,19 +1269,30 @@ sub execute_events {
 
 sub execute_event {
     my ( $event_ref, $editor, $info_ref ) = @_;
-    
+
     my $package = $event_ref->{'package'};
     my $sub = $event_ref->{'sub'};
     #print "EXECUTE_EVENT : PAckage $package, sub = $sub\n";
     my $action = $event_ref->{'action'};
     if ( ! defined $sub ) {
-        if ( $action eq 'exit' ) {
-            return;
+        if ( defined $action ) {
+            return if ( $action eq 'exit' );
+            if ( $action eq 'nop' ) {
+                print "Avant exécution d'une action nop pour ", $editor->name, "\n";
+                thread_nop( $editor, $event_ref );
+                return;
+            }
         }
     }    
     my $thread = $event_ref->{'thread'};
     if ( defined $thread ) {
         #print "Appel de thread execute avec thread = $thread\n";
+        if ( ! defined $action ) {
+            print "1 Avant appel transform and execute pour thread : action = undef\n";
+        }
+        else {
+            print "1 Avant appel transform and execute pour thread : action = $action\n";
+        }
         return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub );
     }
     else  {
@@ -1225,6 +1300,7 @@ sub execute_event {
         if ( defined $sync and $sync eq 'false' ) {
             $event_ref->{'tid'} = 0;
             #print "Avant thread_execute pour tid = 0\n";
+            #print "2 Avant appel transform and execute pour thread : action = $action\n";
             return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub );
         }
         my $answer = transform_and_execute( $editor, $info_ref, $package, $sub );
@@ -1269,9 +1345,36 @@ sub thread_execute {
     }
     else {
         #print "Appel en asynchrone pour tid = $tid\n";
-        Text::Editor::Easy::Async->ask_thread( @param );
-        
+        Text::Editor::Easy::Async->ask_thread( @param );        
     }        
+}
+
+sub thread_nop {
+    my ( $editor, $event_ref ) = @_;
+        
+    my $tid = $event_ref->{'tid'};
+    my $unique_ref = $editor->get_ref;
+    if ( ! defined $tid ) {
+        if ( $event_ref->{'thread'} ne 'File_manager' ) {
+            print STDERR "Can't execute event : unknown tid for thread $event_ref->{'thread'}\n";
+            return;
+        }
+        else {
+            $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $unique_ref, 'File_manager' );
+            #print "Récupéré le tid $tid pour le thread File_manager\n";
+            # Utiliser l'interface dynamique pour modifier l'évènement... ?
+        }
+    }
+    my $sub_name = 'Text::Editor::Easy::Events::nop';
+    my @param = ( $sub_name, $tid );
+    Text::Editor::Easy::Async->ask_thread( @param );
+}
+
+sub nop {
+    my ( $self, $reference ) = @_;
+    
+    print "Dans nop, thread = ", threads->tid, ", self = $self, reference = $reference\n";
+    return;
 }
 
 my %editor;
@@ -1285,7 +1388,7 @@ sub thread_transform {
         Text::Editor::Easy::Comm::set_ref( $editor, $unique_ref);
         $editor{$unique_ref} = $editor;
     }
-    #print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
+    print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
     my $answer = transform_and_execute( $editor, $info_ref, $package, $sub);
     return untransform( $answer, $action );
 }
@@ -1348,6 +1451,9 @@ under the same terms as Perl itself.
 
 
 1;
+
+
+
 
 
 

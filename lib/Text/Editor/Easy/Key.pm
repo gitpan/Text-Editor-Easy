@@ -9,11 +9,11 @@ Text::Editor::Easy::Key - Key functions using object-oriented interface of "Text
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 use Data::Dump qw(dump);
 
 sub left {

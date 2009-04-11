@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Gtk_glue - Link between "Text::Editor::Easy::Abstra
 
 =head1 VERSION
 
-Version 0.1
+Version 0.45
 
 =cut
 
-our $VERSION = '0.1';
+our $VERSION = '0.45';
 
 use Gtk2 -init;
 

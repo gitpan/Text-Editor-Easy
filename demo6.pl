@@ -100,7 +100,7 @@ Text::Editor::Easy->new(
         'sub'       => 'main',
         'file'      => "${file_path}expenses.cpt",
         'highlight' => { 'sub' => 'input', },
-		'font_size' => 10,
+        'font_size' => 10,
         'y_offset'  => 100,
         'height'    => 500,
         'x_offset'  => 100,
@@ -125,7 +125,7 @@ sub main {
             'zone'      => $zone2,
             'file'      => "${file_path}account.hst",
             'highlight' => { 'sub' => 'output', },
-			'font_size' => 10,
+            'font_size' => 10,
         }
     );
 }

@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
@@ -102,11 +102,13 @@ Text::Editor::Easy->new(
         'zone'        => $zone4,
         'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
         'name'        => 'main_tab',
-        'motion_last' => {
-            'use'     => 'Text::Editor::Easy::Program::Tab',
-            'package' => 'Text::Editor::Easy::Program::Tab',
-            'sub'     => 'motion_over_tab',
-            'mode'    => 'async',
+        'events' => {
+            'motion' => {
+                'use'     => 'Text::Editor::Easy::Program::Tab',
+                'package' => 'Text::Editor::Easy::Program::Tab',
+                'sub'     => 'motion_over_tab',
+                'thread'    => 'Motion',
+            }
         },
         'save_info' => $main_tab_info_ref,
         'font_size' => 11,
@@ -125,6 +127,9 @@ close EXEC; # This should be enough to stop process "exec.pl"
 
 sub main {
     my ( $onglet, @parm ) = @_;
+    
+    
+    
     
     my $tab_tid = $onglet->ask_named_thread( 'get_tid', 'File_manager');
     $onglet->ask_thread('add_thread_method', $tab_tid,
@@ -183,11 +188,13 @@ sub main {
         {
             'zone'        => $out_tab_zone,
             'name'        => 'out_tab',
-            'motion_last' => {
-                'use'     => 'Text::Editor::Easy::Program::Tab',
-                'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => 'motion_over_tab',
-                'mode'    => 'async',
+            'events' => {
+                'motion' => {
+                    'use'     => 'Text::Editor::Easy::Program::Tab',
+                    'package' => 'Text::Editor::Easy::Program::Tab',
+                    'sub'     => 'motion_over_tab',
+                    'thread'    => 'Motion',
+               }
             },
             'save_info' => { 'color' => 'green', },
         }
@@ -226,6 +233,13 @@ sub main {
     );
     my $new_ref = $files_session[$main_tab_info_ref->{'selected'}];
     $new_ref->{'focus'} = 'yes';
+    $new_ref->{'events'} = {
+        'motion' => { 
+            'action' => 'nop',
+            'thread' => 'Motion',
+        },
+    };
+			
     Text::Editor::Easy->new( $new_ref );
 
     Text::Editor::Easy->bind_key(
@@ -270,14 +284,15 @@ sub main {
         {
             'zone'        => $zone3,
             'name'        => 'stack_calls',
-            'motion_last' => {
-                'use'     => 'Text::Editor::Easy::Motion',
-                'package' => 'Text::Editor::Easy::Motion',
-                'sub'     => 'cursor_set_on_who_file',
-                'mode'    => 'async',
-
-               #'only' => '$origin eq "graphic" or $sub_origin eq "cursor_set"',
-                'init' => [ 'init_set', $zone1 ]
+            'events' => {
+                'motion' => {
+                    'use'     => 'Text::Editor::Easy::Motion',
+                    'package' => 'Text::Editor::Easy::Motion',
+                    'sub'     => 'cursor_set_on_who_file',
+                    'thread'    => 'Motion',
+                   #'only' => '$origin eq "graphic" or $sub_origin eq "cursor_set"',
+                    'init' => [ 'Text::Editor::Easy::Motion::init_set', $zone1 ]
+                }
             },
         }
     );
@@ -289,12 +304,14 @@ sub main {
             'file'         => "tmp/${name}_trace.trc",
             'name'         => 'Editor',
             'growing_file' => 1,
-            'shift_motion_last'  => {
-                'use'     => 'Text::Editor::Easy::Motion',
-                'package' => 'Text::Editor::Easy::Motion',
-                'sub'     => 'move_over_out_editor',
-                'mode'    => 'async',
-                'init'    => [ 'init_move', $who->get_ref, $zone1 ],
+            'events' => {
+                'shift_motion'  => {
+                    'use'       => 'Text::Editor::Easy::Motion',
+                    'package' => 'Text::Editor::Easy::Motion',
+                    'sub'        => 'move_over_out_editor',
+                    'thread'   => 'Motion',
+                    'init'      => [ 'Text::Editor::Easy::Motion::init_move', $who->get_ref, $zone1 ],
+                }
             },
         }
     );
@@ -302,11 +319,12 @@ sub main {
         {
             'zone' => $zone2,
             'name' => 'Eval',
-            'shift_motion_last'  => {
-                'use'     => 'Text::Editor::Easy::Motion',
-                'package' => 'Text::Editor::Easy::Motion',
-                'sub'     => 'move_over_eval_editor',
-                'mode'    => 'async',
+            'events' => {
+                'shift_motion'  => {
+                    'package' => 'Text::Editor::Easy::Motion',
+                    'sub'     => 'move_over_eval_editor',
+                    'thread'  => 'Motion',
+                }
             },
         }
     );
@@ -326,18 +344,23 @@ sub main {
         {
             'zone'        => $zone5,
             'name'        => 'macro',
-            'change_last' => {
-                'use'     => 'Text::Editor::Easy::Program::Search',
-                'package' => 'Text::Editor::Easy::Program::Search',
-                'sub'     => 'modify_pattern',
-                'mode'    => 'async',
-                'only'    => '$origin eq "graphic"',
-                'init'    => [ 'init_eval', $out->get_ref ],
-            },
             'highlight' => {
                 'use'     => 'Text::Editor::Easy::Syntax::Perl_glue',
                 'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
                 'sub'     => 'syntax',
+            },
+           'events' => {
+                'motion' => { 
+                    'action' => 'nop',
+                    'thread' => 'Motion',
+                },
+                'change' => {
+                    'use'     => 'Text::Editor::Easy::Program::Search',
+                    'package' => 'Text::Editor::Easy::Program::Search',
+                    'sub'     => 'modify_pattern',
+                    'thread' => 'Motion',
+                    'init' => [ 'Text::Editor::Easy::Program::Search::init_eval', $out->get_ref ],
+                }
             },
         }
     );
@@ -357,7 +380,7 @@ sub main {
     } );
     
     # Self designing : no annulation management yet, frequent save for the moment
-    if ( -d "../save" ) {
+    if ( -d "../../save" ) {
         Text::Editor::Easy->create_new_server( {
             'use' => 'Text::Editor::Easy::Program::Save',
             'package' => 'Text::Editor::Easy::Program::Save',
@@ -470,11 +493,13 @@ END_PROGRAM
             'name' => $out_name,
             'file'         => "tmp/${file_name}_trace.trc",
             'growing_file' => 1,
-            'shift_motion_last'  => {
-                'use'     => 'Text::Editor::Easy::Motion',
-                'package' => 'Text::Editor::Easy::Motion',
-                'sub'     => 'move_over_external_editor',
-                'mode'    => 'async',
+            'events' => {
+                'shift_motion'  => {
+                    'use'     => 'Text::Editor::Easy::Motion',
+                    'package' => 'Text::Editor::Easy::Motion',
+                    'sub'     => 'move_over_external_editor',
+                    'thread'    => 'Motion',
+                }
             },
           } );
           Text::Editor::Easy->declare_trace_for ( 
@@ -549,6 +574,7 @@ sub restart {
 
 sub save_session {
     # In thread 0, the graphical MainLoop is over
+    print "Début save_session\n";
     $session_ref->{'main_tab'} = Text::Editor::Easy->save_conf_thread_0;
     $session_ref->{'window'} = scalar Text::Editor::Easy->window->get;
     $session_ref->{'zone_list'} = Text::Editor::Easy::Zone->list('complete');
@@ -556,6 +582,7 @@ sub save_session {
     open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
     print INFO dump $session_ref;
     close INFO;
+    print "Fin save_session\n";
 }
 
 =head1 COPYRIGHT & LICENSE
@@ -566,5 +593,12 @@ This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 =cut
+
+
+
+
+
+
+
 
 
