@@ -9,11 +9,11 @@ Text::Editor::Easy::Key - Key functions using object-oriented interface of "Text
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 use Data::Dump qw(dump);
 
 sub left {
@@ -893,7 +893,7 @@ sub sel_second {
 sub search {
     my ( $self ) = @_;
     
-    Text::Editor::Easy->save_current( $self->get_ref );
+    Text::Editor::Easy->save_current( $self->id );
 
         my $macro_instructions = << 'END_PROGRAM';
 my $editor = Text::Editor::Easy->last_current;
@@ -923,15 +923,15 @@ sub enter_search {
     #print "REGEXP = $regexp\n";
     my $editor = Text::Editor::Easy->last_current;
     
-    #$options_ref = Text::Editor::Easy->data_get_search_options ( $self->get_ref );
+    #$options_ref = Text::Editor::Easy->data_get_search_options ( $self->id );
     my ( $line_init, $pos ) = $editor->cursor->get;
     my ( $line, $start, $end, $regexp ) = $editor->search($exp);
-    Text::Editor::Easy::Async->data_set_search_options ( $editor->get_ref, {
+    Text::Editor::Easy::Async->data_set_search_options ( $editor->id, {
         'exp' => dump ($regexp),
         'line_init' => $line_init->ref,
         'pos_init' => $pos,
     } );
-    #print "Référence pour save ", $editor->get_ref, "\n";
+    #print "Référence pour save ", $editor->id, "\n";
     $editor->deselect;
     return if ( ! defined $line );
     my $text = $line->select($start, $end, {'force' => 'middle_top'} );
@@ -942,8 +942,8 @@ sub enter_search {
 
 sub f3_search {
     my $editor = Text::Editor::Easy->last_current;
-    my $options_ref = Text::Editor::Easy->data_get_search_options ( $editor->get_ref );
-    #print "Référence pour load ", $editor->get_ref, "\n";
+    my $options_ref = Text::Editor::Easy->data_get_search_options ( $editor->id );
+    #print "Référence pour load ", $editor->id, "\n";
     #print "EXP : $options_ref->{'exp'}\n";
     #print "LINE: $options_ref->{'line_init'}\n";
     #print "pos : $options_ref->{'pos_init'}\n";

@@ -9,11 +9,11 @@ Text::Editor::Easy::Events - Manage events linked to user code : specific code i
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 INTRODUCTION
 
@@ -479,14 +479,14 @@ events is that you can't know when they occur and how many. Suppose your code re
 moves his mouse from left to right of your editor, you can have more than 10 mouse motion events generated in one second. And a perfect
 response to the first event can be useless as soon as the second event has occured. Moreover, the 'Graphic' thread will send all asynchronous events
 to your thread, even if it is busy working. Events will stack in a queue if your thread can't manage them quickly. If your code makes, in the end,
-a graphical action visible by the user, there could be a long delay between the event and its visible action.
+a graphical action visible by the user, there could be a long delay between the last event and its visible action.
 And the user would consider your code as very slow. On the contrary, if you work in an interruptible way, that is, if you insert, from time to time,
 little code like that :
 
     return if (anything_for_me); # "me" stands for your thread executing your code
 
 the user could have the feeling that your code is very fast : this is because you empty your thread queue more quickly and thus decrease the delay
-between an event and your answer. But you should add this line (that is, check your thread queue) when you are in a proper
+between the last event and its answer. But you should add this line (that is, check your thread queue) when you are in a proper
 state : just imagine that there is really something for you and that your code will be stopped and executed another time from the start.
 
 The conclusion is :  "A good way to be fast is to give up useless tasks" and using more than one thread allows you to give up, so don't hesitate
@@ -986,13 +986,17 @@ The information received by your sub is a hash containing the following keys (th
 Events can be linked to a L<'zone' instance|Text::Editor::Easy::Zone> rather than to a 
 'Text::Editor::Easy' instance.
 
-At least, 1 event will be acessible for a 'zone' instance :
+2 events are acessible for a 'zone' instance :
 
 =over 4
 
 =item *
 
-top_editor_change : will happen each time a new 'editor' instance is on top.
+top_editor_change : happens each time a new 'editor' instance is on top of the zone.
+
+=item *
+
+editor_destroy : happens each time a 'editor' instance belonging to the zone is destroyed.
 
 =back
 
@@ -1028,11 +1032,6 @@ use threads;
 use Text::Editor::Easy::Comm;
 use Devel::Size qw(size total_size);
 
-my %ref_init;
-my %referenced;
-
-my %thread_known;
-
 use constant {
     SUB_REF => 0,
     PACKAGE => 1, 
@@ -1041,7 +1040,7 @@ use constant {
 };
 
 sub reference_events {
-    my ( $unique_ref, $events_ref ) = @_;
+    my ( $id, $events_ref ) = @_;
     
     # print "Dans reference_events events = $events_ref\n";
     if ( ! ref $events_ref or ref $events_ref ne 'HASH' ) {
@@ -1052,7 +1051,7 @@ sub reference_events {
         my $event_list_ref = $events_ref->{$event_name};
         if ( ref $event_list_ref eq 'HASH' ) {
             #print "Single event declaration\n";
-            my $answer = reference_event($unique_ref, $event_list_ref);
+            my $answer = reference_event($id, $event_list_ref);
             if ( ! ref $answer ) {
                 return if ( $answer eq 'error' );
                 delete $events_ref->{$event_name};
@@ -1069,7 +1068,7 @@ sub reference_events {
             #print "Multiple event declaration\n";
             my @new_list;
             while ( my $event_ref = shift @$event_list_ref ) {
-                my $answer = reference_event($unique_ref, $event_ref);
+                my $answer = reference_event($id, $event_ref);
                 if ( ! ref $answer ) {
                     return if ( $answer eq 'error' );
                 }
@@ -1098,10 +1097,10 @@ my %possible_sync = (
 
 
 sub reference_event {
-    my ( $unique_ref, $event_ref ) = @_;
+    my ( $id, $event_ref ) = @_;
     
     my $package = 'main';
-    print "REF de event_ref : ", ref $event_ref, "\n";
+    #print "REF de event_ref : ", ref $event_ref, "\n";
     my $use = $event_ref->{'use'};
     my $thread = $event_ref->{'thread'};
     if ( $use ) {
@@ -1115,7 +1114,7 @@ sub reference_event {
     }
     my $action = $event_ref->{'action'};
     if ( defined $action ) {
-        print "Action définie à $action pour event_ref = $event_ref\n";
+        #print "Action définie à $action pour event_ref = $event_ref\n";
         if ( ! $possible_action{$action} ) {
             print STDERR "Unknown action value $action, instance not created\n";
             return 'error';
@@ -1134,7 +1133,7 @@ sub reference_event {
         $package = $event_ref->{'package'};
     }
     if ( defined $thread ) {
-        my $answer_ref = thread_use( $unique_ref, $thread, $use, $event_ref->{'create'}, $event_ref->{'init'}, $package );
+        my $answer_ref = thread_use( $id, $thread, $use, $event_ref->{'create'}, $event_ref->{'init'}, $package );
         return $answer_ref if ( ! ref $answer_ref );
         $event_ref->{'tid'} = $answer_ref->{'tid'};
         if ( $action ) {
@@ -1147,8 +1146,25 @@ sub reference_event {
         }
     }
     
-    my $sub = $event_ref->{'sub'};
-    return $event_ref if ( defined $sub );
+    my $sub_ref = $event_ref->{'sub'};
+    if ( defined $sub_ref ) {
+        my $sub = ref $sub_ref;
+        if ( $sub ) {
+            if ( $sub ne 'ARRAY' ) {
+                print STDERR "'sub' option in 'event' declaration should be a string or an array reference\n";
+                return 'error';
+            }
+            $sub = $sub_ref;
+        }
+        else {
+            $sub = [ $sub_ref ];
+        }
+        $event_ref->{'sub'} = $sub;
+        return $event_ref;
+    }
+
+    $event_ref->{'sub'} = [ ];
+    
     if ( ! defined $action ) {
         print STDERR "No action defined and no sub provided, event cancelled\n";
         return 'unlink';
@@ -1167,11 +1183,11 @@ sub reference_event {
 }
 
 sub thread_use {
-    my ( $unique_ref, $thread, $use, $create, $init, $package ) = @_;
+    my ( $id, $thread, $use, $create, $init, $package ) = @_;
 
     my $tid = $thread;
     if ( $thread =~ /\D/ ) {
-        $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $unique_ref, $thread );
+        $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $id, $thread );
         $tid = 0 if ( $thread eq 'Graphic' );
         if ( ! defined $tid and $thread ne 'File_manager' ) {
             if ( defined $create ) {
@@ -1210,7 +1226,7 @@ sub thread_use {
 }
 
 sub execute_events {
-    my ( $events_ref, $editor, $info_ref ) = @_;
+    my ( $events_ref, $object, $info_ref ) = @_;
 
     my $events_list_ref;
     
@@ -1231,12 +1247,12 @@ sub execute_events {
         my $action = $event->{'action'};
         #print "Event $event\n";
         #if ( ! defined $action ) {
-        #    print "    ... action non définie pour editor = ", $editor->name, "\n";
+        #    print "    ... action non définie pour objet = ", $object->name, "\n";
         #}
         #else {
         #    print "    ... action $action\n";
         #}
-        my $new_info_ref = execute_event($event, $editor, $info_ref);
+        my $new_info_ref = execute_event($event, $object, $info_ref);
         next EVENT if ( ! defined $action or $action eq 'nop' );
         return if ( $action eq 'exit' );
 
@@ -1271,14 +1287,14 @@ sub execute_event {
     my ( $event_ref, $editor, $info_ref ) = @_;
 
     my $package = $event_ref->{'package'};
-    my $sub = $event_ref->{'sub'};
+    my ( $sub, @user ) = @{$event_ref->{'sub'}};
     #print "EXECUTE_EVENT : PAckage $package, sub = $sub\n";
     my $action = $event_ref->{'action'};
     if ( ! defined $sub ) {
         if ( defined $action ) {
             return if ( $action eq 'exit' );
             if ( $action eq 'nop' ) {
-                print "Avant exécution d'une action nop pour ", $editor->name, "\n";
+                #print "Avant exécution d'une action nop pour ", $editor->name, "\n";
                 thread_nop( $editor, $event_ref );
                 return;
             }
@@ -1287,13 +1303,13 @@ sub execute_event {
     my $thread = $event_ref->{'thread'};
     if ( defined $thread ) {
         #print "Appel de thread execute avec thread = $thread\n";
-        if ( ! defined $action ) {
-            print "1 Avant appel transform and execute pour thread : action = undef\n";
-        }
-        else {
-            print "1 Avant appel transform and execute pour thread : action = $action\n";
-        }
-        return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub );
+        #if ( ! defined $action ) {
+        #    print "1 Avant appel transform and execute pour thread : action = undef\n";
+        #}
+        #else {
+        #    print "1 Avant appel transform and execute pour thread : action = $action\n";
+        #}
+        return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, @user );
     }
     else  {
         my $sync = $event_ref->{'sync'};
@@ -1301,33 +1317,46 @@ sub execute_event {
             $event_ref->{'tid'} = 0;
             #print "Avant thread_execute pour tid = 0\n";
             #print "2 Avant appel transform and execute pour thread : action = $action\n";
-            return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub );
+            return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, @user );
         }
-        my $answer = transform_and_execute( $editor, $info_ref, $package, $sub );
+        my $answer = transform_and_execute( $editor, $info_ref, $package, $sub, @user );
         #print "Dans execute_event ref de answer = ", ref( $answer ), "\n";
         return untransform( $answer, $action );
     }
 }
 
 sub thread_execute {
-    my ( $thread, $event_ref, $editor, $info_ref, $package, $sub ) = @_;
+    my ( $thread, $event_ref, $object, $info_ref, $package, $sub, @user ) = @_;
 
     my $tid = $event_ref->{'tid'};
-    my $unique_ref = $editor->get_ref;
+    
+    my $type = ref $object;  
+    my $id = '';
+    if ( $type eq 'Text::Editor::Easy' ) {
+        $id = $object->id;
+    }
     if ( ! defined $tid ) {
         if ( $thread ne 'File_manager' ) {
             print STDERR "Can't execute event : unknown tid for thread $thread\n";
             return;
         }
         else {
-            $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $unique_ref, 'File_manager' );
+            $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $id, 'File_manager' );
             #print "Récupéré le tid $tid pour le thread File_manager\n";
             # Utiliser l'interface dynamique pour modifier l'évènement... ?
         }
     }
+    my $object_ref;
+    if ( $id eq '' ) {
+        $object_ref = [ $type, $object ];
+    }
+    else {
+        $object_ref = [ 'Text::Editor::Easy', $id ];
+    }
+    
     my $sync = $event_ref->{'sync'};
     my $sub_name = 'Text::Editor::Easy::Events::thread_transform';
-    my @param = ( $sub_name, $tid, $unique_ref, $package, $sub, $info_ref, $event_ref->{'action'} );
+    my @param = ( $sub_name, $tid, $object_ref, $package, $sub, $info_ref, $event_ref->{'action'}, @user );
     $sync = 'false' if ( ! defined $sync );
     if ( $sync eq 'true' ) {
         return Text::Editor::Easy->ask_thread( @param );
@@ -1353,14 +1382,20 @@ sub thread_nop {
     my ( $editor, $event_ref ) = @_;
         
     my $tid = $event_ref->{'tid'};
-    my $unique_ref = $editor->get_ref;
+
+    my $type = ref $editor;  
+    my $id = '';
+    if ( $type eq 'Text::Editor::Easy' ) {
+        $id = $editor->id;
+    }
+    
     if ( ! defined $tid ) {
         if ( $event_ref->{'thread'} ne 'File_manager' ) {
             print STDERR "Can't execute event : unknown tid for thread $event_ref->{'thread'}\n";
             return;
         }
         else {
-            $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $unique_ref, 'File_manager' );
+            $tid = Text::Editor::Easy::Comm::get_tid_from_name_and_instance( $id, 'File_manager' );
             #print "Récupéré le tid $tid pour le thread File_manager\n";
             # Utiliser l'interface dynamique pour modifier l'évènement... ?
         }
@@ -1373,42 +1408,54 @@ sub thread_nop {
 sub nop {
     my ( $self, $reference ) = @_;
     
-    print "Dans nop, thread = ", threads->tid, ", self = $self, reference = $reference\n";
+    #print "Dans nop, thread = ", threads->tid, ", self = $self, reference = $reference\n";
     return;
 }
 
-my %editor;
-
 sub thread_transform {
-    my ( $self, $ref, $unique_ref, $package, $sub, $info_ref, $action ) = @_;
+    my ( $self, $ref, $object_ref, $package, $sub, $info_ref, $action, @user ) = @_;
     
-    my $editor = $editor{$unique_ref};
-    if ( ! defined $editor ) {
-        $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $editor, $unique_ref);
-        $editor{$unique_ref} = $editor;
+    my $object;
+    if ( $object_ref->[0] ne 'Text::Editor::Easy' ) {
+        # Cas à gérer 
+        # $object = $type -> get_from_id;  ==> $type eq 'Text::Editor::Easy' ou 'Text::Editor::Easy::Zone' ou '...Window' ou ...
+        $object = $object_ref->[1];
     }
-    print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
-    my $answer = transform_and_execute( $editor, $info_ref, $package, $sub);
+    else {
+        $object = Text::Editor::Easy->get_from_id( $object_ref->[1] );
+    }
+    
+    #print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
+    my $answer = transform_and_execute( $object, $info_ref, $package, $sub, @user);
     return untransform( $answer, $action );
 }
 
 sub transform_and_execute {
-    my ( $editor, $info_ref, $package, $sub ) = @_;
+    my ( $editor, $info_ref, $package, $sub, @user ) = @_;
 
-    my $ref_line = $info_ref->{'line'};
-    if ( defined $ref_line ) {
-        my $line = Text::Editor::Easy::Line->new( $editor, $ref_line, );
-        $info_ref->{'line'} = $line;
+    KEY: for my $key ( keys %$info_ref ) {
+        if ( $key eq 'line' ) {
+            my $line = Text::Editor::Easy::Line->new( $editor, $info_ref->{'line'} );
+            $info_ref->{'line'} = $line;
+            next KEY;
+        }
+        if ( $key eq 'display' ) {
+            my $display = Text::Editor::Easy::Display->new( $editor, $info_ref->{'display'} );
+            $info_ref->{'display'} = $display;
+            next KEY;
+        }
+        if ( $key =~ /editor$/ ) {
+            my $value = $info_ref->{$key};
+            if ( defined $value ) {
+                my $editor = Text::Editor::Easy->get_from_id( $info_ref->{$key} );
+                $info_ref->{$key} = $editor;
+            }
+            next KEY;
+        }
     }
-    my $ref_display = $info_ref->{'display'};
-    if ( defined $ref_display ) {
-        my $display =
-          Text::Editor::Easy::Display->new( $editor, $ref_display, );
-        $info_ref->{'display'} = $display;
-    }
+    
     no strict "refs";
-    return &{"${package}::$sub"}( $editor, $info_ref );
+    return &{"${package}::$sub"}( $editor, $info_ref, @user );
 }
 
 sub untransform {

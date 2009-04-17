@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Text::Editor::Easy::Comm;
 
@@ -21,35 +21,38 @@ use File::Basename;
 
 use Data::Dump qw(dump);
 
-my %tab_object;
-
 sub on_main_editor_change {
-    my $name = on_top_editor_change(@_);
-    #print "On main editor change : $name\n";
-    $_[0]->change_title($name);
+    my ( $zone, $info_ref, @user ) = @_;
+    
+    my $name = on_top_editor_change( $zone, $info_ref, @user );
+    #print "On main editor change : $name, zone = $zone->{'name'}\n";
+    $info_ref->{'editor'}->change_title($name);
     #print "Après changement de nom\n";
 }
 
 sub on_top_editor_change {
-    my ( $new_on_top_editor, $tab_ref, $hash_ref, $old_on_top_editor, $conf_ref ) = @_;
+    my ( $zone, $info_ref, $tab_ref ) = @_;
 
-#print "Nom du nouveau fichier on_top : |", $new_on_top_editor->file_name, "|\n";
-    my $tab_editor = $tab_object{$tab_ref};
-    if ( !$tab_editor ) {
-        print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
-        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $tab_editor, $tab_ref);
-        $tab_object{$tab_ref} = $tab_editor;
-        # Il faudrait ajouter une méthode supplémentaire pour le Tab : la méthode qui met à jour save_info (clé "file_list")
-        # ==> cette méthode ne doit pas être partagée par tous les objets Text::Editor::Easy (nouvel objet Tab, héritage à voir)
-    }
+    #print "Dans on_top_editor_change : tab_ref = $tab_ref\n";
+
+    my $new_on_top_editor = $info_ref->{'editor'};
+    my $hash_ref          = $info_ref->{'hash_ref'};
+    
+    my $old_on_top_editor = $info_ref->{'old_editor'};
+    my $conf_ref          = $info_ref->{'conf'};
+    
+
+    #print "Nom du nouveau fichier on_top : |", $new_on_top_editor->file_name, "|\n";
+    
+    my $tab_editor = Text::Editor::Easy->get_from_id ( $tab_ref );
+    
     if ( defined $old_on_top_editor ) {
         my $name = $old_on_top_editor->name;
-        print "\n\nDans on_top_editor_change de Tab : old_editor => $name\n";
-        Text::Editor::Easy::Async->update_conf ( $old_on_top_editor->get_ref, $conf_ref, $name );
+        #print "\n\nDans on_top_editor_change de Tab : old_editor => $name\n";
+        Text::Editor::Easy::Async->update_conf ( $old_on_top_editor->id, $conf_ref, $name );
     }
 
-    #$tab_editor->async->select_new_on_top ( $new_on_top_editor->get_ref, $tab_ref, $hash_ref );
+    #$tab_editor->async->select_new_on_top ( $new_on_top_editor->id, $tab_ref, $hash_ref );
     my ( $absolute_path, $file_name, $relative_path, $full_absolute, $full_relative, $name )
             = $new_on_top_editor->file_name;
 
@@ -60,7 +63,7 @@ sub on_top_editor_change {
     # déselection, sélection, ...)
     
     # Ancien appel asynchrone
-            #$tab_editor->async->select_new_on_top ( $new_on_top_editor->get_ref, $tab_ref, $hash_ref, 
+            #$tab_editor->async->select_new_on_top ( $new_on_top_editor->id, $tab_ref, $hash_ref, 
             #    $absolute_path, $file_name, $relative_path, $full_absolute, $full_relative, $name );
     # Nouvel appel asynchrone
     select_new_on_top_thread_0 ( $tab_editor, $new_on_top_editor, $hash_ref, 
@@ -167,18 +170,10 @@ sub new_on_top {
 }
 
 sub on_editor_destroy {
-    my ( $destroyed_editor, $tab_ref, $hash_ref ) = @_;
+    my ( $zone, $hash_ref, $tab_ref ) = @_;
 
     my $destroyed = $hash_ref->{'name'};
-    my $tab_editor = $tab_object{$tab_ref};
-    if ( !$tab_editor ) {
-        print "Création locale l'éditeur correspondant au Tab $tab_ref\n";
-        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $tab_editor, $tab_ref);
-        $tab_object{$tab_ref} = $tab_editor;
-        # Il faudrait ajouter une méthode supplémentaire pour le Tab : la méthode qui met à jour save_info (clé "file_list")
-        # ==> cette méthode ne doit pas être partagée par tous les objets Text::Editor::Easy (nouvel objet Tab, héritage à voir)
-    }
+    my $tab_editor = Text::Editor::Easy->get_from_id( $tab_ref );
     my $info_ref      = $tab_editor->load_info;
     my $file_list_ref = $info_ref->{'file_list'};
     my $selected = $info_ref->{'selected'};
@@ -279,8 +274,7 @@ sub select_new_on_top_thread_0 {
 sub update_conf {
     my ( $self, $ref_old_on_top_editor, $conf_ref, $old_name ) = @_;
     
-    my $old_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref( $old_editor, $ref_old_on_top_editor);
+    my $old_editor = Text::Editor::Easy->get_from_id( $ref_old_on_top_editor );
     
     # Text::Editor::Easy::Program::Tab n'a pas été "évalué" par File_manager => il faudrait gérer l'évaluation automatique dans Comm...
     
@@ -343,14 +337,7 @@ sub select_new_on_top {
     my $file_list_ref = $info_ref->{'file_list'};
     my ( $text, $indice, $start, $end ) = search_position ( $file_list_ref, $name );
     my ( $first_ref, $first_text ) = Text::Editor::Easy::File_manager::next_line( $self );
-    my $tab_editor = $tab_object{$tab_ref};
-    if ( !$tab_editor ) {
-        $tab_editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $tab_editor, $tab_ref);
-        $tab_object{$tab_ref} = $tab_editor;
-        # Il faudrait ajouter une méthode supplémentaire pour le Tab : la méthode qui met à jour save_info (clé "file_list")
-        # ==> cette méthode ne doit pas être partagée par tous les objets Text::Editor::Easy (nouvel objet Tab, héritage à voir)
-    }
+    my $tab_editor = Text::Editor::Easy->get_from_id( $tab_ref );
     $tab_editor->async->deselect;
 
     if ( defined $indice ) {
@@ -430,7 +417,7 @@ sub save_conf {
     
     my $old_editor = Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor;
     my $conf_ref = $old_editor->on_focus_lost();
-    update_conf( $self, $old_editor->get_ref, $conf_ref, $old_editor->name );
+    update_conf( $self, $old_editor->id, $conf_ref, $old_editor->name );
 
     open (INFO, ">$file" ) or die "Impossible d'ouvrir $file : $!\n";
     print INFO dump Text::Editor::Easy::File_manager::load_info( $self );
@@ -443,7 +430,7 @@ sub save_conf_thread_0 {
     #print "Dans save_conf_thread_0 : file = $file\n";
     my $old_editor = Text::Editor::Easy::Zone->whose_name('zone1')->on_top_editor;
     my $conf_ref = $old_editor->on_focus_lost();
-    return Text::Editor::Easy->update_conf( $old_editor->get_ref, $conf_ref, $old_editor->name );
+    return Text::Editor::Easy->update_conf( $old_editor->id, $conf_ref, $old_editor->name );
 }
 
 sub get_conf_for_absolute_file_name {

@@ -10,7 +10,7 @@ Faster than using the object-oriented interface (that is, faster than "Text::Edi
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
@@ -19,7 +19,7 @@ use constant {
     SELECTION => 18,
 };
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 use Data::Dump qw(dump);
 
 sub left {

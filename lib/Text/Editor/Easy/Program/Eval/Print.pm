@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use threads;    # Pour debug
 
@@ -25,12 +25,13 @@ Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
 my $length_s_n;
 
 sub init_print_eval {
-    my ( $self, $reference, $unique_ref ) = @_;
+    my ( $self, $reference, $id ) = @_;
 
-    print DBG "Dans init_print_eval de 0.1 : $self|$reference|$unique_ref|",
+    print DBG "Dans init_print_eval de 0.1 : $self|$reference|$id|",
       threads->tid, "|\n";
-    $self->[0] = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref ($self->[0], $unique_ref);
+    $self->[0] = Text::Editor::Easy->get_from_id( $id );
+    
+    print DBG "Editor_id = |$id|", $self->[0]->id, "|,... editor = ", $self->[0], "\n";
 
     #$self->[0]->insert("Fin de print eval\n");
     $self->[1] = $self->[0]->async;
@@ -42,13 +43,14 @@ sub print_eval {
 
     #return;
     print DBG "Dans print_eval : $self|$seek_start|$length_s_n|$data\n";
+    print DBG "Editor_id = |", $self->[0]->id, "|,... editor = ", $self->[0], "\n";
     my @lines = $self->[0]->insert($data);
 
     print DBG "==================\nReçu les références suivantes :";
-	for my $line ( @lines ) {
-		print DBG "\nREF : ", $line->ref, "|" , $line->text;
+    for my $line ( @lines ) {
+        print DBG "\nREF : ", $line->ref, "|" , $line->text;
     }
-	print DBG "\n==================\n";
+    print DBG "\n==================\n";
 
     my $seek_current = $seek_start;
     my $indice = 0;
@@ -61,15 +63,15 @@ sub print_eval {
         
         # Le texte doit être celui contenu dans $data, pas celui de la ligne !
         my $text = $line->text;
-		my $info = $line->get_info;
-		if ( ! defined $info ) {
-				$info = '';
-		}
-		else {
-				$info .= ';';
-		}
-		print DBG "Avant |$text| info = $info\n";
-		
+        my $info = $line->get_info;
+        if ( ! defined $info ) {
+                $info = '';
+        }
+        else {
+                $info .= ';';
+        }
+        print DBG "Avant |$text| info = $info\n";
+        
         my $length;
         if ( $indice == 0 ) {
             $length = length ( $data[0] );

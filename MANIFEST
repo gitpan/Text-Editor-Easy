@@ -52,6 +52,7 @@ lib/Text/Editor/Easy/Window.pm
 lib/Text/Editor/Easy/Zone.pm
 prove.bat
 prove.sh
+t/00-check_Tk.t
 t/00-load.t
 t/boilerplate.t
 t/class_thread_add_method.t
@@ -66,3 +67,4 @@ t/multiplexed_thread_creation.t
 t/new_insert.t
 t/pod.t
 t/return.t
+t/test_tk.pl

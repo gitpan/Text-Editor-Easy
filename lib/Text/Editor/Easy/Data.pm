@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Data::Dump qw(dump);
 use threads;
@@ -474,7 +474,7 @@ sub reference_print_redirection {
 
 sub trace_call {
     my (
-        $self,    $call_id, $server, $method, $unique_ref,
+        $self,    $call_id, $server, $method, $editor_id,
         $context, $seconds, $micro,  @calls
       )
       = @_;
@@ -546,9 +546,9 @@ sub trace_call {
     #}
     #print DBG "\n";
     $call_id_ref->[METHOD_LIST]{$method}       = 1;
-    $call_id_ref->[INSTANCE_LIST]{$unique_ref} = 1;
+    $call_id_ref->[INSTANCE_LIST]{$editor_id} = 1;
     $call_id_ref->[METHOD]                     = $method;
-    $call_id_ref->[C_INSTANCE]                   = $unique_ref;
+    $call_id_ref->[C_INSTANCE]                   = $editor_id;
 
     my $thread_status = $self->[THREAD][$server][STATUS][0];
     if ( defined $thread_status and $thread_status =~ /^P/ ) {
@@ -893,21 +893,21 @@ sub data_set_search_options {
 my $event_number = 0;
 
 sub trace_user_event {
-    my ( $self, $unique_ref, $event, $options_ref ) = @_;
+    my ( $self, $id, $event, $options_ref ) = @_;
     
     # Procédure appelée uniquement par le thread graphique (tid 0)
     return if ( $self->[THREAD][0][STATUS][0] !~ /^idle/ );
     
     my $call_id = 'U_' . $event_number;
-    #trace_call ( $self, $call_id, 0, $event, $unique_ref, 'void', 0, 0);
+    #trace_call ( $self, $call_id, 0, $event, $id, 'void', 0, 0);
     if ( $self->[FULL_TRACE] ) {
         Text::Editor::Easy::Async->trace_full_call( $call_id, undef, $event );
     }
     my $call_id_ref = $self->[CALL]{$call_id};
-    $call_id_ref->[INSTANCE_LIST]{$unique_ref} = 1;
+    $call_id_ref->[INSTANCE_LIST]{$id} = 1;
     $call_id_ref->[METHOD_LIST]{'user event'} = 1;
     $call_id_ref->[THREAD_LIST]{0} = 1;
-    $call_id_ref->[C_INSTANCE] = $unique_ref;
+    $call_id_ref->[C_INSTANCE] = $id;
     $call_id_ref->[STATUS] = 'started';
     $self->[CALL]{$call_id} = $call_id_ref;
     print DBG "Evènement $event\n\tDéclaration de call_id $call_id, ref $call_id_ref, $call_id_ref->[THREAD_LIST]\n";

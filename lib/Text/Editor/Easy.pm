@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 WHY ANOTHER EDITOR ?
 
@@ -288,7 +288,7 @@ will be the line number in console mode (in console mode, you can't be more prec
 
 =head3 'from' option
 
-As lines have a height, displaying a line at a precise ordinate don't tell what part of the line will be located at this ordinate.
+As lines have a height, displaying a line at a precise ordinate doesn't tell what part of the line will be located at this ordinate.
 By default, it's the top of the line. For the 'from' option, you can use 'top', 'middle' and 'bottom'. Note that this option may
 change things a lot if the reference line is a multi-line : wrap mode and several displays for this line.
 
@@ -465,14 +465,14 @@ sub kill {
 
  sub file_name {
     my ($self) = @_;
-    my $ref    = $self->get_ref;
+    my $ref    = $self->id;
     return Text::Editor::Easy->data_file_name($ref);
 }
 
 sub name {
     my ($self) = @_;
 
-    return Text::Editor::Easy->data_name($self->get_ref);
+    return Text::Editor::Easy->data_name($self->id);
 }
 
 sub revert {
@@ -935,7 +935,7 @@ sub first {
 
     my ( $id, $text ) = $self->next_line;
 
-    #print "Dans first : $self|", $self->get_ref, "|$id|$text|\n";
+    #print "Dans first : $self|", $self->id, "|$id|$text|\n";
     return Text::Editor::Easy::Line->new(
         $self,
         $id,
@@ -951,8 +951,8 @@ sub async {
     my ($self) = @_;
 
     my $async = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy::Async';
-    my $unique_ref = Text::Editor::Easy::Comm::get_ref($self);
-    Text::Editor::Easy::Comm::set_ref($async, $unique_ref);
+    my $id = Text::Editor::Easy::Comm::id($self);
+    Text::Editor::Easy::Comm::set_ref($async, $id);
     return $async;
 }
 use warnings;
@@ -982,54 +982,35 @@ sub get_in_zone {
     if ( scalar @ref < $number + 1 ) {
         return;
     }
-    my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref( $editor, $ref[$number] );
-    return $editor;
+    return Text::Editor::Easy->get_from_id( $ref[$number] );
 }
 
 sub whose_name {
     my ( $self, $name ) = @_;
 
-    my $ref = Text::Editor::Easy->data_get_editor_from_name($name);
-    if ($ref) {
-
-        #print "Référence récupérée de data |$ref|\n";
-        my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
-        return $editor;
-    }
-    return;
+    my $id = Text::Editor::Easy->data_get_editor_from_name($name);
+    return Text::Editor::Easy->get_from_id( $id );
 }
 
 sub whose_file_name {
     my ( $self, $file_name ) = @_;
 
-    my $ref = Text::Editor::Easy->data_get_editor_from_file_name($file_name);
-    if ($ref) {
-        my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
-        return $editor;
-    }
-    return;
+    my $id = Text::Editor::Easy->data_get_editor_from_file_name($file_name);
+    return Text::Editor::Easy->get_from_id( $id );
 }
 
 sub last_current {
     my ( $self ) = @_;
 
-    my $ref = Text::Editor::Easy->data_last_current();
-    if ($ref) {
-        my $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref( $editor, $ref);
-        return $editor;
-    }
-    return;
+    my $id = Text::Editor::Easy->data_last_current();
+    return Text::Editor::Easy->get_from_id( $id );
 }
 
 sub zone {
     my ( $self ) = @_;
     
-    my $ref = $self->get_ref;
-    return Text::Editor::Easy->data_zone($ref);    
+    my $id = $self->id;
+    return Text::Editor::Easy->data_zone($id);
 }
 
 package Text::Editor::Easy::Async;

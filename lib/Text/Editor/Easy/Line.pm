@@ -10,11 +10,11 @@ and "Text::Editor::Easy::File_manager").
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 SYNOPSIS
 
@@ -150,7 +150,7 @@ sub new {
 
     return if ( !$ref_id );
 
-    my $ref_Editor = $editor->get_ref;
+    my $ref_Editor = $editor->id;
     my $line       = $ref_line{$ref_Editor}{$ref_id};
     if ($line) {
         return $line;

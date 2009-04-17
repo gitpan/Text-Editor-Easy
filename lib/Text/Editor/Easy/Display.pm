@@ -10,11 +10,11 @@ wrap mode, you can have several displays for a single line on a file.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 # Ce package n'est qu'une interface orientée objet à des fonctions de File_manager.pm rendues inaccessibles (ne se trouvent
 # pas dans les hachages gérés par AUTOLOAD de Text::Editor::Easy) car susceptibles de changer
@@ -35,21 +35,24 @@ my %ref_line
   ; # Il y aura autant de hachage de références que de threads demandeurs de lignes
 
 sub new {
-    my ( $classe, $ref_Editor, $ref_id ) = @_;
+    my ( $classe, $editor, $line_id ) = @_;
 
-    return if ( !$ref_id );
-    my $line = $ref_line{$ref_Editor}{$ref_id};
+    return if ( !$line_id );
+    
+    # Attention, la clé du hachage %ref_line ne peut pas être un objet $editor => stringinfication implicite
+    # Marche car l'adresse scalaire est unique et donc la chaîne générée est unique par éditeur
+    my $line = $ref_line{$editor}{$line_id};
     if ($line) {
         return $line;
     }
-    my $unique_ref = $ref_Editor->get_ref;
+
     $line = bless \do { my $anonymous_scalar }, $classe;
 
     my $ref = refaddr $line;
-    $ref_Editor{$ref}               = $ref_Editor;
-    $ref_id{$ref}                   = $ref_id;
-    $ref_line{$ref_Editor}{$ref_id} = $line;
-    weaken $ref_line{$ref_Editor}{$ref_id};
+    $ref_Editor{$ref}               = $editor;
+    $ref_id{$ref}                   = $line_id;
+    $ref_line{$editor}{$line_id}    = $line;
+    weaken $ref_line{$editor}{$line_id};
 
     return $line;
 }

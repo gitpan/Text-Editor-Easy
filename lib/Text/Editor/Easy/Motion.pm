@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -26,9 +26,7 @@ sub init_move {
     my ( $self, $reference, $ref_editor, $zone ) = @_;
 
     print "DANS INIT_MOVE $self, $ref_editor, $zone\n";
-    $show_calls_editor = bless \do { my $anonymous_scalar },
-      "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref( $show_calls_editor, $ref_editor);
+    $show_calls_editor = Text::Editor::Easy->get_from_id ( $ref_editor );
     $display_zone = $zone->{'name'};
 }
 
@@ -46,9 +44,6 @@ my %line_number;    # Sauvegarde des recherches, fuite mémoire pas important ici
 sub move_over_eval_editor {
     my ( $editor, $hash_ref ) = @_;
 
-    print "Dans move_over_eval_editor\n";
-    
-    my $unique_ref = $editor->get_ref;
     $hash_ref->{'editor'} = 'eval';
     move_over_out_editor ( $editor, $hash_ref );
 }
@@ -85,7 +80,7 @@ sub move_over_out_editor {
              = Text::Editor::Easy->get_info_for_extended_trace (
                  $line_of_out->seek_start,
                  $pos,
-                 $editor->get_ref,
+                 $editor->id,
                  $line_of_out->ref,
                );
             return if ( ! defined $ref_first );            
@@ -93,7 +88,7 @@ sub move_over_out_editor {
         else { # $type eq 'eval', log of macro instructions
             ( $ref_first, $pos_first, $ref_last, $pos_last, @enreg ) 
              = Text::Editor::Easy->get_info_for_eval_display (
-                 $editor->get_ref,
+                 $editor->id,
                  $line_of_out->ref,
                  $pos
                );
@@ -106,7 +101,7 @@ sub move_over_out_editor {
          = Text::Editor::Easy->get_info_for_display (
              $seek_start,
              $pos,
-             $editor->get_ref,
+             $editor->id,
              $line_of_out->ref,
            );
         print "Reçu de get_info_for_display $ref_first et $pos_first\n";
@@ -377,7 +372,7 @@ sub nop {
     # Just to stop other potential useless processing
     return if ( anything_for_me );
     
-    my ( $unique_ref, $editor ) = @_;
+    my ( $id, $editor ) = @_;
     $editor->async->make_visible;
 }
 

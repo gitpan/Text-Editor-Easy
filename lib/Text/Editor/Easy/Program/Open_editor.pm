@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 use threads;
@@ -213,7 +213,7 @@ sub enter {
 }
 
 sub motion_last {
-    my ( $unique_ref, $editor, $hash_ref ) = @_;
+    my ( $id, $editor, $hash_ref ) = @_;
     
     return if ( anything_for_me );
     $editor->async->make_visible;

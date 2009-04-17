@@ -1,12 +1,13 @@
 Revision history for Text-Editor-Easy
 
 --------------------------+
-0.45  : 11 April 2009     !
+0.46  : 17 April 2009     !
 --------------------------+
     - Using module Syntax::Highlight::Perl::Improved instead of Syntax::Highlight::Perl.
     - Suppression of old event management, but new event management still to be completed.
     - Migration of 'Motion' thread (used for event management) from Text::Editor::Easy module to Editor.pl program :
     now, this thread has nothing special and any other thread could be added the same way with any name for any event.
+    - Using 'Events.pm' to manage 'Text::Editor::Easy::Zone' events.
 
 --------------------------+
 0.44  : 8 January 2009    !

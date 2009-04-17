@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
@@ -199,7 +199,7 @@ sub main {
             'save_info' => { 'color' => 'green', },
         }
     );
-    my $ref_onglet = $onglet->get_ref;
+    my $id_onglet = $onglet->id;
     
     my $zone1_size = {
         '-x'                   => 0,
@@ -219,16 +219,18 @@ sub main {
         {
             'size' => $zone1_size,
             'name'                 => 'zone1',
-            'on_top_editor_change' => {
-                'use'     => 'Text::Editor::Easy::Program::Tab',
-                'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_main_editor_change', $ref_onglet ],
+            'events' => {
+                'editor_destroy' => {
+                    'use'     => 'Text::Editor::Easy::Program::Tab',
+                    'package' => 'Text::Editor::Easy::Program::Tab',
+                    'sub'     => [ 'on_editor_destroy', $id_onglet ],
+                },
+                'top_editor_change' => {
+                    'use'     => 'Text::Editor::Easy::Program::Tab',
+                    'package' => 'Text::Editor::Easy::Program::Tab',
+                    'sub'     => [ 'on_main_editor_change', $id_onglet ],
+                },
             },
-            'on_editor_destroy' => {
-                'use'     => 'Text::Editor::Easy::Program::Tab',
-                'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_editor_destroy', $ref_onglet ],
-            }
         }
     );
     my $new_ref = $files_session[$main_tab_info_ref->{'selected'}];
@@ -260,10 +262,12 @@ sub main {
                 '-height'              => -50,
             },
             'name'                 => 'zone2',
-            'on_top_editor_change' => {
-                'use'     => 'Text::Editor::Easy::Program::Tab',
-                'package' => 'Text::Editor::Easy::Program::Tab',
-                'sub'     => [ 'on_top_editor_change', $out_tab->get_ref ],
+            'events' => {
+                'top_editor_change' => {
+                    'use'     => 'Text::Editor::Easy::Program::Tab',
+                    'package' => 'Text::Editor::Easy::Program::Tab',
+                    'sub'     => [ 'on_top_editor_change', $out_tab->id ],
+                }
             }
         }
     );
@@ -290,7 +294,6 @@ sub main {
                     'package' => 'Text::Editor::Easy::Motion',
                     'sub'     => 'cursor_set_on_who_file',
                     'thread'    => 'Motion',
-                   #'only' => '$origin eq "graphic" or $sub_origin eq "cursor_set"',
                     'init' => [ 'Text::Editor::Easy::Motion::init_set', $zone1 ]
                 }
             },
@@ -310,7 +313,7 @@ sub main {
                     'package' => 'Text::Editor::Easy::Motion',
                     'sub'        => 'move_over_out_editor',
                     'thread'   => 'Motion',
-                    'init'      => [ 'Text::Editor::Easy::Motion::init_move', $who->get_ref, $zone1 ],
+                    'init'      => [ 'Text::Editor::Easy::Motion::init_move', $who->id, $zone1 ],
                 }
             },
         }
@@ -359,7 +362,7 @@ sub main {
                     'package' => 'Text::Editor::Easy::Program::Search',
                     'sub'     => 'modify_pattern',
                     'thread' => 'Motion',
-                    'init' => [ 'Text::Editor::Easy::Program::Search::init_eval', $out->get_ref ],
+                    'init' => [ 'Text::Editor::Easy::Program::Search::init_eval', $out->id ],
                 }
             },
         }

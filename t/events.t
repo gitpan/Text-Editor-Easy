@@ -4,6 +4,10 @@ BEGIN {
       print("1..0 # Skipped: Perl not compiled with 'useithreads'\n");
       exit(0);
   }
+  if (! -f 'tk_is_ok' ) {
+      print("1..0 # Skipped: Tk can't work : graphical environment is out of order\n");
+      exit(0);
+  }
 }
 
 use strict;
@@ -24,9 +28,10 @@ my $editor = Text::Editor::Easy->new({
 	'focus' => 'yes',
     'events' => {
         'any_hard_clic' => {              # hard_clic for any meta key combination
-                'sub' => 'my_hard_clic_sub',
+                'sub' => [ 'my_hard_clic_sub', 2, 'abc' ],
 				'action' => 'change',
 				'thread' => 'Graphic',
+                #'thread' => 'Motion',
 				'create' => 'warning',
 				'init' => [ 'main::init_any_hard', "Bonjour" ],
         },    
@@ -56,7 +61,7 @@ my $editor = Text::Editor::Easy->new({
 
 #sub main {
 
-#   my ( $editor ) = @_;
+   #my ( $editor ) = @_;
 
 use Test::More qw( no_plan );
 
@@ -108,9 +113,9 @@ sub second_clic {
 }
 
 sub my_hard_clic_sub {
-     my ( $editor, $info_ref ) = @_;
+     my ( $editor, $info_ref, @user ) = @_;
 
-     print "Dans my_hard_clic_sub...\n";
+     print "Dans my_hard_clic_sub...|@user|\n";
      if ( $info_ref->{'x'} < ( $editor->width / 2 ) ) {
          print "   ...pas de changement\n";
          return $info_ref;                               # no jump, values unchanged

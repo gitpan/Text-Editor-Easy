@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Text::Editor::Easy::Comm;
 
@@ -23,12 +23,11 @@ my $eval_thread;
 my $eval_print;
 
 sub init_eval {
-    my ( $self, $reference, $unique_ref ) = @_;
+    my ( $self, $reference, $id ) = @_;
     
-    print "Dans init_eval de Search.pm .. $self, $unique_ref\n";
+    print "Dans init_eval de Search.pm .. $self, $id\n";
     
-    $out = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref( $out, $unique_ref);
+    $out = Text::Editor::Easy->get_from_id( $id );
 
     #$out->insert('Bonjour');
     #$self, $package, $tab_methods_ref, $self_server
@@ -55,7 +54,7 @@ sub init_eval {
             'object'  => [],
             'init'    => [
                 'Text::Editor::Easy::Program::Eval::Print::init_print_eval',
-                $unique_ref
+                $id
             ],
         }
     );
@@ -141,8 +140,7 @@ sub search {
 
     print "IND $ind, EXP $exp\n";
     my @search = Text::Editor::Easy->list_in_zone('zone1');
-    my $search = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref( $search, $search[$ind] );
+    my $search = Text::Editor::Easy->get_from_id( $search[$ind] );
 
     # Recherche dans l'écran
     return if ( anything_for_me() );

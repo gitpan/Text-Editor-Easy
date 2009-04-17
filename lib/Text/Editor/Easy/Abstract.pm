@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 SYNOPSIS
 
@@ -164,23 +164,22 @@ use constant {
     INSER     => 0,
     SCREEN    => 1,
     SEGMENT   => 2,
-    SUB_REF   => 3,
+    #ID    => 3,    # Text::Editor::Easy unique identifier
     GRAPHIC   => 4,
     REGEXP    => 5,
     CALC_LINE => 6,
     CURSOR    => 7,
     FILE      => 8,
     RETURN    => 10,    # Test de redirection
-    UNIQUE    => 11,    # Text::Editor::Easy unique identifier
+    SUB_REF   => 11,
     INIT_TAB  => 12,
     PARENT    => 13,
-    REDIRECT  => 14,
-    ASSIST    => 15,
-    KEY => 16,
-    H_FONT => 17,
-    SELECTION => 18,
-    AT_END => 19,
-    EVENTS => 20,
+    ASSIST    => 14,
+    KEY => 15,
+    H_FONT => 16,
+    SELECTION => 17,
+    AT_END => 18,
+    EVENTS => 19,
 };
 
 use Text::Editor::Easy::Key;
@@ -282,17 +281,17 @@ my $window_destroyed;
 # A une référence d'éditeur unique, on fait correspondre un objet Abstract
 my %abstract;
 
-my %event_zone;
+my %zone_events;
 my %use;
 
 sub new {
-    my ( $classe, $hash_ref, $editor, $unique_ref ) = @_;
+    my ( $classe, $hash_ref, $editor, $id ) = @_;
 
     #print "Dans Abstract::new : force_resize = $force_resize\n";
 
     # Début construction
     my $edit_ref = bless [], $classe;
-    $edit_ref->[UNIQUE] = $unique_ref;
+    $edit_ref->[ID] = $id;
 
     if ( ! %abstract ) {
         $hash_ref->{'destroy'} = \&window_destroy;
@@ -311,12 +310,12 @@ sub new {
     my $events = $hash_ref->{'events'};
     $edit_ref->[EVENTS] = {};
     if ( $events ) {
-         my $hash_returned = Text::Editor::Easy::Events::reference_events($unique_ref, $events);
+         my $hash_returned = Text::Editor::Easy::Events::reference_events($id, $events);
          return if ( ! ref $hash_returned );
          $edit_ref->[EVENTS] = $hash_returned;
     }
 
-    $abstract{$unique_ref} = $edit_ref;
+    $abstract{$id} = $edit_ref;
 
     #$edit_ref->[FILE] = $ARGV[0] || "../test.hst";
     $edit_ref->[FILE] = $hash_ref->{file} || '*buffer*';
@@ -1144,7 +1143,7 @@ sub clic {
     my $meta = $info_ref->{'meta'};
     
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
-        $edit_ref->[UNIQUE], 
+        $edit_ref->[ID], 
         "User clicked at X = $x and Y = $y", {
             'x' => $x,
             'y' => $y,
@@ -1274,7 +1273,7 @@ sub motion {
     my $meta = $info_ref->{'meta'};
     
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
-        $edit_ref->[UNIQUE], 
+        $edit_ref->[ID], 
         "User moved mouse to X = $x and Y = $y", {
             'x' => $x,
             'y' => $y,
@@ -1357,6 +1356,7 @@ sub motion {
 
     $step = "${meta}motion";
     if ( ! $label or $label eq $step ) {
+        #print "Evènement $step définir pour ", $editor->name, "\n";
         if ( my $event = $event_ref->{$step} ) {
             execute_events( $event, $editor, $info_ref );
         }
@@ -1376,7 +1376,7 @@ sub drag {
     ( $info_ref ) = calc_line_pos ( $edit_ref, $info_ref );
 
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
-        $edit_ref->[UNIQUE], 
+        $edit_ref->[ID], 
         "User 'dragged' to X = $x and Y = $y", {
             'x' => $x,
             'y' => $y,
@@ -1848,7 +1848,7 @@ sub key_press {
     #print "KEY CODE : $key_code\n";
     #return;
     Text::Editor::Easy->trace_user_event( 
-        $edit_ref->[UNIQUE],
+        $edit_ref->[ID],
         "User pressed key $key_code",
     );
     $sub_sub_origin = $key_code;
@@ -1881,7 +1881,7 @@ sub key_press {
             }
             $code_ref->( $first_parameter, @tab );
         }
-        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
         return $key_code;
     }
     #else {
@@ -1891,7 +1891,7 @@ sub key_press {
     #print "|$key|$ascii|" if ( $alt_key );
     #print "|$key|$ascii|";
     if ( length($ascii) != 1 or $special ) {
-        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+        #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
         return $key_code;
     }
     
@@ -1902,14 +1902,14 @@ sub key_press {
     # assist doit pointer sur une référence à un package ou une fonction
     insert( $edit_ref, $ascii,
         { 'assist' => $edit_ref->[ASSIST], 'indent' => 'auto' } );
-    #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[UNIQUE] );
+    #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
     return $key_code;
 }
 
 sub cursor_make_visible {
     my ($edit_ref) = @_;
 
-    #print "Dans cursor_make_visible $edit_ref|", $edit_ref->[UNIQUE], "|\n";
+    #print "Dans cursor_make_visible $edit_ref|", $edit_ref->[ID], "|\n";
     verify_if_cursor_is_visible_horizontally($edit_ref);
     verify_if_cursor_is_visible_vertically($edit_ref);
 }
@@ -4123,7 +4123,6 @@ sub bind_key { # instance call
     my $string = "\\&" . $package . "::$sub";
 
     #print "STRING $string|$package\n";
-    #$edit_ref->[REDIRECT]{$redirect} = eval "\\&$package::$sub";
     $self->[KEY]{$key} = eval $string;
 
     #$key{$key} = eval "\\&$package::$sub";
@@ -4152,7 +4151,6 @@ sub bind_key_global { # class call
     my $string = "\\&" . $package . "::$sub";
 
     #print "STRING $string|$package\n";
-    #$edit_ref->[REDIRECT]{$redirect} = eval "\\&$package::$sub";
     $key{$key} = eval $string;
 
     #$key{$key} = eval "\\&$package::$sub";
@@ -4667,7 +4665,7 @@ sub on_top_ref_editor {
         print STDERR "No editor found on top of zone $zone\n";
         return;
     }
-    return $edit_ref->[UNIQUE];
+    return $edit_ref->[ID];
 }
 
 sub on_top {
@@ -4695,15 +4693,24 @@ sub on_top {
 
     #print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
     return if ( ! defined $zone );
-    my $event_ref = $event_zone{$zone};
-    if ( defined $event_ref
-        and my $data_ref = $event_ref->{'on_top_editor_change'} )
-    {
+    
+    my $event_ref = $zone_events{$zone};
+    my $step = 'top_editor_change';
+    if ( my $event = $event_ref->{$step} ) {
         my $editor = $self->[PARENT];
         my $hash_ref = $editor->load_info('conf');
-        $hash_ref = {} if ( ! defined $hash_ref );
-        $data_ref->{'sub_ref'}->( $editor, $data_ref->{'tab_ref'}, $hash_ref, $old_editor, $conf_ref );
-        print "Après évènement on_top_editor_change\n";
+        my @old_editor = ( 'old_editor', undef );
+        if ( $old_editor ) {
+            @old_editor = ( 'old_editor', $old_editor->id );
+        }
+        #print "Evènement top_editor_change défini pour zone = $zone\n";
+        execute_events( $event, Text::Editor::Easy::Zone->whose_name($zone), {
+                'editor'     => $self->[ID],
+                'hash_ref'   => $hash_ref,
+                @old_editor,
+                'conf'       => $conf_ref,
+            },
+        );
     }
 }
 
@@ -4805,7 +4812,7 @@ sub resize_all {
     for my $abstract_ref ( values %abstract ) {
 
         #if ( $graphic == $abstract_ref->[GRAPHIC] ) {
-        print "Text::Editor::Easy $abstract_ref->[UNIQUE]\n";
+        print "Text::Editor::Easy $abstract_ref->[ID]\n";
         $abstract_ref->deselect;
         resize(
             $abstract_ref,
@@ -4815,22 +4822,16 @@ sub resize_all {
     }
 }
 
-sub reference_zone_event {
-    my ( $self, $name, $event, $hash_ref ) = @_;
+sub reference_zone_events {
+    my ( $self, $name, $events ) = @_;
 
-    #print "Dans reference_zone_event $name,$event, ", $hash_ref->{sub}[0], $hash_ref->{sub}[1], "\n";
-    my $use = $hash_ref->{'use'};
-    if ( defined $use and !$use{$use} ) {
-        eval "use $use";
-        #print "EVAL use $use en erreur\n$@\n" if ($@);
-        $use{$use} = 1;
-    }
-    my $package = $hash_ref->{'package'};
-    $package = 'main' if ( !defined $package );
-    if ( my $sub = $hash_ref->{'sub'}[0] ) {
-        $event_zone{$name}{$event}{sub_ref} = eval "\\&${package}::$sub";
-        $event_zone{$name}{$event}{tab_ref} = $hash_ref->{sub}[1];
-    }
+    $zone_events{$name} = {};
+
+    print "Dans reference_zone_events : name = $name, event_ref = $events\n";
+    my $hash_returned = Text::Editor::Easy::Events::reference_events( 'Text::Editor::Easy', $events );
+    print "Valeur de retour de hash_returned : $hash_returned\n";
+    return if ( ! ref $hash_returned );
+    $zone_events{$name} = $hash_returned;
 }
 
 sub abstract_join {
@@ -4893,11 +4894,15 @@ sub graphic_kill {
     
     # Evènement de Tab : on_editor_destroy
     my $zone = $self->[GRAPHIC]->get_zone;
-    my $event_ref = $event_zone{$zone};
-    if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
-        $data_ref->{'sub_ref'}->( $self->[PARENT], $data_ref->{'tab_ref'}, {
-                'name' => $self->[PARENT]->name ,
-            } );
+    
+    my $event_ref = $zone_events{$zone};
+    my $step = 'editor_destroy';
+    if ( my $event = $event_ref->{$step} ) {
+        #print "Evènement editor_destroy défini pour zone = $zone\n";
+        execute_events( $event, Text::Editor::Easy::Zone->whose_name($zone), { 
+            'editor' => $self->[ID],
+            'name' => $self->[PARENT]->name,
+        } );
     }
 }
 
@@ -4906,9 +4911,15 @@ sub on_editor_destroy { # zone event called on a Zone object
     
     #print "Dans on_editor_destroy $zone|$name\n";
     return if ( ! defined $zone );
-    my $event_ref = $event_zone{$zone};
-    if ( defined $event_ref and my $data_ref = $event_ref->{'on_editor_destroy'} ) {
-        $data_ref->{'sub_ref'}->( undef, $data_ref->{'tab_ref'}, {'name' => $name} );
+    
+    my $event_ref = $zone_events{$zone};
+    my $step = 'editor_destroy';
+    if ( my $event = $event_ref->{$step} ) {
+        #print "Evènement editor_destroy défini pour zone = $zone\n";
+        execute_events( $event, $zone, { 
+            'editor' => $self->[ID],
+            'name' => $self->[PARENT]->name,
+        } );
     }
 }
 

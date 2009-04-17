@@ -10,11 +10,11 @@ But only one "Text::Editor::Easy" object can be on the top of its zone. So , in 
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use threads; # debug
 use Scalar::Util qw(refaddr);
@@ -36,23 +36,14 @@ sub new {
     my $zone = bless $hash_ref, $classe;
     my $name = $hash_ref->{'name'};
     if ( defined $name ) {
-
         # le thread Data n'est peut être pas opérationnel
         #Text::Editor::Easy::Async->reference_zone($hash_ref);
         Text::Editor::Easy->reference_zone($hash_ref);
     }
-    if ( my $new_hash_ref = $hash_ref->{'on_top_editor_change'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_top_editor_change',
-            $new_hash_ref, undef );
+    if ( my $event_ref = $hash_ref->{'events'} ) {
+        Text::Editor::Easy->reference_zone_events( $name, $event_ref );
     }
-    if ( my $new_hash_ref = $hash_ref->{'on_editor_destroy'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_editor_destroy',
-            $new_hash_ref, undef );
-    }
-    if ( my $new_hash_ref = $hash_ref->{'on_new_editor'} ) {
-        Text::Editor::Easy->reference_zone_event( $name, 'on_new_editor',
-            $new_hash_ref, undef );
-    }
+
     return $zone;
 }
 
@@ -83,11 +74,9 @@ sub on_top_editor {
     
     print "Dans on_top_editor de Zone ", $self->{'name'}, "\n";
     
-    my $ref = Text::Editor::Easy->on_top_ref_editor($self);
-    print "Dans on_top_editor de Zone ", $self->{'name'}, ", ref = $ref\n";
-    my $editor = bless \do { my $anonymous_scalar }, 'Text::Editor::Easy';
-    Text::Editor::Easy::Comm::set_ref($editor, $ref);
-    return $editor;
+    my $id = Text::Editor::Easy->on_top_ref_editor($self);
+    print "Dans on_top_editor de Zone ", $self->{'name'}, ", id = $id\n";
+    return Text::Editor::Easy->get_from_id( $id );
 }
 
 sub list {

@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
@@ -184,18 +184,11 @@ This function recovers the link between a print and the code that generated it.
 
 =cut
 
-my %editor;
-
 sub get_info_for_eval_display {
     my ( $self, $ref_editor, $ref_line, $pos_in_line ) = @_;
 
     print DBG "Dans get_info_for_eval_display : ref_editor : $ref_editor| ref_line $ref_line| pos_in_line $pos_in_line\n";
-    my $editor = $editor{$ref_editor};
-    if ( ! $editor ) {
-        $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref ($editor, $ref_editor);
-        $editor{$ref_editor} = $editor;
-    }
+    my $editor = Text::Editor::Easy->get_from_id( $ref_editor );
     my $seek_start = $editor->line_get_info( $ref_line );
     my $text = $editor->line_text ( $ref_line );
     print DBG "Seek start de la ligne : $seek_start| texte : $text\n";
@@ -352,12 +345,7 @@ sub get_info_for_display {
     my ( $self, $start_of_line, $shift, $ref_editor, $ref_line ) = @_;
 
     print DBG "Dans get_info_for_display : |$start_of_line| décalage : $shift\n";
-    my $editor = $editor{$ref_editor};
-    if ( ! $editor ) {
-        $editor = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-        Text::Editor::Easy::Comm::set_ref ($editor, $ref_editor);
-        $editor{$ref_editor} = $editor;
-    }
+    my $editor = Text::Editor::Easy->get_from_id( $ref_editor );
 
     my $value = $self->[HASH]{$start_of_line};
     if ( ! defined $value ) {
@@ -663,8 +651,7 @@ sub declare_trace_for {
     my ( $self, $name, $file_name ) = @_;
 
     my $editor = Text::Editor::Easy->whose_name( $name );
-    my $ref = $editor->get_ref;
-    $editor{$ref} = $editor;
+    my $ref = $editor->id;
     
     my $new_self;
     $new_self->[OUT_NAME] = $file_name;

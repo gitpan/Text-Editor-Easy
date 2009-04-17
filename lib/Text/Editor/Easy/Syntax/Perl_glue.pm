@@ -9,11 +9,11 @@ Text::Editor::Easy::Syntax::Perl_glue - Perl highlighting (will always be limite
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Syntax::Highlight::Perl::Improved ':FULL';
 my $formatter = new Syntax::Highlight::Perl::Improved;

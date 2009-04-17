@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -62,8 +62,6 @@ use constant {
 
 sub new {
     my ( $class, $hash_ref ) = @_;
-
-    my $zone_ref = $hash_ref->{'zone'};
 
     my $self = [];
     bless $self, $class;
@@ -530,12 +528,6 @@ sub create_canva {
 
     #print "DAns create canva : ", $zone_ref->{'name'}, "\n";
     my $size_ref = $zone_local{'size'};
-    #delete $zone_local{'name'};
-    #delete $zone_local{'on_top_editor_change'};
-    #delete $zone_local{'on_editor_destroy'};
-    #delete $zone_local{'on_new_editor'};
-
-    #my $canva = $mw->Canvas(
     
     my $canva = $mw->EditorCanva(
         -background => $color,
@@ -767,10 +759,6 @@ sub on_top {
     $zone{ $zone_name } = $self;
 
     my %local_zone = %{ $global_zone{$zone_name} };
-    #delete $local_zone{'name'};
-    #delete $local_zone{'on_top_editor_change'};
-    #delete $local_zone{'on_editor_destroy'};
-    #delete $local_zone{'on_new_editor'};
     
     $self->[CANVA]->place( -in => $self->[TOP_LEVEL], %{ $local_zone{'size'} } );
 

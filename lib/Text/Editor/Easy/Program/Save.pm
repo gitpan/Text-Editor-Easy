@@ -12,11 +12,11 @@ The process of regular save is launched only if the Editor.pl program finds a ".
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 use Text::Editor::Easy;
 use Text::Editor::Easy::Comm;

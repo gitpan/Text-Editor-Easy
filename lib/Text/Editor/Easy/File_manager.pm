@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 SYNOPSIS
 
@@ -76,7 +76,7 @@ use constant {
     GROWING     => 12,
     TO_DELETE   => 13,
     SAVED_INFO  => 14,
-    UNIQUE_REF => 15,
+    ID          => 15,
     HASH_REF     => 16,
     LAST_MODIF => 17,
     
@@ -109,17 +109,16 @@ use constant {
 sub init_file_manager {
 
     #my ( $editor, $file_name, $growing_file, $save_info ) = @_;
-    my ( $file_manager_ref, $reference, $unique_ref, $file_name, $growing_file, $save_info, $bloc )
+    my ( $file_manager_ref, $reference, $id, $file_name, $growing_file, $save_info, $bloc )
       = @_;
 
-    #print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$unique_ref|$file_name\n";
+    #print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$id|$file_name\n";
 
-    $file_manager_ref->[UNIQUE_REF]  = $unique_ref;
-    $file_manager_ref->[PARENT] = bless \do { my $anonymous_scalar }, "Text::Editor::Easy";
-    Text::Editor::Easy::Comm::set_ref ($file_manager_ref->[PARENT], $unique_ref);
+    $file_manager_ref->[ID]  = $id;
+    $file_manager_ref->[PARENT] = Text::Editor::Easy->get_from_id ($id );
 
-    print DBG "File_manager de l'instance $unique_ref";
-    my $name = Text::Editor::Easy->data_name($unique_ref);
+    print DBG "File_manager de l'instance $id";
+    my $name = Text::Editor::Easy->data_name($id);
     if ( defined $name ) {
         print DBG " ($name)";
     }
@@ -1564,7 +1563,7 @@ sub load_info {
             return $self->[SAVED_INFO]{$key};
         }
         else {
-            print STDERR "Saved_info in File_manager is not a hash, key wanted : $key\n===\n", dump( $self->[SAVED_INFO] ), "\n====\n";
+            #print STDERR "Saved_info in File_manager is not a hash, key wanted : $key\n===\n", dump( $self->[SAVED_INFO] ), "\n====\n";
             return;
         }
     }
