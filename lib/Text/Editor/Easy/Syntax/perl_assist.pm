@@ -19,11 +19,11 @@ Text::Editor::Easy::Syntax::perl_assist -- Automatic indentation, addition of ch
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 my %opt = (
     "for"   => \&for,

@@ -10,11 +10,11 @@ But only one "Text::Editor::Easy" object can be on the top of its zone. So , in 
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use threads; # debug
 use Scalar::Util qw(refaddr);
@@ -22,17 +22,22 @@ use Scalar::Util qw(refaddr);
 # A modifier en une référence de scalaire...
 sub new {
     my ( $classe, $hash_ref ) = @_;
-    
-        if ( my $trace_ref = $hash_ref->{'trace'} ) {
+
+    if ( ! defined $hash_ref or ref $hash_ref ne 'HASH' ) {
+        $hash_ref = {};
+    }
+
+    my $trace_ref = $hash_ref->{'trace'};
+    if ( $trace_ref ) {
 
 # Hash "%Trace" must be seen by all future created threads but needn't be  a shared hash
 # ===> will be duplicated by perl thread creation mecanism
-            %Text::Editor::Easy::Trace = %{$trace_ref};
-            delete $hash_ref->{'trace'};
-        }
+        %Text::Editor::Easy::Trace = %{$trace_ref};
+        delete $hash_ref->{'trace'};
+    }
     #Text::Editor::Easy::trace_test();
 
-    Text::Editor::Easy::Comm::verify_model_thread();
+    #Text::Editor::Easy::Comm::verify_model_thread( $trace_ref );
     my $zone = bless $hash_ref, $classe;
     my $name = $hash_ref->{'name'};
     if ( defined $name ) {
@@ -41,6 +46,7 @@ sub new {
         Text::Editor::Easy->reference_zone($hash_ref);
     }
     if ( my $event_ref = $hash_ref->{'events'} ) {
+        #print "Des évènements pour la zone $name\n";
         Text::Editor::Easy->reference_zone_events( $name, $event_ref );
     }
 
@@ -95,8 +101,8 @@ my %resize_sub = (
 sub resize {
     my ( $self, $where, $how_many_ref, @coordinates ) = @_;
     
-    print "Dans resize de Zone : where = $where|@coordinates| tid = ", threads->tid, "\n";
-    return if ( ! defined $resize_sub{$where} );
+    #print "Dans resize de Zone : where = $where|@coordinates| tid = ", threads->tid, "\n";
+    return if ( ! defined $where or ! defined $resize_sub{$where} );
     $resize_sub{ $where }->( $self, $how_many_ref, @coordinates );
     return;
 }

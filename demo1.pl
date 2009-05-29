@@ -68,7 +68,7 @@ say ( "Welcome to Text::Editor::Easy"
 
 sub say {
     print @_;
-    print STDERR "....",
+        print STDERR "....",
     "\n#\n#Writing 'manually' on STDERR...\n";
 }
 

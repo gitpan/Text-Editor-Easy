@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 =head1 SYNOPSIS
 
@@ -113,6 +113,7 @@ sub init_file_manager {
       = @_;
 
     #print "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$id|$file_name\n";
+    #print DBG "Dans init_file_manager tid ", threads-> tid, " $file_manager_ref|$reference|$id|$file_name\n";
 
     $file_manager_ref->[ID]  = $id;
     $file_manager_ref->[PARENT] = Text::Editor::Easy->get_from_id ($id );
@@ -1488,6 +1489,8 @@ sub get_ref_for_empty_structure {
 
 # Fonction appelée sur fichier vide (par exemple, au démarrage, lors de la création)
     my ($self) = @_;
+    
+    #print "Dans get_ref_for_empty_structure : self = $self\n";
 
     my $line_ref;
     $line_ref->[PARENT] = $self->[ROOT];

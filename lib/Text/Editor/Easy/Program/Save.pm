@@ -12,11 +12,11 @@ The process of regular save is launched only if the Editor.pl program finds a ".
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Text::Editor::Easy;
 use Text::Editor::Easy::Comm;
@@ -65,7 +65,8 @@ sub save_arbo {
         # Méthode pas très propre pour appeler une méthode d'un objet pas créé dont on connait la référence... évite le bless et l'AUTOLOAD
         # Thread dédié => sauvegarde synchrone (pas de gestion de l'attente de fin d'exécution)
         Text::Editor::Easy::Comm::ask_named_thread(
-            $ref,
+            #$ref,
+            Text::Editor::Easy->get_from_id( $ref ),
             'Text::Editor::Easy::File_manager::save_internal',
             'File_manager'
         );

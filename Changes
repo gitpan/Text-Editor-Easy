@@ -1,6 +1,19 @@
 Revision history for Text-Editor-Easy
 
 --------------------------+
+0.47  : 29 May 2009       !
+--------------------------+
+    - true initialization made with a 'use Text::Editor::Easy;' :
+        - Class methods had to be accesible without the need to create an instance first
+    - Start to set the trace mecanism : suppression of package variable %Trace, start to write the doc.
+    - Can now choose any shortcut for 'Text::Editor::Easy' (a bit too long, indeed) : this
+        shortcut is a start to allow standard perl inheritance system (thread complexity with
+        knowledge diffusion still to be checked)
+    - Starting dynamic event management :
+        - events can be added, updated or deleted during execution
+        - specific event management can be set for future instance creations
+
+--------------------------+
 0.46  : 17 April 2009     !
 --------------------------+
     - Using module Syntax::Highlight::Perl::Improved instead of Syntax::Highlight::Perl.

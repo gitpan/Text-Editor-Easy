@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -366,7 +366,7 @@ sub initialize {
 sub launch_loop {
     my ( $self, $sub, $seconds ) = @_;
 
-   print "Lancement d'une boucle seconds = $seconds\n";
+   #print "Lancement d'une boucle seconds = $seconds\n";
     
    return $self->[TOP_LEVEL]->repeat( $seconds * 1000, $sub );
 }

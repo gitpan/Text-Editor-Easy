@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -315,7 +315,7 @@ sub manage_file {
 sub init_set {
     my ( $self, $reference, $zone ) = @_;
 
-    print "Dans init_set $self, $zone\n";
+    #print "Dans init_set $self, $zone\n";
     $display_zone = $zone->{'name'};
 }
 
@@ -335,7 +335,7 @@ sub cursor_set_on_who_file {
     my ( $file, $number, $package ) = ( $1, $2, $3 );
 
     my ( $new_editor, $line );
-    print "Dans cursor_set_on_who_file : avant manage_..., thread", threads->tid, "\n";
+    #print "Dans cursor_set_on_who_file : avant manage_..., thread", threads->tid, "\n";
     return if (anything_for_me);    # Abandonne si autre chose à faire
     if ( ! -f $file ) {
         # gestion de l'eval...
@@ -347,9 +347,9 @@ sub cursor_set_on_who_file {
 
     return if ( ! defined $new_editor );
 
-    print "Appel on top pour new_editor ", $new_editor->name, "\n";
+    #print "Appel on top pour new_editor ", $new_editor->name, "\n";
     $new_editor->on_top;
-    print "Fin appel on top pour new_editor\n";
+    #print "Fin appel on top pour new_editor\n";
     $line->select( undef, undef, 'white' );
     $editor->deselect;
     $hash_ref->{'line'}->select( undef, undef, 'orange' );

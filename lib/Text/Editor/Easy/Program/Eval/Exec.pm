@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Exec - Execution of macro panel instructions 
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Text::Editor::Easy::Comm;
 use threads;    # Pour debug
@@ -65,7 +65,11 @@ sub idle_eval_exec {
     }
 }
 
-print "Fin de l'évaluation de Program::Exec...\n";
+sub ed {
+    my ( $name ) = @_;
+    
+    return Text::Editor::Easy->whose_name( $name );
+}
 
 =head1 FUNCTIONS
 

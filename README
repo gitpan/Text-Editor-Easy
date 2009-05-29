@@ -1,18 +1,19 @@
 Text-Editor-Easy
 
-Version 0.46.
+Version 0.47.
 Pure perl editor module and program. 10 demos in the program,
-but still not usable.
+but still not usable : numerous bugs to work on, memory leaks to stop,
+interface to complete, louds of documentation to write, ...
 
 
 INSTALLATION
 
-I hope that this module can be installed with the standard cpan command.
+This module should be installable with the standard cpan command.
 
 Anyway, it contains pure perl modules and programs.
 So it shouldn't be hard to install it manually and run the demos.
 
-It's compatible with Windows and UNIX. I use perl 5.8.8 on Windows
+It's compatible with Windows and UNIX. I use perl 5.10.0 on Windows
 and perl 5.8.8 on Linux.
 
 In order to install it manually to execute the demos,
@@ -38,16 +39,37 @@ Once finished, execute the "Editor.pl" program in the root directory. Don't
 remove the tmp directory : it can be empty but the "Editor.pl" program
 needs one.
 
+
 SUPPORT AND DOCUMENTATION
 
 Here are a few screen shots of what you should get when running the demos :
 http://sgrommier.free.fr/perl/editor/
 
-The documentation, that just starts to be written, will be in 3 places :
+About test results on the cpan :
+Most cpan machines have not Tk properly installed, and a lot of perl
+distributions are not compiled with ithread. So most, of the time,
+tests are skipped.
+
+As this editor is in active development, support is not yet managed and
+documentation should grow at each package upload.
+
+The 'final' documentation will be in 3 places :
     - of course, in the modules as pod
     - I will try "pseudo-videos" runnable from the Editor.pl program
     - on the web : http://sgrommier.free.fr/perl/editor/. Compared to pod,
 I can add pictures and translation.
+
+In 'Text::Editor::Easy', Easy has been chosen because I want the plain interface
+to be very easy. From a basic programmer point of view, it will be very clear
+and easy to make a graphical perl text application with personnal highlighting.
+
+But I really wanted this module to be programmer-oriented and in a new 'dynamic way' : 
+the possibilities for a demanding programmer will be very elaborate and hardly found elsewhere.
+And this is very demanding ... to me : I try to generalize things that I don't even use for
+my 'Editor.pl' program, and I have to explain all these (surely useless) possibilities in 
+the documentation. But I feel much better having done these generalizations, and 
+sometimes I use them to simplify my own code where I hadn't thought it could have been 
+useful...
 
 
 COPYRIGHT AND LICENCE

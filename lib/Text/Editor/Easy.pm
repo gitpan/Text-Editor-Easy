@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 =head1 WHY ANOTHER EDITOR ?
 
@@ -58,7 +58,12 @@ use your graphical module : the interface of the module (especially, method "cre
 you to create threads as simply as you create a new variables. See module L<Text::Editor::Easy::Comm> for the thread
 mecanism.
 
-Threads are not only used for speed. With private variables, they allow you to partition your code. So you don't
+Using threads, you can make 'real interactive' applications : a 'Cancel' button that works, for instance. All
+you have to do is to work in an L<interruptible way|Text::Editor::Easy::Comm/anything_for_me> which is not
+possible in a mono-thread application. Thus, graphical applications (with interactive users) should always
+be multi-threaded.
+
+Threads are not only used for speed or interactivity. With private variables, they allow you to partition your code. So you don't
 have a large program with a huge amount of data to manage but a lot of little threads, specialized in a much simpler
 task with fewer variables to manage.
 The only remaining problem is how to communicate with all these "working together threads" : the L<Text::Editor::Easy::Comm>
@@ -306,6 +311,173 @@ the cursor belongs to a line that is displayed, it should be visible.
 
 Place the editor on top of the screen to make it visible. No action is made if editor was already on top or had the focus.
 
+=head1 TRACE MECANISM
+
+You can redirect standard prints and make special prints on debug files.
+
+=head2 STANDARD PRINTS (STDOUT / STDERR)
+
+There are 3 possible states for standard prints :
+
+=over 4
+
+=item *
+
+No redirection
+
+=item *
+
+Redirection in a file with no default action, but specific user actions 
+are possible.
+
+=item *
+
+Redirection in a file with a complete analysis which is saved and can be checked
+later. Specific user actions are still possible.
+
+=back
+
+A specific user action is just a user sub that is called each time a print matches some user
+conditions.
+
+By default, there is no redirection.
+
+With a complete analysis, a trace thread is created : this thread managed a small
+database (with SDBM_File) of all prints. A link is made between the exact
+position of the print in the redirection file and data (saved in other
+files) explaining the print :
+
+=over 4
+
+=item *
+
+Destination (STDOUT or STDERR)
+
+=item *
+
+Complete stack call at the time of the print
+
+=item *
+
+Which thread made the print and for what L<call_id|Text::Editor::Easy::Comm>.
+
+=back
+
+Moreover, with a complete analysis, all calls between threads are traced
+the same way : an other small database, managed by the same thread, saves
+information on each 'call_id'.
+
+If we use these 2 databases together, all prints can be traced in a 'multi-threaded'
+way.
+
+=head3 Tracing STDIN / STDOUT from the start
+
+ # Tracing from the very start : in a BEGIN bloc
+ 
+ use Text::Editor::Easy { 
+     'trace' => {
+         'print' => {
+             # Interface to be written
+         }
+     }
+ };
+
+
+Another possibility when redirection is not so urgent :
+
+ use Text::Editor::Easy;
+ 
+ # Tracing from the start of the execution (no instruction between the use and the configure)
+ 
+ Text::Editor::Easy->configure( { 
+     'trace' => {
+         'print' => {
+            # Configure method to be written
+         }
+     }
+ } );
+
+In the first case, the redirection is made in a BEGIN bloc (executed as soon as parsed) wheras in the second case, it's made during execution.
+
+Generally, whith the "use" syntax, after the name of the module to use, you put a list of words that will 
+be imported in your name space. But if the list contains just one parameter and if this parameter is a 
+hash, you can do more than just import names : you can configure lots of things in a BEGIN bloc. This 
+might be useful to have 'prints' from further BEGIN blocs (other 'use' calls...) catched for further 
+analysis...
+
+So, the 'configure' class method accepts a hash as single parameter. The 'configure' method can be called
+automatically with the 'use' syntax : the 'use' parameter is the same as the configure method.
+
+For the 'trace mecanism', only the 'trace' key is used. The value of this key is another hash. This inside
+hash accepts 'print' and 'full' keys :
+
+=over 4
+
+=item *
+
+print :
+
+=item *
+
+full :
+
+=back
+
+=head3 Changing STDIN / STDOUT state
+
+=head3 User action for 'selected prints'
+
+=head2 SPECIAL PRINTS ON DEBUG FILES
+
+In order to debug a special module, you can add 'special prints' on a special 'file handle'.
+Let's call this file a 'debug file'.
+
+This special file has the following properties :
+
+=over 4
+
+=item *
+
+If you don't want traces any more, you can use a global option to unswitch
+all the 'debug prints' without deleting the print sentences.
+
+=item *
+
+You can trace modules as a whole (no traces in all modules, traces in all module),
+or trace them independantly (trace 'Foo.pm' and 'Bar.pm' only).
+
+=item *
+
+There can be 'redirection sequences' in order to debug a special funtion of 
+the module : in this case, a new single file will contain the 'debug prints'
+of the function and for only one call. After the sequence, prints are made
+as usual on the global 'debug file' of the module.
+
+=back
+
+To sum up, a print on the 'debug file' makes one the following action :
+
+=over 4
+
+=item *
+
+nothing, if traces are 'off' for this module (and if no sequence has been started)
+
+=item *
+
+a print on the global 'debug file' of the module (traces are 'on' for this module and no
+sequence has been started)
+
+=item *
+
+a print on a 'debug sequence file', the number of these files being linked
+to the module activity
+
+=back
+
+The interface is too light at present ('manage_debug_file' funtion) and 
+should be set.
+
 =cut
 
 use Scalar::Util qw(refaddr);
@@ -314,9 +486,6 @@ use threads;
 use threads::shared;
 
 use Text::Editor::Easy::Comm;
-
-our %Trace; # Hash to tell modules if they have to make displays or to be silent
-
 use Text::Editor::Easy::Zone;
 use Text::Editor::Easy::Cursor;
 use Text::Editor::Easy::Screen;
@@ -324,21 +493,48 @@ use Text::Editor::Easy::Window;
 
 my $main_loop_launched : shared;
 
+package Text::Editor::Easy::Async;
+our @ISA = 'Text::Editor::Easy';
+
+package Text::Editor::Easy;
+
+#Text::Editor::Easy::Comm::verify_model_thread();
+my $shortcut : shared = undef;
+
+sub import {
+    my ( $self, $options_ref ) = @_;
+    
+    my $trace_ref = undef;
+
+    if ( defined $options_ref ) {
+        #print "Dans import options_ref = ", dump( $options_ref ), "\n";
+        if ( my $ref = ref $options_ref ) {
+            if ( $ref eq 'HASH' ) {
+                $trace_ref = $options_ref->{'trace'};
+                $shortcut = $options_ref->{'short'};
+            }
+        }
+    }
+    #print "Dans import trace_ref = ", dump( $trace_ref ), "\n";
+    Text::Editor::Easy::Comm::verify_model_thread( $trace_ref );
+    
+    if ( defined $shortcut ) {
+        eval "package $shortcut;our \@ISA = 'Text::Editor::Easy'";
+    }
+}
+
 sub new {
     my ( $classe, $hash_ref ) = @_;
 
-    # Création du "thread modèle", générateur de tous les autres
-    if ( my $trace_ref = $hash_ref->{'trace'} ) {
-
-# Hash "%Trace" must be seen by all future created threads but needn't be  a shared hash
-# ===> will be duplicated by perl thread creation mecanism
-        %Trace = %{$trace_ref};
+    if ( ! defined $hash_ref or ref $hash_ref ne 'HASH' ) {
+        $hash_ref = {};
     }
-    Text::Editor::Easy::Comm::verify_model_thread();
 
     my $editor = bless \do { my $anonymous_scalar }, $classe;
-
     my $ref = refaddr $editor;
+
+    #print "Début new : editor = $editor, ref = $ref\n";
+
     Text::Editor::Easy::Comm::set_ref($editor, $ref);
 
     my $zone = $hash_ref->{'zone'};
@@ -346,10 +542,17 @@ sub new {
         $hash_ref->{'zone'} = Text::Editor::Easy::Zone->whose_name($zone);
     }
 
-    #Text::Editor::Easy::Comm::verify_motion_thread( $ref, $hash_ref );
+    # Référencement de l'éditeur avec forçage éventuel de certaines données
+    $hash_ref = Text::Editor::Easy->reference_editor( $ref, $hash_ref );
+    
+    #print "hash_ref events vaut : ", dump( $hash_ref->{'events'} ), "\n";
+    
+    return if ( ! defined $hash_ref->{'events'} );
 
-    my $correct = Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor );
-    return if ( ! $correct );
+    if ( ! Text::Editor::Easy::Comm::verify_graphic( $hash_ref, $editor ) ) {
+        print STDERR 'Error during graphic creation of Text::Editor::Easy object\n';
+        return;
+    }
 
     #if ( defined $hash_ref->{'growing_file'} ) {
     #    print "GROWING FILE ..$hash_ref->{'growing_file'}\n";
@@ -408,14 +611,12 @@ sub new {
             'name' => 'File_manager',
         }
     );
-
-    # Référencement de l'éditeur
-    Text::Editor::Easy->reference_editor( $ref, $hash_ref );
     
     $editor->set_synchronize();
     my $focus = $hash_ref->{'focus'};
     if ( ! defined $focus ) {
-        #print "Création de l'éditeur $editor : mise au premier plan (appel on_top)\n";
+        #print "Création de l'éditeur ", $editor->name, " : mise au premier plan (appel on_top)\n";
+        #print "    ===> id de cet éditeur avant appel on_top : ", $editor->id, "\n";
         $editor->on_top($hash_ref);
         #print "Fin de la mise au premier plan pour $editor\n";
     }
@@ -465,8 +666,8 @@ sub kill {
 
  sub file_name {
     my ($self) = @_;
-    my $ref    = $self->id;
-    return Text::Editor::Easy->data_file_name($ref);
+
+    return Text::Editor::Easy->data_file_name($self->id);
 }
 
 sub name {
@@ -759,9 +960,11 @@ sub AUTOLOAD {
     my ( $self, @param ) = @_;
 
     my $what = $AUTOLOAD;
-    $what =~ s/^Text::Editor::Easy:://;
-    $what =~ s/^Async:://;
-
+    #$what =~ s/^Text::Editor::Easy:://;
+    #$what =~ s/^Async:://;
+    #$what =~ s/^${shortcut}::// if ( defined $shortcut );
+    $what =~ s/^.*:://;
+    
     # Following call not to be shown in trace
     return Text::Editor::Easy::Comm::ask2( $self, $what, @param );
 }
@@ -1013,9 +1216,6 @@ sub zone {
     return Text::Editor::Easy->data_zone($id);
 }
 
-package Text::Editor::Easy::Async;
-our @ISA = 'Text::Editor::Easy';
-
 =head1 FUNCTIONS
 
 =head2 append
@@ -1113,7 +1313,7 @@ Sebastien Grommier, C<< <sgrommier at free.fr> >>
 
 This module is moving fast. Bugs are not yet managed.
 
-Maybe you'd like to know that I writed this Editor from scratch. I didn't take a single line to any existing editor. The very few
+Maybe you'd like to know that I started writing this Editor from scratch. I didn't take a single line to any existing editor. The very few
 editors I had a glance at were too tightly linked to a graphical user interface. Maybe you obtain faster execution results like that,
 but you do not recycle anything. I wanted an engine which you could plug to, a little like perl has been designed.
 
@@ -1125,7 +1325,7 @@ and launch the "Editor.pl" program.
 To be in an editor allows you to display information interactively. Full documentation will be accessible from here with version 1.0.
 
 In future versions, there will be a "video mode" : perl code to make the images and ogg files for the sound. These videos will cost almost
-nothing in space compared to actual compressed videos (the sound will be, by far, the heaviest part of them).
+nothing in space compared to actual compressed videos (the sound will be, indeed, the heaviest part of them).
 
 All softwares should include "help videos" like what I describe : it would prove that what you are about to use is easy to manipulate and it
 would give you a quick interactive glance of all the possibilities. But most softwares are awfully limited (or just don't have the ability) when

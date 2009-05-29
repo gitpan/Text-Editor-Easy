@@ -9,11 +9,11 @@ Text::Editor::Easy::Cursor - Object oriented interface to cursor data (managed b
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 # Les fonctions de Abstract.pm réalisant toutes les méthodes de ce package commencent par "cursor_" puis reprennent
 # le nom de la méthode
@@ -105,15 +105,14 @@ sub get {
 }
 
 my %method = (
-    'position_in_display' =>
-      \&Text::Editor::Easy::Abstract::cursor_position_in_display,
-    'position_in_text' =>
-      \&Text::Editor::Easy::Abstract::cursor_position_in_text,
-    'abs'          => \&Text::Editor::Easy::Abstract::cursor_abs,
-    'virtual_abs'  => \&Text::Editor::Easy::Abstract::cursor_virtual_abs,
-    'line'         => \&Text::Editor::Easy::Abstract::cursor_line,
-    'get'          => \&Text::Editor::Easy::Abstract::cursor_get,
-    'make_visible' => \&Text::Editor::Easy::Abstract::cursor_make_visible,
+    'position_in_display' => 1,
+    'position_in_text'    => 1,
+    'abs'                 => 1,
+    'virtual_abs'         => 1,
+    'line'                => 1,
+    'get'                 => 1,
+    'make_visible'        => 1,
+    'set_shape'           => 1,
 );
 
 sub AUTOLOAD {

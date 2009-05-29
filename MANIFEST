@@ -55,12 +55,12 @@ prove.sh
 t/00-check_Tk.t
 t/00-load.t
 t/boilerplate.t
+t/class_events.t
 t/class_thread_add_method.t
 t/class_thread_creation.t
 t/events.t
 t/insert.t
 t/insert_mode.t
-t/instance_thread_add_method.t
 t/instance_thread_add_object.t
 t/instance_thread_creation.t
 t/multiplexed_thread_creation.t

@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 =head1 SYNOPSIS
 
@@ -306,14 +306,7 @@ sub new {
     }
 
     #print "Création dans abstract growing = ", $hash_ref->{'growing'}, "\n";
-
-    my $events = $hash_ref->{'events'};
-    $edit_ref->[EVENTS] = {};
-    if ( $events ) {
-         my $hash_returned = Text::Editor::Easy::Events::reference_events($id, $events);
-         return if ( ! ref $hash_returned );
-         $edit_ref->[EVENTS] = $hash_returned;
-    }
+    $edit_ref->[EVENTS] = $hash_ref->{'events'};
 
     $abstract{$id} = $edit_ref;
 
@@ -324,6 +317,7 @@ sub new {
     $edit_ref->[SCREEN][WRAP]            = 0;
 
     #$edit_ref->[CALC_LINE] = 0;
+    print "Dans init de Abstract self PARENT = ", $editor, "\n";
     $edit_ref->[PARENT] = $editor;
 
     $edit_ref->[ASSIST] = 0;
@@ -1151,7 +1145,6 @@ sub clic {
         }
     );
 
-
     if ( $origin eq 'graphic' and !$sub_origin ) {
         $sub_origin = 'clic';
     }
@@ -1165,7 +1158,7 @@ sub clic {
         ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
         return if ( ! defined $info_ref );
         $meta = $info_ref->{'meta'};
-    } 
+    }
 
     $step = "${meta}hard_clic";
     if ( ! $label or $label eq $step ) {
@@ -1232,7 +1225,9 @@ sub clic {
 
     $step = "${meta}clic";
     if ( ! $label or $label eq $step ) {
+        #print "step = $step\n";
         if ( my $event = $event_ref->{$step} ) {
+            #print "Un évènement ${meta}clic défini...\n";
             ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
             return if ( ! defined $info_ref );
             $meta = $info_ref->{'meta'};
@@ -1297,7 +1292,7 @@ sub motion {
     }
 
     if ( ! $label or $label eq 'any_hard_motion' ){
-        editor_make_visible( $edit_ref );
+        make_visible( $edit_ref );
     }
 
     $meta = $info_ref->{'meta'};
@@ -1435,8 +1430,10 @@ sub zone_resize {
     my ( $edit_ref, $info_ref ) = @_;
 
     #print "Dans zone resize : x = $info_ref->{'x'}, y = $info_ref->{'y'}\n";
-
-    if ( $info_ref->{'shape'} =~ /^sb/ ) {
+    my $shape;
+    
+    $shape = $info_ref->{'shape'} if ( defined $info_ref );
+    if ( defined $shape and $shape =~ /^sb/ ) {
         Text::Editor::Easy::Motion::zone_resize(
             $edit_ref->[GRAPHIC]->get_zone,
             $edit_ref->[CURSOR][RESIZE],
@@ -1456,7 +1453,9 @@ sub zone_resize {
 sub drag_select {
     my ( $edit_ref, $info_ref ) = @_;
    
-    if ( $info_ref->{'shape'} !~ /^sb/ ) {
+    my $shape;
+    $shape = $info_ref->{'shape'} if ( defined $info_ref );
+    if ( defined $shape and $shape !~ /^sb/ ) {
         Text::Editor::Easy::Abstract::Key::motion_select( $edit_ref, $info_ref );
     }
 }
@@ -1690,15 +1689,21 @@ sub init {
         }
     }
 
-    my $line_ref;
-    if ( !$ref ) {
+    my $line_ref = undef;
+    if ( ! $ref ) {
         $line_ref = read_next_line($edit_ref);
         if ( !$line_ref ) {
 
-            # Fichier vide : en pratique, pour affichage, une ligne vide
+            print "Fichier vide : en pratique, pour affichage, une ligne vide\n";
             $line_ref->[TEXT] = "";
             $line_ref->[REF] = $edit_ref->[PARENT]->get_ref_for_empty_structure;
             create_text_in_line( $edit_ref, $line_ref );
+            print "après création ligne vide : LINE REF = $line_ref\n";
+            print "   REF = |", $line_ref->[REF], "|\n";
+            print "   TEXTE = |", $line_ref->[TEXT], "|\n";
+        }
+        else {
+            print "Récupéré line_ref de read_next_line : $line_ref\n";
         }
     }
     else {
@@ -1714,6 +1719,7 @@ sub init {
         $edit_ref->display( $line_ref->[REF], { 'at' => $line_at } );
     }
     else {
+        print "Pas de configuration trouvée pour l'affichage de LINE REF = ", $line_ref->[REF], "\n";
         $edit_ref->display( $line_ref->[REF], { 'at' => 'top' } );
     }
 
@@ -2233,19 +2239,19 @@ sub inser {
     }
 }
 
-sub editor_insert_mode {
+sub insert_mode {
     my ($edit_ref) = @_;
 
     return $edit_ref->[INSER];
 }
 
-sub editor_set_insert {
+sub set_insert {
     my ($edit_ref) = @_;
 
     $edit_ref->[INSER] = 1;
 }
 
-sub editor_set_replace {
+sub set_replace {
     my ($edit_ref) = @_;
 
     $edit_ref->[INSER] = 0;
@@ -3173,6 +3179,14 @@ sub display {
     }
 
     # Vérification de la validité de la ligne avant effacement de l'écran
+    if ( ! defined $ref ) {
+        print STDERR "PAs de référence donnée pour un display\n";
+        my $indice = 0;
+        while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
+            print "PACK $pack, FILE $file, LINE $line\n";
+        }
+        return;
+    }
     my $top_line_ref;
     if ( $ref =~ /^(\d+)_/ ) {
         ($top_line_ref) = get_line_ref_from_display_ref( $edit_ref, $ref );
@@ -4672,7 +4686,7 @@ sub on_top {
     my ( $self ) = @_;
     my $zone = $self->[GRAPHIC]->get_zone;
 
-    #print "Dans abstract on_top : zone = $zone, $self->[PARENT]|",
+    #print "Dans abstract on_top : zone = $zone, éditeur = ", $self->[PARENT]->name, "|self = $self\n";
 
     my ( $graphic, $old_editor ) = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
     my $conf_ref;
@@ -4691,7 +4705,7 @@ sub on_top {
     }
     $self->[GRAPHIC]->on_top;
 
-    #print "Appel de on_top pour l'éditeur ", $self->[PARENT], " ZONE = $zone\n";
+    #print "Appel de on_top pour l'éditeur ", $self->[PARENT]->name, " ZONE = $zone\n";
     return if ( ! defined $zone );
     
     my $event_ref = $zone_events{$zone};
@@ -4908,17 +4922,14 @@ sub graphic_kill {
 
 sub on_editor_destroy { # zone event called on a Zone object
     my ( $self, $zone, $name ) = @_;
-    
-    #print "Dans on_editor_destroy $zone|$name\n";
     return if ( ! defined $zone );
     
     my $event_ref = $zone_events{$zone};
     my $step = 'editor_destroy';
     if ( my $event = $event_ref->{$step} ) {
-        #print "Evènement editor_destroy défini pour zone = $zone\n";
         execute_events( $event, $zone, { 
             'editor' => $self->[ID],
-            'name' => $self->[PARENT]->name,
+            'name' => $name,
         } );
     }
 }
@@ -4987,25 +4998,34 @@ sub tell_order {
 sub area_select {
     my ( $self, $first_ref, $last_ref ) = @_;
     
+    if ( $first_ref ne 'top' and ref $first_ref->[0] ) {
+        print "First ref 0 = ", $first_ref->[0], "\n";
+        $first_ref->[0] = $first_ref->[0]->id;
+    }
+    if ( $last_ref->[0] ne 'bottom' and ref $last_ref->[0] ) {
+        $last_ref->[0] = $last_ref->[0]->id;
+    }
     #print "Dans area_select je dois sélectionner de $first_ref->[0] position $first_ref->[1]\n";
     #print "   jusqu'à $last_ref->[0] position $last_ref->[1]\n";
     
     # Positionnement sur la première ligne avec déselection
     my $line_ref = $self->[SCREEN][FIRST];
     my $ref = $line_ref->[REF];
+    #print "Référence de la première ligne : $ref\n";
     if ( $first_ref ne 'top' ) {
         while ( $ref != $first_ref->[0] ) {
             line_deselect ( $self, $ref );
             $line_ref = $line_ref->[NEXT];
             my $new_ref = $line_ref->[REF];
-            while ( $new_ref == $ref ) {
-                $line_ref = $line_ref->[NEXT];
-                $new_ref = $line_ref->[REF];
+            if ( defined $new_ref ) {
+                while ( $new_ref == $ref ) {
+                    $line_ref = $line_ref->[NEXT];
+                    $new_ref = $line_ref->[REF];
+                }
+                $ref = $new_ref;
             }
-            $ref = $new_ref;
         }
     }
-    
     # Sélection de la première ligne
     line_deselect ( $self, $ref );
     if ( $first_ref eq 'top' ) {
@@ -5019,7 +5039,7 @@ sub area_select {
         }
     }
     else {
-        if ( $last_ref->[0] != $ref ) {
+        if ( $last_ref->[0] ne $ref ) {
             line_select ( $self, $ref, $first_ref->[1] );
         }
         else {
@@ -5029,7 +5049,6 @@ sub area_select {
             return;
         }
     }
-    
     # Sélection des lignes suivantes (entièrement) jusqu'à la dernière
     $line_ref = $line_ref->[NEXT];
     return if ( ! defined $line_ref );
@@ -5039,7 +5058,7 @@ sub area_select {
         $new_ref = $line_ref->[REF];
     }
     $ref = $new_ref;
-    while ( $ref != $last_ref->[0] ) {
+    while ( $ref ne $last_ref->[0] ) {
         line_select( $self, $ref );
         $line_ref = $line_ref->[NEXT];
         return if ( ! defined $line_ref );
@@ -5082,11 +5101,30 @@ sub graphic_zone_update {
     $self->[GRAPHIC]->zone_update($name, $hash_ref);
 }
 
-sub editor_make_visible {
+
+sub make_visible {
     my ( $self ) = @_;
     
     $self->[GRAPHIC]->put_on_top;
 }
+
+sub update_events {
+    my ( $self, $ref, $id_ref, $event_ref, $name ) = @_;
+    
+    #print "Dans update_events : reçu event_ref = ", dump($event_ref), "\n";
+    #print "    ...name = $name\n" if (defined $name);
+    
+    for my $id ( @$id_ref ) {
+        #print "update_events : traitement de l'id $id\n";
+        if ( $name ) {
+            $abstract{$id}[EVENTS]{$name} = $event_ref;
+        }
+        else {
+            $abstract{$id}[EVENTS] = $event_ref;
+        }
+    }
+}
+
 
 1;
 
@@ -5218,11 +5256,11 @@ Return the middle ordinate of a displayed line.
 
 =head2 divide_line
 
-=head2 editor_insert_mode
+=head2 insert_mode
 
-=head2 editor_set_insert
+=head2 set_insert
 
-=head2 editor_set_replace
+=head2 set_replace
 
 =head2 editor_visual_search
 

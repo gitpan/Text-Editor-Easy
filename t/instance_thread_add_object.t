@@ -1,14 +1,7 @@
-BEGIN {
-  use Config;
-  if (! $Config{'useithreads'}) {
-      print("1..0 # Skipped: Perl not compiled with 'useithreads'\n");
-      exit(0);
-  }
-  if (! -f 'tk_is_ok' ) {
-      print("1..0 # Skipped: Tk can't work : graphical environment is out of order\n");
-      exit(0);
-  }
-}
+use Test::More qw( no_plan );
+use Config;
+plan skip_all => "Perl not compiled with 'useithreads'" if (! $Config{'useithreads'});
+plan skip_all => "Tk is not working properly on this machine" if (! -f 'tk_is_ok' );
 
 use strict;
 
@@ -23,8 +16,6 @@ my $editor = Text::Editor::Easy->new (
         'height'   => 300,
     }
 );
-
-use Test::More qw( no_plan );
 
 # Full trace thread creation
 print "Full trace thread creation by trace_print call\n";

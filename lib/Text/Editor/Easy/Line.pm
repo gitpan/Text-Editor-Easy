@@ -10,11 +10,11 @@ and "Text::Editor::Easy::File_manager").
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 =head1 SYNOPSIS
 
@@ -214,7 +214,7 @@ sub set {
     my $ref           = refaddr $self;
     my $editor        = $ref_Editor{$ref};
     my $id = $editor->line_set( $ref_id{$ref}, @param );
-    print "Dans line_set reçu id $id de line_set\n";
+    #print "Dans line_set reçu id $id de line_set\n";
     return Text::Editor::Easy::Line->new(
         $editor,
         $id,
@@ -230,6 +230,12 @@ sub seek_start {
 }
 
 sub ref {
+    my ($self) = @_;
+
+    return $ref_id{ refaddr $self };
+}
+
+sub id {
     my ($self) = @_;
 
     return $ref_id{ refaddr $self };

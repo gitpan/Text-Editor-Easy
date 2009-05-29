@@ -10,20 +10,35 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
-
-use Text::Editor::Easy;
-use Text::Editor::Easy::Comm;
 
 use IO::File;
 use Data::Dump qw(dump);
 
 if ( ! -d 'tmp' ) {
-    print "Need a tmp directory under your current directory : can't go on\n";
+    print STDERR "Need a tmp directory under your current directory : can't go on\n";
     exit 1;
 }
+
+sub demo8 {
+    my $editor = Text::Editor::Easy->whose_name('demo8.pl');
+    
+    my $sub_ref = eval $editor->slurp;
+    return $sub_ref->(@_);
+
+    #print "End of execution\n";
+}
+
+
+use Text::Editor::Easy { 
+    'trace' => {
+        'all' => 'tmp/',
+        'trace_print' => 'full',
+    },
+    'short' => 'Editor', # Not so short, but clear
+};
 
 # Start from a distant path
 use File::Basename;
@@ -64,7 +79,7 @@ if ( -f "editor.session" ) {
 }
 my @window_size;
 while ( my ($key, $value) = each %{$session_ref->{'window'}}) {
-    print "Valeur $key / $value\n";
+    #print "Valeur $key / $value\n";
     push @window_size, $key, $value;
 }
 
@@ -90,14 +105,10 @@ my $zone4 = Text::Editor::Easy::Zone->new(
     {
         'size' => $size_zone4,
         'name'      => 'zone4',
-        'trace' => {
-            'all' => 'tmp/',
-            'trace_print' => 'full',
-        },
     }
 );
 
-Text::Editor::Easy->new(
+Editor->new(
     {
         'zone'        => $zone4,
         'sub'         => 'main', # Program "Editor.pl" will go on with another thread (sub "main" executed)
@@ -116,20 +127,20 @@ Text::Editor::Easy->new(
     }
 );
 
-print "Taille de l'écran : ", join ( ' | ', Text::Editor::Easy->window->get) ,"\n";
+print "Taille de l'écran : ", join ( ' | ', Editor->window->get) ,"\n";
 
 save_session();
 
 # End of launching perl process (F5 key management)
 print EXEC "quit\n";
 close EXEC; # This should be enough to stop process "exec.pl"
+
+
 # End of Editor.pl
+#unlink ( "editor.session" );
 
 sub main {
     my ( $onglet, @parm ) = @_;
-    
-    
-    
     
     my $tab_tid = $onglet->ask_named_thread( 'get_tid', 'File_manager');
     $onglet->ask_thread('add_thread_method', $tab_tid,
@@ -141,7 +152,7 @@ sub main {
                         ],
         }
     );
-    Text::Editor::Easy->ask_thread('add_thread_method', $tab_tid,
+    Editor->ask_thread('add_thread_method', $tab_tid,
         {
                 'use' => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
@@ -152,14 +163,14 @@ sub main {
                     ],
         }
     );
-    Text::Editor::Easy->ask_thread('add_thread_method', 0,
+    Editor->ask_thread('add_thread_method', 0,
         {
                 'use' => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
                 'method' =>  'save_conf_thread_0',
         }
     );
-    Text::Editor::Easy->ask_thread('add_thread_method', 0,
+    Editor->ask_thread('add_thread_method', 0,
         {
                 'package' => 'main',
                 'method' =>  'restart',
@@ -184,7 +195,7 @@ sub main {
         'name'      => 'out_tab_zone',
     } );
 
-    my $out_tab = Text::Editor::Easy->new(
+    my $out_tab = Editor->new(
         {
             'zone'        => $out_tab_zone,
             'name'        => 'out_tab',
@@ -242,12 +253,12 @@ sub main {
         },
     };
 			
-    Text::Editor::Easy->new( $new_ref );
+    Editor->new( $new_ref );
 
-    Text::Editor::Easy->bind_key(
+    Editor->bind_key(
         { 'package' => 'main', 'sub' => 'launch', 'key' => 'F5' } );
 
-    Text::Editor::Easy->bind_key(
+    Editor->bind_key(
         { 'package' => 'main', 'sub' => 'toto', 'key' => 'alt_shift_t' } );
 
 
@@ -284,7 +295,7 @@ sub main {
             'name'       => 'zone3',
         }
     );
-    my $who = Text::Editor::Easy->new(
+    my $who = Editor->new(
         {
             'zone'        => $zone3,
             'name'        => 'stack_calls',
@@ -301,7 +312,7 @@ sub main {
     );
     use File::Basename;
     my $name  = fileparse($0);
-    my $out_1 = Text::Editor::Easy->new(
+    my $out_1 = Editor->new(
         {
             'zone'         => $zone2,
             'file'         => "tmp/${name}_trace.trc",
@@ -318,7 +329,7 @@ sub main {
             },
         }
     );
-    my $out = Text::Editor::Easy->new(
+    my $out = Editor->new(
         {
             'zone' => $zone2,
             'name' => 'Eval',
@@ -343,7 +354,7 @@ sub main {
             'name'       => 'zone5',
         }
     );
-    my $macro = Text::Editor::Easy->new(
+    my $macro = Editor->new(
         {
             'zone'        => $zone5,
             'name'        => 'macro',
@@ -368,14 +379,14 @@ sub main {
         }
     );
     
-    Text::Editor::Easy->bind_key( { 'package' => 'main', 'sub' => 'restart', 'key' => 'F10' } );
-    Text::Editor::Easy->bind_key({ 
+    Editor->bind_key( { 'package' => 'main', 'sub' => 'restart', 'key' => 'F10' } );
+    Editor->bind_key({ 
             'package' => 'Text::Editor::Easy::Program::Open_editor',
             'use' => 'Text::Editor::Easy::Program::Open_editor',
             'sub' => 'open',
             'key' => 'ctrl_o'
     } );
-    Text::Editor::Easy->bind_key({ 
+    Editor->bind_key({ 
             'package' => 'Text::Editor::Easy::Program::Open_editor',
             'use' => 'Text::Editor::Easy::Program::Open_editor',
             'sub' => 'open',
@@ -384,7 +395,7 @@ sub main {
     
     # Self designing : no annulation management yet, frequent save for the moment
     if ( -d "../../save" ) {
-        Text::Editor::Easy->create_new_server( {
+        Editor->create_new_server( {
             'use' => 'Text::Editor::Easy::Program::Save',
             'package' => 'Text::Editor::Easy::Program::Save',
             'methods' =>  [ 
@@ -442,7 +453,7 @@ $line->select($start, $end);
 $editor->visual_search( $regexp, $line, $end);
 END_PROGRAM
 
-            my $editor = Text::Editor::Easy->whose_name('stack_calls');
+            my $editor = Editor->whose_name('stack_calls');
             $editor->empty;
             my @exp = ( 
                 'qr/e.+s/', 
@@ -472,26 +483,26 @@ Text::Editor::Easy->restart;
 END_PROGRAM
         }
 
-        my $eval_editor = Text::Editor::Easy->whose_name( 'macro' );
+        my $eval_editor = Editor->whose_name( 'macro' );
         $eval_editor->empty;
         $eval_editor->insert($macro_instructions);
         return;
     }
     if ( defined $file_name ) {
-        print "fichier $file_name\n";
+        #print "fichier $file_name\n";
         my $out_name = $file_name;
         $out_name =~ s/\.pl$//;
         $out_name =~ s/\.t$//;
         return if ( $out_name eq $file_name );
-        my $out_editor = Text::Editor::Easy->whose_name( $out_name );
+        my $out_editor = Editor->whose_name( $out_name );
 
-        print "Avant lancement : $file_name|start|perl -I${file_path}lib -MText::Editor::Easy::Program::Flush ${file_path}$file_name\n";
+        #print "Avant lancement : $file_name|start|perl -I${file_path}lib -MText::Editor::Easy::Program::Flush ${file_path}$file_name\n";
         print EXEC
 "$file_name|start|perl -I${file_path}lib -MText::Editor::Easy::Program::Flush ${file_path}$file_name\n";
 
         if ( ! defined $out_editor ) {
         
-          $out_editor = Text::Editor::Easy->new( {
+          $out_editor = Editor->new( {
             'zone' => 'zone2',
             'name' => $out_name,
             'file'         => "tmp/${file_name}_trace.trc",
@@ -505,13 +516,13 @@ END_PROGRAM
                 }
             },
           } );
-          Text::Editor::Easy->declare_trace_for ( 
+          Editor->declare_trace_for ( 
               $out_name,
               "tmp/${file_name}_trace.trc",
           );
         }
         else {
-           print "Le fichier correspondant à $out_name existe : $out_name\n";
+           #print "Le fichier correspondant à $out_name existe : $out_name\n";
             $out_editor->empty;
             $out_editor->set_at_end;
         }
@@ -520,7 +531,7 @@ END_PROGRAM
 }
 
 sub demo8 {
-    my $editor = Text::Editor::Easy->whose_name('demo8.pl');
+    my $editor = Editor->whose_name('demo8.pl');
     
     my $sub_ref = eval $editor->slurp;
     return $sub_ref->(@_);
@@ -529,7 +540,7 @@ sub demo8 {
 }
 
 sub up_demo9 {
-    my $editor = Text::Editor::Easy->whose_name('stack_calls');
+    my $editor = Editor->whose_name('stack_calls');
     my ( $line ) = $editor->cursor->get;
     #print "Dans up_demo9 : trouvé $line | ", $line->text, "\n";
     if ( my $previous = $line->previous ) {
@@ -541,7 +552,7 @@ sub up_demo9 {
 }
 
 sub down_demo9 {
-    my $editor = Text::Editor::Easy->whose_name('stack_calls');
+    my $editor = Editor->whose_name('stack_calls');
     my ( $line ) = $editor->cursor->get;
     #print "Dans down_demo9 : trouvé $line | ", $line->text, "\n";
     if ( my $next = $line->next ) {
@@ -555,7 +566,7 @@ sub down_demo9 {
 sub new_search {
     my ( $exp ) = @_;
 
-    my $macro_ed = Text::Editor::Easy->whose_name('macro');
+    my $macro_ed = Editor->whose_name('macro');
     
     # Hoping the automatic inserted lines are still there and in the right order !
     # ==> the line number 2 of the macro editor will be set to "my \$exp = $exp;" and this will cause
@@ -572,20 +583,20 @@ sub restart {
     print EXEC "Editor.pl|start|perl ${file_path}Editor.pl\n";
 
     # Fin de l'éditeur courant
-    Text::Editor::Easy->exit;
+    Editor->exit;
 }
 
 sub save_session {
     # In thread 0, the graphical MainLoop is over
-    print "Début save_session\n";
-    $session_ref->{'main_tab'} = Text::Editor::Easy->save_conf_thread_0;
-    $session_ref->{'window'} = scalar Text::Editor::Easy->window->get;
+    #print "Début save_session\n";
+    $session_ref->{'main_tab'} = Editor->save_conf_thread_0;
+    $session_ref->{'window'} = scalar Editor->window->get;
     $session_ref->{'zone_list'} = Text::Editor::Easy::Zone->list('complete');
 
     open (INFO, ">editor.session" ) or die "Can't write editor.session : $!\n";
     print INFO dump $session_ref;
     close INFO;
-    print "Fin save_session\n";
+    #print "Fin save_session\n";
 }
 
 =head1 COPYRIGHT & LICENSE

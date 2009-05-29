@@ -10,11 +10,11 @@ Here is the code that makes this instance special.
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Text::Editor::Easy::Comm  qw(anything_for_me);
 use threads;

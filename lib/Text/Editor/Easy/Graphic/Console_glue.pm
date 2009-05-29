@@ -9,11 +9,11 @@ Text::Editor::Easy::Graphic::Console_glue - Link between "Text::Editor::Easy::Ab
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 #require Term::Screen;
 require Term::Screen::Win32;

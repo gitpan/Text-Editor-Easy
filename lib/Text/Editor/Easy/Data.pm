@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Data::Dump qw(dump);
 use threads;
@@ -48,6 +48,7 @@ use constant {
     CURRENT => 15,
     SEARCH => 16,
     ZONE => 17,
+    EVENTS => 18,
 
     #------------------------------------
     # LEVEL 2 : $self->[TOTAL][???]
@@ -80,8 +81,35 @@ use constant {
     EVAL        => 3,
 };
 
+use IO::File;
+my $own_STDOUT;
+
+sub import {
+    my ( $self, $trace_ref ) = @_;
+
+
+    my $name       = fileparse($0);
+    $own_STDOUT = "tmp/${name}_trace.trc";
+    #print "Dans data reçu trace_ref = $trace_ref\n";
+    #if ( $Text::Editor::Easy::Trace{'trace_print'} ) {
+    if ( $trace_ref->{'trace_print'} ) {
+        #print "Dans data, ouverture de ENC avec name tmp/${name}_trace.trc\n";
+        open( ENC, ">$own_STDOUT" ) or die "ouverture de $own_STDOUT : $!\n";
+        autoflush ENC;
+    }
+
+    #print "Dans data, avant ouverture de ENC\n";
+    #print DBG "Dans data, avant ouverture de ENC\n";
+    Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG, $trace_ref );
+    #print "Dans data, après ouverture de ENC\n";
+    print DBG "Dans data, après ouverture de ENC\n";
+}
+
 sub reference_editor {
     my ( $self, $ref, $options_ref ) = @_;
+    
+    open ( DB1, ">DEBUG.txt" ) or die "Impossible d'ouvrir DEBUG.txt : $!\n";
+    print DB1 "Dans reference_editor\n";
 
     my $zone_ref = $options_ref->{'zone'};
     
@@ -120,7 +148,7 @@ sub reference_editor {
 
     #print "...suite reference de Data : |$zone|\n";
     # Bogue à voir
-    return if ( !defined $zone );
+    $zone = '' if ( !defined $zone );
     my $order = $self->[ZONE_ORDER]{$zone};
     $order = 0 if ( !defined $order );
     if ( defined $file_name ) {
@@ -133,7 +161,7 @@ sub reference_editor {
         push @{ $self->[NAME_OF_ZONE]{$zone}{$name} }, $order;
     }
     $self->[EDITOR_OF_ZONE]{$zone}[$order] = $ref;
-    $self->[NAME]{$name} = 1;
+    $self->[NAME]{$name} = 1 if ( defined $name );
     $self->[INSTANCE]{$ref}{'name'}        = $name;
     $self->[INSTANCE]{$ref}{'file_name'}   = $file_name;
     $self->[INSTANCE]{$ref}{'absolute_path'}   = $absolute_path;
@@ -150,9 +178,265 @@ sub reference_editor {
     }
  
     $self->[ZONE_ORDER]{$zone} += 1;    # Valeur de retour, ordre dans la zone
-    #return data_file_name ( $self, $ref );
+    
+    # Forçage éventuel d'évènements
+
+    
+    my $event_ref = init_events( $self, $options_ref->{'events'}, $name );
+    print DB1 "1 - Event ref vaut ", dump($event_ref), "\n";
+    if ( defined $event_ref ) {
+        $event_ref = Text::Editor::Easy::Events::reference_events($ref, $event_ref);
+        print DB1 "2 - Event ref vaut ", dump($event_ref), "\n";
+    }
+    else {
+        $event_ref = {};
+    }
+    print DB1 "3 - Event ref vaut ", dump($event_ref), "\n";
+    $self->[INSTANCE]{$ref}{'events'} = $event_ref;
+    $options_ref->{'events'} = $event_ref;
+
+
+    close DB1;
+    return $options_ref;
 }
 
+sub update_events {
+    my ( $self, $ref, $id_ref, $event_ref, $name ) = @_;
+
+
+    for my $id ( @$id_ref ) {
+        if ( defined $name ) {
+            $self->[INSTANCE]{$id}{'events'}{$name} = $event_ref;
+        }
+        else {
+            $self->[INSTANCE]{$id}{'events'} = $event_ref;
+        }
+    }
+}
+
+sub init_events {
+    my ( $self, $event_ref, $name ) = @_;
+    
+    for my $el_ref ( @{$self->[EVENTS]} ) {
+        if ( ref $el_ref->[0] ) {
+            $event_ref = force_events ( $event_ref, $el_ref, $name );
+        }
+        else {
+            $event_ref = force_event ( $event_ref, $el_ref, $name );
+        }
+    }
+
+    return $event_ref;
+}
+
+sub force_event {
+    my ( $event_ref, $el_ref, $name ) = @_;
+    
+    my ( $event_name, $force_ref, $options_ref ) = @$el_ref;
+    $options_ref = {} if ( ! defined $options_ref );
+    
+    my $names = $options_ref->{'names'};
+    #print "Avant test du nom name = $name, names = $names\n";
+    if ( ! defined $name or ( defined $names and $name !~ $names ) ) {
+        #print "Le nom ne correspond pas ou n'est pas défini\n";
+        return $event_ref;
+    }
+    #print "Le nom correspond ou il n'y a pas d'expression régulière\n";
+    my $values = $options_ref->{'values'};
+    if ( defined $values ) {
+        if ( $values eq 'defined' and ! defined $event_ref->{$event_name} ) {
+            return $event_ref;
+        }
+        if ( $values eq 'undefined' and defined $event_ref->{$event_name} ) {
+            return $event_ref;
+        }
+    }
+    if ( defined $force_ref ) {
+        %{$event_ref->{$event_name}} = %$force_ref;
+    }
+    else {
+        delete $event_ref->{$event_name};
+    }
+    return $event_ref;
+}
+
+sub force_events {
+    my ( $event_ref, $el_ref, $name ) = @_;
+    
+    my ( $force_ref, $options_ref ) = @$el_ref;
+    $options_ref = {} if ( ! defined $options_ref );
+    
+    my $names = $options_ref->{'names'};
+    if ( ! defined $name or ( defined $names and $name !~ $names ) ) {
+        return $event_ref;
+    }
+    my $values = $options_ref->{'values'};
+    if ( defined $values ) {
+        if ( $values eq 'defined' and ! defined $event_ref ) {
+            return $event_ref;
+        }
+        if ( $values eq 'undefined' and defined $event_ref ) {
+            return $event_ref;
+        }
+    }
+    if ( defined $force_ref ) {
+        %$event_ref = %$force_ref;
+    }
+    else {
+        $event_ref = undef;
+    }
+    return $event_ref;
+}
+
+my %true_instance_value = (
+    'existing' => 1,
+    'future'   => 1,
+    'all'      => 1,
+);
+
+sub data_set_events {
+    my ( $self, $type, $event_ref, $options_ref ) = @_;
+    
+    $options_ref = {} if ( ! defined $options_ref );
+    my $instances = $options_ref->{'instances'};
+    if ( defined $instances and ! $true_instance_value{$instances} ) {
+        print STDERR "'$instances' is an unknown value for 'instances' option of 'set_events' method\n";
+        return;
+    }
+    if ( ! $instances or ( $instances eq 'all' or $instances eq 'future' ) ) {
+        #print "Je change self->EVENTS\n";
+        push @{$self->[EVENTS]}, [ $event_ref, $options_ref ];
+    }
+    if ( ! $instances  or ( $instances eq 'all' or $instances eq 'existing' ) ) {
+        return internal_update_events( $self, $type, $event_ref, $options_ref->{'values'}, $options_ref->{'names'} );
+    }
+    return {};
+}
+
+sub internal_update_events {
+    my ( $self, $type, $event_ref, $values, $names ) = @_;
+    
+    my $instance_ref = $self->[INSTANCE];
+    my @ids = keys %$instance_ref;
+    if ( defined $values ) {
+        my @new_ids;
+        if ( $values eq 'defined' ) {
+            for ( @ids ) {
+                if ( defined $instance_ref->{$_}{'events'} ) {
+                    push @new_ids, $_;
+                }
+            }
+        }
+        elsif ( $values eq 'undefined' ) {
+            for ( @ids ) {
+                if ( ! defined $instance_ref->{$_}{'events'} ) {
+                    push @new_ids, $_;
+                }
+            }
+        }
+        else {
+            print STDERR "'$values' is an unknown value for 'values' option of 'set_events' method\n";
+            return;
+        }
+        @ids = @new_ids;
+    }
+    if ( defined $names ) {
+        my @new_ids;
+        for ( @ids ) {
+            my $name = $instance_ref->{$_}{'name'};
+            if ( defined $name and $name =~ $names ) {
+                push @new_ids, $_;
+            }
+        }
+        @ids = @new_ids;
+    }
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    if ( scalar @ids ) {
+        my $call_id = Text::Editor::Easy::Async->ask_thread( 'update_events', 0, \@ids, $event_ref );
+        for ( @ids ) {
+            $self->[INSTANCE]{$_}{'events'} = $event_ref;
+        }
+        return { 0 => $call_id };
+    }
+    else {
+        return {};
+    }
+}
+
+sub data_set_event {
+    my ( $self, $type, $event_name, $event_ref, $options_ref ) = @_;
+    
+    $options_ref = {} if ( ! defined $options_ref );
+    my $instances = $options_ref->{'instances'};
+    if ( defined $instances and ! $true_instance_value{$instances} ) {
+        print STDERR "'$instances' is an unknown value for 'instances' option of 'set_event' method\n";
+        return;
+    }
+    if ( ! $instances or ( $instances eq 'all' or $instances eq 'future' ) ) {
+        #print "Je change self->EVENTS\n";
+        push @{$self->[EVENTS]}, [ $event_name, $event_ref, $options_ref ];
+    }
+    if ( ! $instances  or ( $instances eq 'all' or $instances eq 'existing' ) ) {
+        return internal_update_event( $self, $type, $event_name, $event_ref, $options_ref->{'values'}, $options_ref->{'names'} );
+    }
+    return {};
+}
+
+sub internal_update_event {
+    my ( $self, $type, $event_name, $event_ref, $values, $names ) = @_;
+    
+    my $instance_ref = $self->[INSTANCE];
+    my @ids = keys %$instance_ref;
+    if ( defined $values ) {
+        my @new_ids;
+        if ( $values eq 'defined' ) {
+            for ( @ids ) {
+                if ( defined $instance_ref->{$_}{'events'}{$event_name} ) {
+                    push @new_ids, $_;
+                }
+            }
+        }
+        elsif ( $values eq 'undefined' ) {
+            for ( @ids ) {
+                if ( ! defined $instance_ref->{$_}{'events'}{$event_name} ) {
+                    push @new_ids, $_;
+                }
+            }
+        }
+        else {
+            print STDERR "'$values' is an unknown value for 'values' option of 'set_events' method\n";
+            return;
+        }
+        @ids = @new_ids;
+    }
+    if ( defined $names ) {
+        my @new_ids;
+        for ( @ids ) {
+            my $name = $instance_ref->{$_}{'name'};
+            if ( defined $name and $name =~ $names ) {
+                push @new_ids, $_;
+            }
+        }
+        @ids = @new_ids;
+    }
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    if ( scalar @ids ) {
+        my $call_id = Text::Editor::Easy::Async->ask_thread( 'update_events', 0, \@ids, $event_ref, $event_name );
+        for ( @ids ) {
+            $self->[INSTANCE]{$_}{'events'}{$event_name} = $event_ref;
+        }
+        return { 0 => $call_id };
+    }
+    else {
+        return {};
+    }
+}
+
+sub print_default_events {
+    my ( $self ) = @_;
+    
+    print "DEFAULT EVENTS = ", dump( $self->[EVENTS] ), "\n";
+}
 
 sub data_zone {
     my ( $self, $ref ) = @_;
@@ -179,7 +463,7 @@ sub data_file_name {
     }
     else {
         if ( defined $key ) {
-           print "Dans data_file_name : demande pour ref = $ref, key = $key\n";
+           #print "Dans data_file_name : demande pour ref = $ref, key = $key\n";
            return $instance_ref->{$key};
         }
         else {
@@ -257,30 +541,35 @@ sub list_in_zone {
 }
 
 sub init_data {
-    my ( $self, $reference, $data_queue ) = @_;
+    my ( $self, $reference, $trace_ref ) = @_;
 
-    #print DBG "Dans init_data : $self, $reference, $data_queue\n";
+    #print DBG "Dans init_data : $self, $reference, $trace_ref\n";
     bless $self, 'Text::Editor::Easy::Data';
 
     #print "Data a été créé\n";
     $self->[COUNTER] = 0;         # PAs de redirection de print
     $self_global = $self;         # Mise à jour de la variable 'globale'
-    if ( defined $Text::Editor::Easy::Trace{'trace_print'} and $Text::Editor::Easy::Trace{'trace_print'} eq 'full' ) {
-        create_full_trace_server();
+    if ( defined $trace_ref->{'trace_print'} and $trace_ref->{'trace_print'} eq 'full' ) {
+        create_full_trace_server( $self );
         $self->[FULL_TRACE] = 1;
     }
 }
 
-use IO::File;
-
-my $name       = fileparse($0);
-my $own_STDOUT = "tmp/${name}_trace.trc";
-if ( $Text::Editor::Easy::Trace{'trace_print'} ) {
-    open( ENC, ">$own_STDOUT" ) or die "ouverture de $own_STDOUT : $!\n";
-    autoflush ENC;
+sub update_full_trace {
+    my ( $self ) = @_;
+    
+    if ( defined $Text::Editor::Easy::Trace{'trace_print'} ) {
+        if ( $Text::Editor::Easy::Trace{'trace_print'} eq 'full' ) {
+            create_full_trace_server( $self );
+            $self->[FULL_TRACE] = 1;
+        }
+        elsif ( defined  $self->[FULL_TRACE] ) {
+            $self->[FULL_TRACE] = 0;
+        }
+    }
 }
 
-Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
+
 
 # Traçage
 my %function = (
@@ -327,7 +616,6 @@ sub trace_print {
     }
     #print DBG "trace_print après eval dump\n";
     my @calls = eval $options{'calls'};
-    trace_display_calls(@calls) if ( !$@ );
     my $tid = $options{'who'};
 
     my $thread_ref = $self->[THREAD][$tid];
@@ -414,6 +702,9 @@ sub trace_print {
                 # La seule façon d'être synchrone, ne plus activer la trace pour l'appel et ses successeurs et ne jamais
                 # rien demander au thread 2 en synchrone jusqu'à la fin...
                 # ==> paramètre supplémentaire à l'appel à passer à toute la chaîne d'appel (possible ? sans Data)
+                
+                # La solution la plus simple est de loin le pseudo-synchronisme... mais elle ne sert pas à grand chose
+                # sinon à bloquer les threads...
             }
 
            #print DBG "redirect_ref method = ", $redirect_ref->{'method'}, "\n";
@@ -436,6 +727,10 @@ sub trace_print {
 }
 
 sub create_full_trace_server {
+    my ( $self ) = @_;
+    
+    return if ( defined $self->[FULL_TRACE] );
+    
     Text::Editor::Easy->create_new_server( {
         'use'     => 'Text::Editor::Easy::Trace::Full',
         'package' => "Text::Editor::Easy::Trace::Full",
@@ -561,8 +856,6 @@ sub trace_call {
 
     $self->[CALL]{$call_id} = $call_id_ref;
     $self->[THREAD][$client] = $thread_ref;
-
-    trace_display_calls(@calls);
 }
 
 sub trace_new {
@@ -570,7 +863,6 @@ sub trace_new {
 
     #print DBG "N:$from\n";
     my @calls = eval $dump_array;
-    trace_display_calls(@calls) if ( !$@ );
 }
 
 sub trace_response {
@@ -752,15 +1044,6 @@ sub trace_start {
         #}
     }
     #print DBG "Fin de trace_start : $call_id, $call_id_ref, $call_id_ref->[THREAD_LIST]\n";
-}
-
-sub trace_display_calls {
-    my @calls = @_;
-    return;
-    for my $indice ( 1 .. scalar(@calls) / 3 ) {
-        my ( $pack, $file, $line ) = splice @calls, 0, 3;
-        print DBG "\tF|$file|L|$line|P|$pack\n";
-    }
 }
 
 sub async_status {
@@ -963,9 +1246,10 @@ my $length_s_n;
 sub tell_length_slash_n {
     print DBG "Dans tell length\n";
     if ( defined $length_s_n ) {
+        print DBG "length_s_n est déjà défini et vaut $length_s_n\n";
         return $length_s_n;
     }
-    return if ( ! $Text::Editor::Easy::Trace{'trace_print'} );
+    #return if ( ! $trace_ref{'trace_print'} );
     my $first = tell ENC;
     print DBG "Dans tell ltength : first = $first\n";
     print ENC "\n";
@@ -1032,8 +1316,6 @@ Save the reference of the Text::Editor::Easy instance that has the focus and in 
 =head2 trace
 
 =head2 trace_call
-
-=head2 trace_display_calls
 
 =head2 trace_new
 

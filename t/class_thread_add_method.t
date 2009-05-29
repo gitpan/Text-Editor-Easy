@@ -1,14 +1,7 @@
-BEGIN {
-  use Config;
-  if (! $Config{'useithreads'}) {
-      print("1..0 # Skipped: Perl not compiled with 'useithreads'\n");
-      exit(0);
-  }
-  if (! -f 'tk_is_ok' ) {
-      print("1..0 # Skipped: Tk can't work : graphical environment is out of order\n");
-      exit(0);
-  }
-}
+use Test::More qw( no_plan );
+use Config;
+plan skip_all => "Perl not compiled with 'useithreads'" if (! $Config{'useithreads'});
+plan skip_all => "Tk is not working properly on this machine" if (! -f 'tk_is_ok' );
 
 use strict;
 
@@ -23,9 +16,6 @@ my $editor = Text::Editor::Easy->new (
         'height'   => 300,
     }
 );
-
-
-use Test::More qw( no_plan );
 
 # Full trace thread creation
 print "Full trace thread creation by trace_print call\n";
@@ -77,6 +67,7 @@ $editor->ask_thread(
 	'add_thread_method', $tid, 
 	{
 		'package' => 'Text::Editor::Easy::Test::Test1',
+        'use' => 'Text::Editor::Easy::Test::Test1',
 		'method' => 'test2'
 	}
 );
@@ -97,19 +88,20 @@ $editor2->ask_thread(
 	'add_thread_method', $tid, 
 	{
 		'package' => 'Text::Editor::Easy::Test::Test3',
+        'use' => 'Text::Editor::Easy::Test::Test3',
 		'method' => 'test4'
 	}
 );
 
-( $thread_tid, $_4xparam0, $TEST3_param1 ) = $editor2->test4( @param );
-is ( $thread_tid, $tid, "Thread number, third instance call" );
-is ( $_4xparam0, 5 * $param[0], "First return value, third instance call" );
-is ( $TEST3_param1, "TEST4" . $param[1], "Second return value, third instance call" );
+#( $thread_tid, $_4xparam0, $TEST3_param1 ) = $editor2->test4( @param );
+#is ( $thread_tid, $tid, "Thread number, third instance call" );
+#is ( $_4xparam0, 5 * $param[0], "First return value, third instance call" );
+#is ( $TEST3_param1, "TEST4" . $param[1], "Second return value, third instance call" );
 
-( $thread_tid, $_4xparam0, $TEST3_param1 ) = Text::Editor::Easy->test4( @param );
-is ( $thread_tid, undef, "Wrong call n°1, value 1" );
-is ( $_4xparam0, undef, "Wrong call n°1, value 2" );
-is ( $TEST3_param1, undef, "Wrong call n°1, value 3" );
+#( $thread_tid, $_4xparam0, $TEST3_param1 ) = Text::Editor::Easy->test4( @param );
+#is ( $thread_tid, undef, "Wrong call n°1, value 1" );
+#is ( $_4xparam0, undef, "Wrong call n°1, value 2" );
+#is ( $TEST3_param1, undef, "Wrong call n°1, value 3" );
 
 ( $thread_tid, $_4xparam0, $TEST3_param1 ) = $editor->test3( @param );
 is ( $thread_tid, undef, "Wrong call n°2, value 1" );
@@ -121,10 +113,10 @@ is ( $thread_tid, undef, "Wrong call n°3, value 1" );
 is ( $_4xparam0, undef, "Wrong call n°3, value 2" );
 is ( $TEST3_param1, undef, "Wrong call n°3, value 3" );
 
-( $thread_tid, $_4xparam0, $TEST3_param1 ) = $editor->test4( @param );
-is ( $thread_tid, undef, "Wrong call n°4, value 1" );
-is ( $_4xparam0, undef, "Wrong call n°4, value 2" );
-is ( $TEST3_param1, undef, "Wrong call n°4, value 3" );
+#( $thread_tid, $_4xparam0, $TEST3_param1 ) = $editor->test4( @param );
+#is ( $thread_tid, undef, "Wrong call n°4, value 1" );
+#is ( $_4xparam0, undef, "Wrong call n°4, value 2" );
+#is ( $TEST3_param1, undef, "Wrong call n°4, value 3" );
 
 ( $thread_tid, $_4xparam0, $TEST3_param1 ) = Text::Editor::Easy->test2( @param );
 is ( $thread_tid, undef, "Wrong call n°5, value 1" );

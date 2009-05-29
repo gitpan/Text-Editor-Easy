@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Text::Editor::Easy::Comm;
 
@@ -84,6 +84,11 @@ sub motion_over_tab {
     return if ( anything_for_me() );
     
     my $first_line = $editor->first;
+    if ( ! $first_line ) {
+        print STDERR "Problème grave avec l'éditeur $editor : ", $editor->name, "\n";
+        return;
+    }
+    
     my $pointed_line = $hash_ref->{'line'};
     return if ( $first_line != $pointed_line );
 
@@ -173,6 +178,7 @@ sub on_editor_destroy {
     my ( $zone, $hash_ref, $tab_ref ) = @_;
 
     my $destroyed = $hash_ref->{'name'};
+    
     my $tab_editor = Text::Editor::Easy->get_from_id( $tab_ref );
     my $info_ref      = $tab_editor->load_info;
     my $file_list_ref = $info_ref->{'file_list'};
@@ -181,6 +187,7 @@ sub on_editor_destroy {
     my $found;
     my $tab_line;
     my @new_file_list;
+    
     FILE: for my $file_conf_ref ( @{$file_list_ref} ) {
         my $name = $file_conf_ref->{'name'};
         if (  $name eq $destroyed ) {
@@ -310,7 +317,7 @@ sub update_conf {
             }
         }
         $info_ref->{'config'} = $info_old_editor_ref;
-        print "Avant appel méthode zone\n";
+        #print "Avant appel méthode zone\n";
         $info_ref->{'zone'} = $old_editor->zone;
     }
     return $load_info_ref;

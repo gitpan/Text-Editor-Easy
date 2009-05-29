@@ -9,11 +9,11 @@ Text::Editor::Easy::Events - Manage events linked to user code : specific code i
 
 =head1 VERSION
 
-Version 0.46
+Version 0.47
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 =head1 INTRODUCTION
 
@@ -73,7 +73,7 @@ As usual, easy things should be done lazily but difficult tasks should always be
             },                            # end of clic event
             'motion' => {                 # second specific management, 'motion' event
                 'sub' => 'my_motion_sub',
-                'use' => 'My_module',     # 'My_module' as in perl 'use My_module' : without .pm extension
+                'use' => 'My_module',     # as in perl 'use My_module' : without .pm extension
             },                            # end of motion event
         }                                 # end of events declaration
     }                                     # end of editor new options
@@ -371,7 +371,7 @@ With any of these 2 values, the B<return value of your specific sub is used and 
          'events' => {
              'clic' => {
                  'sub'    => 'my_clic_sub',
-                 'action' => 'change',     # event information can be changed by the sub 'my_clic_sub'
+                 'action' => 'change',     # event information can be changed by 'my_clic_sub'
              },
          }
      }
@@ -418,7 +418,8 @@ not a hash...) as long as you have the 'action' options set to 'change'.
          'line' => $editor->first,
          'pos'  => int( 20 * $info_ref->{'y'} / $editor->height ),
      );
-     return [ 'clic', \%new_info ];                      # jump to 'clic' label, providing the hash required
+                                                         # jump to 'clic' label
+     return [ 'clic', \%new_info ];                      # providing the hash required
  }
 
 The difficult point is that, at a precise label, default management or other events expect to find a precise C<$info_ref> hash with precise keys
@@ -567,7 +568,7 @@ if you use this option.
 This point is easier to understand when you know that, for instance, for a single mouse clic, you can L<manage up to 3 different events|/EVENT NAMES AND LABELS>.
 
 Now what about the 'sync' option with a 'false' value ?
-Well, you will force an asynchronous call and this could be used ... for the 'Graphic' thread ! This trick won't prevent you from freezing the user
+You will force an asynchronous call and this could be used ... for the 'Graphic' thread ! This trick won't prevent you from freezing the user
 interface if your code is huge, but if you know what you are doing...
 
  'events' => {
@@ -613,7 +614,7 @@ your thread is working hard, trying to slow down the least it can the 'Graphic' 
 
 So there is a very bad thing that could happen : if your thread asks for a service that is managed by the 'Graphic' thread... you know what follows...
 As the 'Graphic' thread is waiting for your answer (synchronous call), it can't serve your request so your thread waits endlessly for
-the 'Graphic' thread response and the 'Graphic' thread waits endlessly for your thread response. Everything is freezed forever (well, in fact some other
+the 'Graphic' thread response and the 'Graphic' thread waits endlessly for your thread response. Everything is freezed forever (in fact some other
 threads are still working, but the 'Graphic' thread is the visual one and the only one versus the window manager).
 
 So, synchronous calls initiated by the 'Graphic' thread can't use a 'Graphic' service. This is quite limiting but you could have to work with this
@@ -679,10 +680,10 @@ So 'pseudo' value for 'sync' option is provided but may lead, from time to time,
 Note that chaotic reponses can be obtained with asynchronous calls too. Maybe a good thing to do is to change 'common data' thanks to
 synchronous calls and only. Asynchronous calls should only be used for displaying common data or changing private data (private to a thread).
 So using $editor->display or $line->select in an asynchronous called sub is OK but using $editor->insert or $line->set can lead to a race
-condition with unpredictible result, see L<perlthrtut/"Thread Pitfalls: Races"> in L<perlthrtut>. In fact, 'Text::Editor::Easy' manages editor data in a private way (only
+condition with unpredictible result, see L<perlthrtut/"Thread Pitfalls: Races">. In fact, 'Text::Editor::Easy' manages editor data in a private way (only
 'File_manager' thread knows about the file being edited) but as methods can be called by any thread, these data should be considered as shared :
 if the cursor position is not the same when the event occurs as when you make your $editor->insert in your event sub (because an other thread
-have changed this position between the event and your asynchronous sub), well, the result may look funny (still worse if a delete has removed 
+have changed this position between the event and your asynchronous sub), the result may look funny (still worse if a delete has removed 
 the line you were expecting to work on !).
 
 =head1 'MULTI-SUB' DECLARATION
@@ -715,10 +716,299 @@ have 2 very different things to do and don't want to hide them in a bad named su
 The sub declaration order is very important in your array : subs are called in this order. So, if you use the 'action' option in the first event, other
 events could work with modified event information or could just be jumped.
 
-=head1 DYNAMIC CONTRIBUTION
+=head1 DYNAMIC CONTRIBUTION, part 1, updating events
 
-If you want to change the way your editor instance manages events after its creation, an other interface, out of the 'new' method, has to be used.
-An 'events' method, as close as possible as the 'events' option, will be provided to check, add or delete events.
+Suppose that your program have several 'Text::Editor::Easy' instances running.
+We've seen that you can add new instances with specific event management.
+Thanks to 'dynamic contribution', you can change event management of already
+running instances.
+A generalization of this 'dynamic contribution' is to have a default set
+of events used for future created instances.
+
+The dynamic interface let you modify :
+
+=over 4
+
+=item *
+
+A single event management of a single instance (instance call)
+
+=item *
+
+All events of a single instance (instance call)
+
+=item *
+
+A single event of a all instances (class call)
+
+=item *
+
+All events of all instances (class call)
+
+=back
+
+'Modify' event management should be understood as one of these possibilities :
+
+=over 4
+
+=item *
+
+Adding an new event (no management before)
+
+=item *
+
+Changing an old event
+
+=item *
+
+Deleting an old event
+
+=back
+
+=head2 Single event versus all events
+
+There are 2 distinct methods :
+
+=over 4
+
+=item *
+
+B<set_event> will change only one event
+
+=item *
+
+B<set_events> will change all the eventB<s>, note that the last B<"s"> makes all the difference.
+
+=back
+
+=head3 set_event method
+
+    Text::Editor::Easy->set_event( 
+        'clic',                           # first parameter
+        {                                 # second parameter, hash
+            'sub'    => 'my_clic_sub',
+            'thread' => 'My_thread',
+        },
+    };
+
+In the previous example, the 'clic' event of 'all instances' (class call) will be changed.
+
+The 'set_event' method accepts from 1 to 3 parameters :
+
+=over 4
+
+=item *
+
+The first is the name of the event to be changed
+
+=item *
+
+The second contains the information that should have been given during the instance creation :
+the interface is the same (you can create threads, eval a new module, ...).
+
+This second parameter can then be a hash reference (for a single action linked to this event) 
+or an array reference (for L<multiple actions|/'MULTI-SUB' DECLARATION>).
+
+If there is no second parameter (or an undef value), the event will be deleted.
+
+=item *
+
+L<A third optional parameter|/Single instance versus 'all instances', options for class calls> 
+can add conditions to define if the event should be changed or not. These conditions
+should be used with class calls.
+
+=back
+
+=head3 set_events method
+
+    $editor->set_events( 
+        {
+            'clic', {
+                'sub'    => 'my_clic_sub',
+                'thread' => 'My_thread',
+            },
+            'motion', {
+                'sub'    => 'my_motion_sub',
+            },
+        }
+    };
+
+In the previous example, B<all> specific event management have been re-set for the existing 
+instance $editor. Of course, only 'clic' and 'motion' events are defined here, but if the 
+'drag' or 'change' events were linked to specific subs, these old links are cut. If you want
+to keep an old specific management with 'set_events' method, you'll have to repeat it in order not
+to erase it.
+
+The 'set_events' method accepts 1 parameter which exactly corresponds to the 'events' option
+used during the instance creation. For class call of 'set_events', 
+L<an optional second parameter|/Single instance versus 'all instances', options for class calls>
+is possible.
+
+Calling 'set_events' with no parameter (or an empty hash) will delete any specific event management.
+
+=head2 Single instance versus 'all instances', options for class calls
+
+If you've read carefully the 2 previous examples, you already know that
+an instance call changes only one instance and a class call changes 'all
+ instances'.
+
+But 'all instances' is not very clear : only existing instances, only the
+ones that will be created from now, both, ... ?
+
+Here, we're talking of class calls of 'set_event' and 'set_events' methods and we want to
+precise the subset of instances to which the changes will apply.
+
+    # 'set_event' class call example with options
+    
+    Text::Editor::Easy->set_event( 
+        'clic',                             # First parameter
+        {                                   # Second parameter
+            'sub'    => 'my_clic_sub',
+            'thread' => 'My_thread',
+        },
+        {                                   # Third optional parameter
+            'instances' => 'future',
+            'values'    => 'undefined',
+        }                                   # End of third parameter
+    };
+
+
+    # 'set_events' class call example with options
+    
+    Text::Editor::Easy->set_events( 
+        { 'clic' =>                         # First parameter
+            {
+                'sub'    => 'my_clic_sub',
+                'thread' => 'My_thread',
+            },
+        }
+        {                                   # Second parameter
+            'names' => qr/\.pl$/,           # 'Regexp' object
+        }                                   # End of second parameter
+    };
+
+
+You can add a third parameter to 'set_event' method or a second parameter
+to 'set_events' method. This last parameter is an optional hash with the following keys :
+
+=over 4
+
+=item *
+
+'instances'
+
+=item *
+
+'values'
+
+=item *
+
+'names'
+
+=back
+
+=head3 'instances' key
+
+Possible values are :
+
+=over 4
+
+=item *
+
+'existing', will affect only existing instances but not the ones to come.
+
+=item *
+
+'future', will affect only instances to come but not existing ones.
+
+=item *
+
+'all', will affect all instances, this is the default option.
+
+=back
+
+=head3 'values' option
+
+Possible values are :
+
+=over 4
+
+=item *
+
+'undefined', will affect only undefined event(s) : won't override existing
+management
+
+=item *
+
+'defined', will affect only defined event(s) : replace existing management,
+but don't add management where there wasn't any.
+
+=item *
+
+'all', no matter if event(s) were defined before : this is the default option
+
+=back
+
+With a 'set_event' call (that is, when you define a particular named event,
+for example, 'clic'), 'undefined' value means that, for each instance, a test
+will be done : if a 'clic' event already exists for the tested instance,
+it won't be updated.
+
+With a 'set_events' call (when you want to set all events at once), 
+'undefined' value means that there is not a single event managed in a 
+specific way. You don't have used 'events' option during creation, or you
+have deleted all events afterwards.
+
+=head3 'names' option
+
+This option accepts a 'Regexp' object that you can obtain with the qr// syntax.
+
+If the name of an 'Editor instance' matches the regexp, the change will apply.
+
+=head2 'values' options with instance call
+
+You can use the 'values' option with an instance call if you are too lazy to check what you've done before.
+
+=head2 endless complexity with optional parameters and new instances
+
+If you have made several class calls with 'set_event' and / or 'set_events' methods that affects new created
+instances, what will happen when a new instance will be created ? Which tests will be made, in which order ...?
+
+The answer is : all tests will be done and in the order you have made the calls. As a joke, if you make
+calls (to 'set_event' and / or 'set_events' methods) from different threads, the order will be undefined !
+
+This is a very complex mecanism of default event management. The interface to get all these
+default actions (done at each instance creation) or set or unset all these default actions in just
+one call is not provided.
+
+=head1 DYNAMIC CONTRIBUTION, part 2, dynamic designing
+
+Perl is dynamic : you can 'eval' new code during execution and in the context of the running program.
+
+Suppose your program is (or contains) an editor, that sounds great ! Your program can ask you for new 
+code to edit (or old one to change) and will go on running using this very code ! You can call that the
+way you want : a 'dynamic application', a limitless 'macro langage', the best configuration tool ever,
+or the most dangerous thing.
+
+=head2 'code' option
+
+This option will be used to replace 'sub', 'use' and 'package' options in L<standard and static
+event definition|/'sub', 'use' and 'package' options of one particular event in 'events' option>.
+
+This option will accept a string that represents the code of the event.
+
+=head1 DYNAMIC CONTRIBUTION, part 3, saving
+
+Suppose you've done complex things with the event management. Some events of a few instances are managed
+in a static way with subs written in different modules but other events are managed in a dynamic way
+with code in memory but saved nowhere... 
+
+This is a real mess but that costed you a lot to come to this ugly point and you wouldn't like
+to lose everything when your program will stop : either in a proper way or by a crash due to numerous
+bugs.
+
+The session management will help you save everything of your instances in order to get the 'same' 
+state (at least, we'll try) that you've had before quitting.
 
 =head1 EVENT LIST
 
@@ -1029,7 +1319,7 @@ our @ISA = ("Exporter");
 our @EXPORT_OK = qw(execute_events);
 
 use threads;
-use Text::Editor::Easy::Comm;
+use Text::Editor::Easy::Comm qw(anything_for_me have_task_done);
 use Devel::Size qw(size total_size);
 
 use constant {
@@ -1109,6 +1399,7 @@ sub reference_event {
             eval "use $use";
             if ( $@ ) {
                 print STDERR "Wrong code for module $use :\n$@";
+                return 'error';
             }
         }
     }
@@ -1176,7 +1467,7 @@ sub reference_event {
     }
     if ( ! defined $thread ) {
         print STDERR "Action nop should be linked with a thread option, event cancelled\n";
-        return;
+        return 'unlink';
     }
     #print "Pour event $event_ref package = $package\n";
     return $event_ref;
@@ -1316,9 +1607,10 @@ sub execute_event {
         if ( defined $sync and $sync eq 'false' ) {
             $event_ref->{'tid'} = 0;
             #print "Avant thread_execute pour tid = 0\n";
-            #print "2 Avant appel transform and execute pour thread : action = $action\n";
+            #print "Avant appel thread_execute pour tid = 0 : editor = $editor\n";
             return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, @user );
         }
+        #print "Dans execute event, avant appel transform... editor = $editor\n";
         my $answer = transform_and_execute( $editor, $info_ref, $package, $sub, @user );
         #print "Dans execute_event ref de answer = ", ref( $answer ), "\n";
         return untransform( $answer, $action );
@@ -1330,9 +1622,9 @@ sub thread_execute {
 
     my $tid = $event_ref->{'tid'};
     
-    my $type = ref $object;  
+    my $type = ref $object;
     my $id = '';
-    if ( $type eq 'Text::Editor::Easy' ) {
+    if ( ref $object and $object->isa('Text::Editor::Easy') ) {
         $id = $object->id;
     }
     if ( ! defined $tid ) {
@@ -1364,10 +1656,13 @@ sub thread_execute {
     elsif ( $sync eq 'pseudo' ) {
         my $call_id = Text::Editor::Easy::Async->ask_thread( @param );
         while ( 'not_ended' ) {
-            if ( anything_for_me ) {
-                have_task_done;
+            # Is there any task for me in the queue ?
+            if ( Text::Editor::Easy::Comm::anything_for_me() ) {
+                Text::Editor::Easy::Comm::have_task_done();
             }
+            
             my $status = Text::Editor::Easy->async_status( $call_id );
+            # Is the asynchronous call that I have asked for ended ?
             last if ( $status eq 'ended' );
         }
         return Text::Editor::Easy->async_response( $call_id );
@@ -1416,13 +1711,14 @@ sub thread_transform {
     my ( $self, $ref, $object_ref, $package, $sub, $info_ref, $action, @user ) = @_;
     
     my $object;
-    if ( $object_ref->[0] ne 'Text::Editor::Easy' ) {
+    if ( $object_ref->[0] eq 'Text::Editor::Easy::Zone' ) {
         # Cas à gérer 
         # $object = $type -> get_from_id;  ==> $type eq 'Text::Editor::Easy' ou 'Text::Editor::Easy::Zone' ou '...Window' ou ...
         $object = $object_ref->[1];
     }
     else {
         $object = Text::Editor::Easy->get_from_id( $object_ref->[1] );
+        #print "Dans thread_transform, récupération pour id ", $object_ref->[1], " de object = $object\n";
     }
     
     #print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
@@ -1448,6 +1744,7 @@ sub transform_and_execute {
             my $value = $info_ref->{$key};
             if ( defined $value ) {
                 my $editor = Text::Editor::Easy->get_from_id( $info_ref->{$key} );
+                #print "Dans transform_and_execute, récupération de editor = $editor\n";
                 $info_ref->{$key} = $editor;
             }
             next KEY;
@@ -1485,6 +1782,95 @@ sub untransform {
     return $info_ref;
 }
 
+sub set_event {
+    my ( $self, $name, $event_ref, $options_ref ) = @_;
+
+    return if ( ! defined $name );
+
+    my $id = '';
+    if ( ref $self and ( ref $self eq 'Text::Editor::Easy'
+    or ref $self eq 'Text::Editor::Easy::Async' ) ) {
+        $id = $self->id;
+    }
+    else {
+        $event_ref = reference_event( $id, $event_ref )  if ( defined $event_ref );
+        my $thread_ref =  Text::Editor::Easy->data_set_event( $self, $name, $event_ref, $options_ref );
+        if ( $self eq 'Text::Editor::Easy::Async' or $self->isa('Text::Editor::Easy::Async') ) {
+            return;
+        }
+        my $call_id = $thread_ref->{threads->tid};
+        if ( $call_id ) {
+            #print "Le thread ", threads->tid, " demande à lui-même de changer un évènement\n";
+            while ( 'not_ended' ) {
+                if ( Text::Editor::Easy::Comm::anything_for_me() ) {
+                    Text::Editor::Easy::Comm::have_task_done();
+                }
+                my $async_status = Text::Editor::Easy->async_status( $call_id );
+                last if ( $async_status eq 'ended' );
+            }
+        }
+        # Tester ici la fin effective des autres threads ...
+        
+        return;
+    }
+    
+    if ( defined $event_ref ) {
+
+        $event_ref = reference_event( $id, $event_ref );
+    
+        return if ( ! ref $event_ref );
+    }
+    
+    #print "Dans set_event : self = $self, name = $name\n";
+    
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    Text::Editor::Easy->ask_thread( 'update_events', 0, [ $id ], $event_ref, $name );    
+    Text::Editor::Easy->ask_thread( 'update_events', 2, [ $id ], $event_ref, $name );
+}
+
+sub set_events {
+    my ( $self, $event_ref, $options_ref ) = @_;
+ 
+    #print "Dans set_events : self = $self\n";
+ 
+    my $id = '';
+    # Pour l'instant, les méthodes 'set_event(s)' ne marchent pas avec les faux objets zone (méthode id non définie, plus d'autres choses à voir, ...)
+    if ( ref $self ) {
+        $id = $self->id;
+    }
+    else {
+        $event_ref = reference_events( $id, $event_ref ) if ( defined $event_ref );
+        my $thread_ref =  Text::Editor::Easy->data_set_events( $self, $event_ref, $options_ref );
+        if ( $self eq 'Text::Editor::Easy::Async' or $self->isa('Text::Editor::Easy::Async') ) {
+            return;
+        }
+        my $call_id = $thread_ref->{threads->tid};
+        if ( $call_id ) {
+            #print "Le thread ", threads->tid, " demande à lui-même de changer des évènements\n";
+            while ( 'not_ended' ) {
+                if ( Text::Editor::Easy::Comm::anything_for_me() ) {
+                    Text::Editor::Easy::Comm::have_task_done();
+                }
+                my $async_status = Text::Editor::Easy->async_status( $call_id );
+                last if ( $async_status eq 'ended' );
+            }
+        }
+        # Tester ici la fin effective des autres threads ...
+        
+        return;
+    }
+
+    if ( defined $event_ref ) {
+        $event_ref = reference_events( $id, $event_ref );
+        
+        return if ( ! ref $event_ref );
+    }
+    
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    Text::Editor::Easy->ask_thread( 'update_events', 0, [ $id ], $event_ref );
+    Text::Editor::Easy->ask_thread( 'update_events', 2, [ $id ], $event_ref );
+}
+
 
 =head1 COPYRIGHT & LICENSE
 
@@ -1498,19 +1884,6 @@ under the same terms as Perl itself.
 
 
 1;
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
