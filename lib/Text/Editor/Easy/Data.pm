@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Data::Dump qw(dump);
 use threads;
@@ -49,6 +49,7 @@ use constant {
     SEARCH => 16,
     ZONE => 17,
     EVENTS => 18,
+    CONF => 19,
 
     #------------------------------------
     # LEVEL 2 : $self->[TOTAL][???]
@@ -100,7 +101,7 @@ sub import {
 
     #print "Dans data, avant ouverture de ENC\n";
     #print DBG "Dans data, avant ouverture de ENC\n";
-    Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG, $trace_ref );
+    Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG, { 'trace' => $trace_ref } );
     #print "Dans data, après ouverture de ENC\n";
     print DBG "Dans data, après ouverture de ENC\n";
 }
@@ -108,8 +109,8 @@ sub import {
 sub reference_editor {
     my ( $self, $ref, $options_ref ) = @_;
     
-    open ( DB1, ">DEBUG.txt" ) or die "Impossible d'ouvrir DEBUG.txt : $!\n";
-    print DB1 "Dans reference_editor\n";
+    #open ( DB1, ">DEBUG.txt" ) or die "Impossible d'ouvrir DEBUG.txt : $!\n";
+    #print DB1 "Dans reference_editor\n";
 
     my $zone_ref = $options_ref->{'zone'};
     
@@ -183,20 +184,20 @@ sub reference_editor {
 
     
     my $event_ref = init_events( $self, $options_ref->{'events'}, $name );
-    print DB1 "1 - Event ref vaut ", dump($event_ref), "\n";
+    #print DB1 "1 - Event ref vaut ", dump($event_ref), "\n";
     if ( defined $event_ref ) {
         $event_ref = Text::Editor::Easy::Events::reference_events($ref, $event_ref);
-        print DB1 "2 - Event ref vaut ", dump($event_ref), "\n";
+        #print DB1 "2 - Event ref vaut ", dump($event_ref), "\n";
     }
     else {
         $event_ref = {};
     }
-    print DB1 "3 - Event ref vaut ", dump($event_ref), "\n";
+    #print DB1 "3 - Event ref vaut ", dump($event_ref), "\n";
     $self->[INSTANCE]{$ref}{'events'} = $event_ref;
     $options_ref->{'events'} = $event_ref;
 
 
-    close DB1;
+    #close DB1;
     return $options_ref;
 }
 
@@ -672,7 +673,7 @@ sub trace_print {
     #print DBG "trace_print avant redirection\n";
     if ( my $hash_list_ref = $self->[REDIRECT] ) {
 
-   #print DBG "REDIRECTION effective pour appel ", $thread_ref->[CALL_ID], "\n";
+      #print DBG "REDIRECTION effective pour appel ", $thread_ref->[CALL_ID], "\n";
       RED: for my $redirect_ref ( values %{$hash_list_ref} ) {
 
             # Eviter l'autovivification
@@ -686,10 +687,10 @@ sub trace_print {
                 { $redirect_ref->{'thread'} } )
             {
 
-                #print DBG "A ECRIRE : ", join ('', @param), "\n";
+                print DBG "A ECRIRE : ", join ('', @param), "\n";
                 my $excluded = $redirect_ref->{'exclude'};
 
-       #print DBG "Excluded : ", $call_id_ref->[THREAD_LIST]{ $excluded }, "\n";
+ #      print DBG "Excluded : ", $call_id_ref->[THREAD_LIST]{ $excluded }, "\n";
                 next RED
                   if (  defined $excluded
                     and defined $call_id_ref->[THREAD_LIST]{$excluded} );
@@ -707,7 +708,7 @@ sub trace_print {
                 # sinon à bloquer les threads...
             }
 
-           #print DBG "redirect_ref method = ", $redirect_ref->{'method'}, "\n";
+  #         print DBG "redirect_ref method = ", $redirect_ref->{'method'}, "\n";
         }
     }
 
@@ -1258,6 +1259,18 @@ sub tell_length_slash_n {
     return $length_s_n;
 }
 
+
+sub configure {
+    my ( $self, $conf_ref ) = @_;
+    
+    $self->[CONF] = $conf_ref;
+}
+
+sub get_conf {
+    my ( $self ) = @_;
+    
+    return $self->[CONF];
+}
 
 =head1 FUNCTIONS
 

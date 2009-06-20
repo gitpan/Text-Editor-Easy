@@ -34,7 +34,7 @@
 # on the middle right panel
 #
 # The actions of the macro instructions
-# modify the 'stack_calls' Text::Editor::Easy object
+# modify the 'call_stack' Text::Editor::Easy object
 # which is the bottom right panel
 #
 # Once F5 has been pressed, you can

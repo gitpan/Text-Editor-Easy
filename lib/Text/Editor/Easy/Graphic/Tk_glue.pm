@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -749,6 +749,7 @@ sub canva_focus {
 sub on_top {
     my ($self) = @_;
 
+    $self->[CANVA]->CanvasRaise;
     #my %local_zone = %{ $self->[ZONE] };
     my $zone_name = $self->[ZONE];
 
@@ -770,7 +771,6 @@ sub focus {
 
     on_top($self);
     $self->[CANVA]->CanvasFocus;
-    $self->[CANVA]->CanvasRaise;
 }
 
 sub get_zone {
@@ -1011,6 +1011,21 @@ sub put_on_top {
     
     $self->[CANVA]->CanvasRaise;
 }
+
+sub set_background {
+    my ( $self, $color ) = @_;
+    
+    eval {
+        $self->[CANVA]->configure( -background => $color );
+    }
+}
+
+sub background {
+    my ( $self ) = @_;
+    
+    return $self->[CANVA]->cget('-background');
+}
+    
 
 =head1 COPYRIGHT & LICENSE
 

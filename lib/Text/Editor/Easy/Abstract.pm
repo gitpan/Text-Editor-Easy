@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 =head1 SYNOPSIS
 
@@ -322,19 +322,7 @@ sub new {
 
     $edit_ref->[ASSIST] = 0;
     if ( my $tab_ref = $hash_ref->{'highlight'} ) {
-        if ( my $use = $tab_ref->{'use'} ) {
-            eval "use $use";
-
-            #print "EVAL use $use en erreur\n$@\n" if ($@);
-            if ( $use eq 'Text::Editor::Easy::Syntax::Perl_glue' ) {
-                $edit_ref->[ASSIST] = 1;
-            }
-        }
-        my $package;
-        $package = $tab_ref->{'package'};
-        $package = 'main' if ( !defined $package );
-        my $sub = $tab_ref->{'sub'};
-        $edit_ref->[SUB_REF] = eval "\\&${package}::$sub";
+        set_highlight( $edit_ref, $tab_ref );
     }
     my @width;
     my @height;
@@ -503,6 +491,24 @@ sub new {
     return $edit_ref;
 }    # Fin new
 
+sub set_highlight {
+    my ( $edit_ref, $tab_ref ) = @_;
+
+    if ( my $use = $tab_ref->{'use'} ) {
+        eval "use $use";
+
+        #print "EVAL use $use en erreur\n$@\n" if ($@);
+        if ( $use eq 'Text::Editor::Easy::Syntax::Perl_glue' ) {
+            $edit_ref->[ASSIST] = 1;
+        }
+    }
+    my $package;
+    $package = $tab_ref->{'package'};
+    $package = 'main' if ( !defined $package );
+    my $sub = $tab_ref->{'sub'};
+    $edit_ref->[SUB_REF] = eval "\\&${package}::$sub";
+}
+
 my %ref_sub;
 
 sub examine_external_request {
@@ -516,6 +522,7 @@ sub examine_external_request {
             $last_graphic_event = $sub_origin;
         }    
         $sub_origin = $what;
+        # Inter-thread call, not to be shown in trace
         execute_this_task( $what, $call_id, @param );
         #print "Retour de execute task $sub_origin, $param[2]\n";
     }
@@ -1871,7 +1878,10 @@ sub key_press {
 
             #print "Touche spéciale...\n";
             #$key{$key_code}->( $edit_ref );
-            $reference->( $edit_ref->[PARENT] );
+            eval {
+                $reference->( $edit_ref->[PARENT] );
+            };
+            print "Wrong code for key $key_code : $@\n" if ( $@ );
         }
         else {
             my @tab      = @{ $reference };
@@ -4119,6 +4129,8 @@ sub line_bottom_ord {
 sub bind_key { # instance call
     my ( $self, $hash_ref ) = @_;
 
+    print "Dans bind_key simple...\n";
+
     my $use = $hash_ref->{'use'};
     eval "use $use"                       if ( defined $use );
     print "EVAL use $use en erreur\n$@\n" if ($@);
@@ -4126,26 +4138,37 @@ sub bind_key { # instance call
     my $sub     = $hash_ref->{'sub'};
     my $package = $hash_ref->{'package'};
     my $key     = $hash_ref->{'key'};
+    my $sub_ref = $hash_ref->{'sub_ref'};
 
     #print "Dans bind key...$sub, $package, $key, $use\n";
-    if ( !defined $sub and $self->[KEY]{$key} ) {
-        delete $self->[KEY]{$key};
+    if ( !defined $sub and !defined $sub_ref ) {
+        if ( $self->[KEY]{$key} ) {
+            delete $self->[KEY]{$key};
+        }
         return;
     }
 
-    # Vérification de la bonne valeur de key_code à faire (ctrl, alt et shift)
-    my $string = "\\&" . $package . "::$sub";
+    if ( defined $sub ) {
+        # Vérification de la bonne valeur de key_code à faire (ctrl, alt et shift)
+        my $string = "\\&" . $package . "::$sub";
 
-    #print "STRING $string|$package\n";
-    $self->[KEY]{$key} = eval $string;
+        #print "STRING $string|$package\n";
+        $self->[KEY]{$key} = eval $string;
 
-    #$key{$key} = eval "\\&$package::$sub";
-    print "key_code =$self->[KEY]{$key}\n";
+        #$key{$key} = eval "\\&$package::$sub";
+        print "key_code =$self->[KEY]{$key}\n";
+    }
+    else {
+        $self->[KEY]{$key} = $sub_ref;
+    }
+
     return;
 }
 
 sub bind_key_global { # class call
     my ( $self, $hash_ref ) = @_;
+
+    print "Dans bind_key_global\n";
 
     my $use = $hash_ref->{'use'};
     eval "use $use"                       if ( defined $use );
@@ -5125,6 +5148,17 @@ sub update_events {
     }
 }
 
+sub background {
+    my ( $self ) = @_;
+    
+    return $self->[GRAPHIC]->background;
+}
+
+sub set_background {
+    my ( $self, $color ) = @_;
+    
+    $self->[GRAPHIC]->set_background( $color );
+}
 
 1;
 

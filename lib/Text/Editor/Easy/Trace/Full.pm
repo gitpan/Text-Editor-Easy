@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :
@@ -111,13 +111,21 @@ sub init_trace_full {
     my %package = (
         'Text::Editor::Easy' => 1,
         'Text::Editor::Easy::Comm' => 1,
+        'Text::Editor::Easy::Abstract' => 1,
     );
 
     my $indice = 0;
     FILE: while ( my ( $pack, $file, $line ) = caller( $indice++ ) ) {
         if ( $pack eq 'Text::Editor::Easy::Comm' ) {
+            # Comm
             $package{$pack} = $file;
-            $file =~ s/Easy\/Comm\.pm/Easy\.pm/;
+            
+            # Abstract
+            $file =~ s/Comm\.pm/Abstract\.pm/;
+            $package{'Text::Editor::Easy::Abstract'} = $file;
+            
+            # Easy
+            $file =~ s/Easy\/Abstract\.pm/Easy\.pm/;
             $package{'Text::Editor::Easy'} = $file;
         }
         last FILE;
@@ -384,7 +392,7 @@ sub get_call_list_for_print {
     PRINT: while ( defined $enreg and $enreg =~ /^\t/ ) {
         chomp $enreg;
         my ( $file, $line, $package ) = split( /\|/, $enreg );
-        if ( $package eq 'Text::Editor::Easy::Comm' ) {
+        if ( $package eq 'Text::Editor::Easy::Comm' or $package eq 'Text::Editor::Easy::Abstract' ) {
             if ( $self->[INTER_CALL]{$line} ) {
                 push @enreg, "", get_info_for_call ( $self, $call_id );
                 last PRINT;
@@ -401,6 +409,12 @@ sub get_call_list_for_print {
         }
         print DBG "J'empile $enreg\n";
         push @enreg, $enreg;
+        
+        if ( $package eq 'Text::Editor::Easy::Graphic' ) {
+            push @enreg, "", get_info_for_call ( $self, $call_id );
+            last PRINT;
+        }
+        
         $enreg = readline $self->[INFO_DESC];
     }
     seek $self->[INFO_DESC], 0, 2;
@@ -496,6 +510,8 @@ sub get_info_for_call {
     #print DBG "Dans get_info_for_call (self = $self): position de $call_id :\n";
     #print DBG "HASH = ", $self->[HASH], "\n";
     #print DBG "KEY  = ", $self->[HASH]{$call_id}, "\n";
+    return if ( ! defined $call_id );
+    
     my $seek = $self->[HASH]{$call_id};
     return if ( ! defined $seek );
     #print DBG "\tSEEK de $call_id => $seek\n";
@@ -509,7 +525,7 @@ sub get_info_for_call {
     CALL: while ( $enreg =~ /^\t/ ) {
         chomp $enreg;
         my ( $file, $line, $package ) = split( /\|/, $enreg );
-        if ( $package eq 'Text::Editor::Easy::Comm' ) {
+        if ( $package eq 'Text::Editor::Easy::Comm' or $package eq 'Text::Editor::Easy::Abstract' ) {
             if ( $self->[INTER_CALL]{$line} ) {
                 if ( defined $new_call_id ) {
                     push @return, "", get_info_for_call ( $self, $new_call_id );
@@ -524,6 +540,12 @@ sub get_info_for_call {
             }
         }
         push @return, $enreg;
+        
+        if ( $package eq 'Text::Editor::Easy::Graphic' ) {
+            push @return, "", get_info_for_call ( $self, $new_call_id );
+            last CALL;
+        }
+        
         $enreg = readline $self->[CALL_DESC];
     }
     # Repostionnement à la fin

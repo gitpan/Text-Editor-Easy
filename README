@@ -1,6 +1,6 @@
 Text-Editor-Easy
 
-Version 0.47.
+Version 0.48.
 Pure perl editor module and program. 10 demos in the program,
 but still not usable : numerous bugs to work on, memory leaks to stop,
 interface to complete, louds of documentation to write, ...

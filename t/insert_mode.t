@@ -1,7 +1,14 @@
-use Test::More qw( no_plan );
+use Test::More;
 use Config;
-plan skip_all => "Perl not compiled with 'useithreads'" if (! $Config{'useithreads'});
-plan skip_all => "Tk is not working properly on this machine" if (! -f 'tk_is_ok' );
+if ( ! $Config{'useithreads'} ) {
+    plan skip_all => "Perl not compiled with 'useithreads'";
+}
+elsif ( ! -f 'tk_is_ok' ) {
+    plan skip_all => "Tk is not working properly on this machine";
+}
+else {
+    plan no_plan;
+}
 
 use strict;
 use lib '../lib';

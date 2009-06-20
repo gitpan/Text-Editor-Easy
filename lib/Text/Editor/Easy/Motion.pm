@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -55,10 +55,21 @@ sub move_over_external_editor {
     move_over_out_editor ( $editor, $hash_ref );
 }
 
+sub return_print {
+    my ( $step ) = @_;
+    
+    my ( $what, $call_id, @param ) = get_task_to_do();
+    print "Interruption du processus à l'étape $step pour $what\n";
+    execute_this_task( $what, $call_id, @param );
+    return 1 if ( $what ne 'use_module' );
+}
+
 sub move_over_out_editor {
     my ( $editor, $hash_ref ) = @_;
 
-    return if (anything_for_me);
+    if (anything_for_me) {
+        return if ( return_print('start') );
+    }
     
     $editor->async->unset_at_end;
 
@@ -68,7 +79,9 @@ sub move_over_out_editor {
     return if ( !$line_of_out );
     my $seek_start = $line_of_out->seek_start;
 
-    return if (anything_for_me);
+    if (anything_for_me) {
+        return if ( return_print('-2-') );
+    }
 
     #print "Avant appel get_info:  $seek_start\n";
     my $pos = $hash_ref->{'pos'};
@@ -107,12 +120,18 @@ sub move_over_out_editor {
         print "Reçu de get_info_for_display $ref_first et $pos_first\n";
     }
 
-    return if (anything_for_me);    # Abandonne si autre chose à faire
+    if (anything_for_me) {
+        return if ( return_print('-3-') );
+    }
 
     $show_calls_editor->deselect;
-    return if (anything_for_me);    # Abandonne si autre chose à faire
+    if (anything_for_me) {
+        return if ( return_print('-4-') );
+    }
     $show_calls_editor->empty;
-    return if (anything_for_me);    # Abandonne si autre chose à faire
+    if (anything_for_me) {
+        return if ( return_print('-5-') );
+    }
 
     #print "ENREG 1 = $enreg[1]\n";
     
@@ -121,7 +140,9 @@ sub move_over_out_editor {
     my ( $file, $number, $package ) = split( /\|/, $info );
     chomp $package;                 # En principe inutile
 
-    return if (anything_for_me);    # Abandonne si autre chose à faire
+    if (anything_for_me) {
+        return if ( return_print('-6-') );
+    }
 
    my ( $new_editor, $line );
     if ( ! -f $file ) {
@@ -131,7 +152,10 @@ sub move_over_out_editor {
     else {
         ( $new_editor, $line ) = manage_file ( $file, $number );        
     }
-    return if ( ! defined $new_editor );
+    if ( ! defined $new_editor ) {
+        print STDERR "Impossible d'avoir l'éditeur $file, ligne $number\n";
+        return;
+    }
 
     #print "AVA?T DISPLAYED\n";
     #print "APRES DISPLAYED\n";
@@ -161,7 +185,7 @@ sub move_over_out_editor {
     #return if (anything_for_me);
     if ( anything_for_me() ) {
         my ( $what, @param ) = get_task_to_do();
-        print "Dans motion avant affichage stack_call =>\n\tWHAT = $what\n";
+        print "Dans motion avant affichage call_stack =>\n\tWHAT = $what\n";
         execute_this_task( $what, @param );
         return if ( $what ne 'reference_event' );
     }
@@ -181,7 +205,7 @@ sub move_over_out_editor {
     my $first_line = $show_calls_editor->first;
     #$display_options = [ $ref, { 'at' => $top_ord, 'from' => 'top' } ];
     $show_calls_editor->insert($string_to_insert, { 
-        'cursor' => 'at_start',
+        'cursor' => [ 'line_1', 0 ],
         'display' => [
             $first_line,
             { 'at' => 'top', 'from' => 'top' },
@@ -192,12 +216,8 @@ sub move_over_out_editor {
     #    my @param = get_task_to_do;
     #    print "Dans move over out, tâche reçue : @param\nFin de paramêtres\n";
     #}
-
-    return if (anything_for_me);    # Abandonne si autre chose à faire
-         # Sélection de la ligne que l'on va traiter : la première
-    #$first_line = $show_calls_editor->first;
-    #$show_calls_editor->display( $first_line, { 'at' => 'top' } );
-    $first_line->select( undef, undef, 'orange' );
+    cursor_set_on_who_file( $show_calls_editor, { 'line' => $first_line->next } );
+    
 }
 
 sub manage_eval {
@@ -207,7 +227,9 @@ sub manage_eval {
     
     my @code = Text::Editor::Easy->get_code_for_eval( $1 );
     #print "Gestion de l'eval dans motion : reçu ", join ("\n", @code), "\n";
-    return if ( anything_for_me );
+    if ( anything_for_me ) {
+        return if ( return_print('-x-') );
+    }
     my $new_editor = $editor{''};
     if ( ! $new_editor ) {
             $new_editor = Text::Editor::Easy->new(
@@ -233,12 +255,17 @@ sub manage_eval {
     else {
         $new_editor->empty;
     }
-    return if ( anything_for_me );
+    if ( anything_for_me ) {
+        return if ( return_print('-y-') );
+    }
 
     for ( @code ) {
         $new_editor->insert( "$_\n" );
     }
-    return if ( anything_for_me );
+    if ( anything_for_me ) {
+        return if ( return_print('-z-') );
+    }
+
     
     my $line = $new_editor->number($number);
     return if ( ! defined $line );
@@ -253,7 +280,9 @@ sub manage_file {
     my $line;
     if ( !$new_editor ) {
         $new_editor = Text::Editor::Easy->whose_file_name($file);
-        return if ( anything_for_me );
+        if ( anything_for_me ) {
+            return if ( return_print('-a-') );
+        }
         if ( !$new_editor ) {
             my $conf_ref = {
                 'file'      => $file,
@@ -283,7 +312,9 @@ sub manage_file {
         # Peut-on être sûr que la liste "file_list_ref" sauvegardée dans 'info' du thread File_manager du Tab est mise à jour ?
         
         $editor{$file} = $new_editor;
-        return if ( anything_for_me );
+        if ( anything_for_me ) {
+            return if ( return_print('-b-') );
+        }
         $line = $new_editor->number($number, {
             'lazy' => threads->tid,
             'check_every' => 20,
@@ -292,7 +323,10 @@ sub manage_file {
         $line_number{$file}{$number} = $line;
     }
     else {
-        return if (anything_for_me);    # Abandonne si autre chose à faire
+        if ( anything_for_me ) {
+            return if ( return_print('-c-') );
+        }
+
         #print "move over out file : AVANT number : $number\n";
         $line = $line_number{$file}{$number};
         if ( !$line ) {

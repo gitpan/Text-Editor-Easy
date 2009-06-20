@@ -9,11 +9,11 @@ Text::Editor::Easy::Events - Manage events linked to user code : specific code i
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 =head1 INTRODUCTION
 
@@ -988,14 +988,59 @@ Perl is dynamic : you can 'eval' new code during execution and in the context of
 Suppose your program is (or contains) an editor, that sounds great ! Your program can ask you for new 
 code to edit (or old one to change) and will go on running using this very code ! You can call that the
 way you want : a 'dynamic application', a limitless 'macro langage', the best configuration tool ever,
-or the most dangerous thing.
+or the most dangerous thing (it's true that powerful things put in bad hands are dangerous, but skilled
+people shouldn't be limited because of unskilled ones).
 
 =head2 'code' option
 
-This option will be used to replace 'sub', 'use' and 'package' options in L<standard and static
+This option can replace 'sub', 'use' and 'package' options in L<standard and static
 event definition|/'sub', 'use' and 'package' options of one particular event in 'events' option>.
 
-This option will accept a string that represents the code of the event.
+This option accepts a string that represents the code of the event.
+
+Note that you must not start your code with 'sub { ...' : you should consider yourself
+already inside an unnamed sub.
+
+ $editor->set_event( 
+     'clic', { 
+         'code' => 'print "Hello\n"';
+     },
+ );
+ 
+ # is almost equivalent to
+ 
+ $editor->set_event( 
+     'clic', { 
+         'sub' => 'hello';
+     },
+ );
+ 
+ sub hello {
+     print "Hello\n";
+ }
+
+About the differences :
+
+=over 4
+
+=item *
+
+to use the 'sub' option, you need a named sub written somewhere in your program or in a module whereas
+the 'code' option let you have your code in memory and nowhere else.
+
+=item *
+
+with the 'code' option, your code is 'checked' (or compiled) during the 'set_event'
+call (with an eval). Moreover, for each event, the code is executed in an 'eval'. So, the
+'code' option is dynamic but slower : you have nothing without nothing ! But 'dynamic
+designing' should be considered as a faster way to design with a future possibility to
+migrate 'dynamic tested code' to 'static code'. 
+
+=back
+
+On the paper, this 'code' option seems useless because you have to write the code anyway. But
+if the code is written after you have started your application ... and by the user himself :
+see 'demo12' provided with the 'Editor.pl' program to understand.
 
 =head1 DYNAMIC CONTRIBUTION, part 3, saving
 
@@ -1341,6 +1386,7 @@ sub reference_events {
         my $event_list_ref = $events_ref->{$event_name};
         if ( ref $event_list_ref eq 'HASH' ) {
             #print "Single event declaration\n";
+            $event_list_ref->{'name'} = $event_name;
             my $answer = reference_event($id, $event_list_ref);
             if ( ! ref $answer ) {
                 return if ( $answer eq 'error' );
@@ -1358,6 +1404,7 @@ sub reference_events {
             #print "Multiple event declaration\n";
             my @new_list;
             while ( my $event_ref = shift @$event_list_ref ) {
+                $event_ref->{'name'} = $event_name;
                 my $answer = reference_event($id, $event_ref);
                 if ( ! ref $answer ) {
                     return if ( $answer eq 'error' );
@@ -1393,15 +1440,22 @@ sub reference_event {
     #print "REF de event_ref : ", ref $event_ref, "\n";
     my $use = $event_ref->{'use'};
     my $thread = $event_ref->{'thread'};
+        # Faux : l'appel à reference_event peut être fait par autre chose que le thread Graphic ...
+        
+    my $thread_defined = 1;
+    if ( ! defined $thread ) {
+        $thread_defined = 0;
+        #eval "use $use";
+        #if ( $@ ) {
+        #    print STDERR "Wrong code for module $use :\n$@";
+        #    return 'error';
+        #}
+        $thread = 0;
+    }
     if ( $use ) {
         $package = $use;
-        if ( ! defined $thread ) {
-            eval "use $use";
-            if ( $@ ) {
-                print STDERR "Wrong code for module $use :\n$@";
-                return 'error';
-            }
-        }
+        
+
     }
     my $action = $event_ref->{'action'};
     if ( defined $action ) {
@@ -1426,12 +1480,14 @@ sub reference_event {
     if ( defined $thread ) {
         my $answer_ref = thread_use( $id, $thread, $use, $event_ref->{'create'}, $event_ref->{'init'}, $package );
         return $answer_ref if ( ! ref $answer_ref );
-        $event_ref->{'tid'} = $answer_ref->{'tid'};
-        if ( $action ) {
-            if ( $action ne 'exit' and $action ne 'nop' ) {
-                if ( ! defined $sync or $sync eq 'false' ) {
-                    print STDERR "Action $action forbidden with asynchronous call to thread $thread\n";
-                    delete $event_ref->{'action'};
+        if ( $thread_defined ) {
+            $event_ref->{'tid'} = $answer_ref->{'tid'}; 
+            if ( $action ) {
+                if ( $action ne 'exit' and $action ne 'nop' ) {
+                    if ( ! defined $sync or $sync eq 'false' ) {
+                        print STDERR "Action $action forbidden with asynchronous call to thread $thread\n";
+                        delete $event_ref->{'action'};
+                    }
                 }
             }
         }
@@ -1455,6 +1511,37 @@ sub reference_event {
     }
 
     $event_ref->{'sub'} = [ ];
+    
+    if ( my $string = $event_ref->{'code'} ) {
+        my $sub_ref = eval "sub { $string }";
+        if ( $@ ) {
+            print STDERR "Wrong code for event '$event_ref->{'name'}' : $@\n";
+            my $indice = 1;
+            for ( split( "\n", $string ) ) {
+                print STDERR "\t$indice - $_\n";
+                $indice += 1;
+            }
+            return 'unlink';
+        }
+        else {
+            my $id = $event_ref->{'id'};
+            my $tid = $event_ref->{'tid'};
+            
+            $tid = 0 if ( ! defined $thread ) ;
+            
+            if ( defined $tid ) {
+            # L'évaluation  peut avoir lieu à tort dans le thread 0 (si thread 'File_manager' : plus lent au premier appel...)
+                $event_ref->{'id'} = Text::Editor::Easy->ask_thread(
+                    'Text::Editor::Easy::Events::thread_eval',
+                    $tid,
+                    $string,
+                    $id
+                ); 
+            }
+            #print "Bonne évaluation, code = $string\n";
+        }
+        return $event_ref;
+    }
     
     if ( ! defined $action ) {
         print STDERR "No action defined and no sub provided, event cancelled\n";
@@ -1514,6 +1601,26 @@ sub thread_use {
         }
     }
     return { 'tid' => $tid }; # $tid maybe undef
+}
+
+my %sub_ref;
+my $sub_ref_id = 0;
+
+sub thread_eval {
+    my ( $self, $ref, $string, $id ) = @_;
+    
+    print "Dans thread_eval : tid = ", threads->tid, "\n";
+    if ( ! defined $id ) {
+        $sub_ref_id += 1;
+        $id = $sub_ref_id;
+    }
+    $sub_ref{$id} = eval "sub { $string }";
+    if ( $@ ) {
+        print STDERR "Wrong 'compilation' during evaluation of :\nsub { $string } :\n$@\n";
+        return;
+    }
+
+    return $id;
 }
 
 sub execute_events {
@@ -1592,6 +1699,7 @@ sub execute_event {
         }
     }    
     my $thread = $event_ref->{'thread'};
+    my $code = [ $event_ref->{'code'}, $event_ref->{'id'} ];
     if ( defined $thread ) {
         #print "Appel de thread execute avec thread = $thread\n";
         #if ( ! defined $action ) {
@@ -1600,7 +1708,7 @@ sub execute_event {
         #else {
         #    print "1 Avant appel transform and execute pour thread : action = $action\n";
         #}
-        return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, @user );
+        return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, $code, @user );
     }
     else  {
         my $sync = $event_ref->{'sync'};
@@ -1608,17 +1716,17 @@ sub execute_event {
             $event_ref->{'tid'} = 0;
             #print "Avant thread_execute pour tid = 0\n";
             #print "Avant appel thread_execute pour tid = 0 : editor = $editor\n";
-            return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, @user );
+            return thread_execute( $thread, $event_ref, $editor, $info_ref, $package, $sub, $code, @user );
         }
         #print "Dans execute event, avant appel transform... editor = $editor\n";
-        my $answer = transform_and_execute( $editor, $info_ref, $package, $sub, @user );
+        my $answer = transform_and_execute( $editor, $info_ref, $package, $sub, $code, @user );
         #print "Dans execute_event ref de answer = ", ref( $answer ), "\n";
         return untransform( $answer, $action );
     }
 }
 
 sub thread_execute {
-    my ( $thread, $event_ref, $object, $info_ref, $package, $sub, @user ) = @_;
+    my ( $thread, $event_ref, $object, $info_ref, $package, $sub, $code, @user ) = @_;
 
     my $tid = $event_ref->{'tid'};
     
@@ -1648,7 +1756,7 @@ sub thread_execute {
     
     my $sync = $event_ref->{'sync'};
     my $sub_name = 'Text::Editor::Easy::Events::thread_transform';
-    my @param = ( $sub_name, $tid, $object_ref, $package, $sub, $info_ref, $event_ref->{'action'}, @user );
+    my @param = ( $sub_name, $tid, $object_ref, $package, $sub, $info_ref, $event_ref->{'action'}, $code, @user );
     $sync = 'false' if ( ! defined $sync );
     if ( $sync eq 'true' ) {
         return Text::Editor::Easy->ask_thread( @param );
@@ -1708,7 +1816,7 @@ sub nop {
 }
 
 sub thread_transform {
-    my ( $self, $ref, $object_ref, $package, $sub, $info_ref, $action, @user ) = @_;
+    my ( $self, $ref, $object_ref, $package, $sub, $info_ref, $action, $code, @user ) = @_;
     
     my $object;
     if ( $object_ref->[0] eq 'Text::Editor::Easy::Zone' ) {
@@ -1722,12 +1830,12 @@ sub thread_transform {
     }
     
     #print "Appel transform_and_execute pour tid = ", threads->tid, "\n";
-    my $answer = transform_and_execute( $object, $info_ref, $package, $sub, @user);
+    my $answer = transform_and_execute( $object, $info_ref, $package, $sub, $code, @user);
     return untransform( $answer, $action );
 }
 
 sub transform_and_execute {
-    my ( $editor, $info_ref, $package, $sub, @user ) = @_;
+    my ( $editor, $info_ref, $package, $sub, $code, @user ) = @_;
 
     KEY: for my $key ( keys %$info_ref ) {
         if ( $key eq 'line' ) {
@@ -1751,8 +1859,28 @@ sub transform_and_execute {
         }
     }
     
-    no strict "refs";
-    return &{"${package}::$sub"}( $editor, $info_ref, @user );
+    if ( defined $sub ) {
+        no strict "refs";
+        return &{"${package}::$sub"}( $editor, $info_ref, @user );
+    }
+    else {
+        # A optimiser : récupérer la référene de sub dans le contexte du thread pour ne permettre qu'une seule évaluation
+        my ( $string, $id ) = @$code;
+        if ( ! defined $id ) {
+            print "'Compilation' à la première exécution\n";
+            $id = thread_eval(0,0, $string);
+            return if ( ! defined $id ); # Erreur de 'compilation'
+        }
+        #print "Exécution avec id = $id\n";
+        my $answer = eval {
+            $sub_ref{$id}->( $editor, $info_ref, @user );
+        };
+        if ( $@ ) {
+            print STDERR "Wrong 'execution' during evaluation of :\nsub { $code } :\n$@\n";
+            return;
+        }
+        return $answer;
+    }
 }
 
 sub untransform {
@@ -1786,13 +1914,16 @@ sub set_event {
     my ( $self, $name, $event_ref, $options_ref ) = @_;
 
     return if ( ! defined $name );
-
+    
     my $id = '';
     if ( ref $self and ( ref $self eq 'Text::Editor::Easy'
     or ref $self eq 'Text::Editor::Easy::Async' ) ) {
         $id = $self->id;
     }
     else {
+        if ( defined $event_ref and ref $event_ref eq 'HASH' ) {
+            $event_ref->{'name'} = $name;
+        }
         $event_ref = reference_event( $id, $event_ref )  if ( defined $event_ref );
         my $thread_ref =  Text::Editor::Easy->data_set_event( $self, $name, $event_ref, $options_ref );
         if ( $self eq 'Text::Editor::Easy::Async' or $self->isa('Text::Editor::Easy::Async') ) {
@@ -1815,6 +1946,9 @@ sub set_event {
     }
     
     if ( defined $event_ref ) {
+        if ( ref $event_ref eq 'HASH' ) {
+            $event_ref->{'name'} = $name;
+        }
 
         $event_ref = reference_event( $id, $event_ref );
     

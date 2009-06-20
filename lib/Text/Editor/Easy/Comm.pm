@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 =head1 SYNOPSIS
 
@@ -151,7 +151,7 @@ for the thread creation. This "reference change" can modify slightly the "person
   'package'
   'method'
   'sub' (if the sub of the package has a different name of the method)
-  'memory' (for dynamic designing : the code of the method to be executed is given and not on a file)
+  'code' (for dynamic designing : the code of the method to be executed is given and not on a file)
 
 The 'add_thread_object' method allows you to add new objects in a MULTIPLEXED thread. The possible options for the hash are :
 
@@ -343,12 +343,16 @@ share(%get_tid_from_thread_name);
 sub add_thread_method {
     my ( $self_server, $reference, $options_ref ) = @_;
 
-    my $initial_instance_ref = $thread_knowledge{'instance'};
+    if ( $reference =~ /\D/ ) {
+        $reference = 'Text::Editor::Easy';
+    }
+
+    my $instance_ref = $thread_knowledge{'instance'};
     #print "Dans add thread method : ", scalar( threads->list ), "\n";
 
     my $method = $options_ref->{'method'};
     return if ( !defined $method );
-    if ( my $ref_method = ref $method ) { 
+    if ( my $ref_method = ref $method ) { # Affectation et pas test
         if ( $ref_method eq 'ARRAY' ) {
             # ARRAY
             # Appel récursif : à optimiser par la suite... (?)
@@ -369,10 +373,10 @@ sub add_thread_method {
         return;
     }
     my $method_ref;
-    if ( my $program = $options_ref->{'memory'} ) {
+    if ( my $program = $options_ref->{'code'} ) {
 
         #Le code doit renvoyer une référence de sub
-        $method_ref->[REF] = eval $program;
+        $method_ref->[REF] = eval "sub { $program }";
         if ($@) {
             $method_ref->[COMPIL] = $@;
             print STDERR "Wrong code for method $method :\n$@\n";
@@ -399,12 +403,15 @@ sub add_thread_method {
         $method_ref->[REF] = eval "\\&${package}::$sub";
     }
     my $is_initial_reference = 0;
-    #if ( !$initial_instance_ref->{$reference} ) {
-    if ( !$initial_instance_ref->{'Text::Editor::Easy'} ) {
-        #print "Ajout pour la nouvelle classe/méthode $reference de $method\n";
-        $ref_method{$method}[OTHER]{'Text::Editor::Easy'} = $method_ref;
+#    print DBG "Add de la méthode $method, reference $reference, \$instance_ref->{$reference} = $instance_ref->{$reference}, \$thread_knowledge{'self_server'} = $thread_knowledge{'self_server'}\n";
+    if ( ! defined $instance_ref->{$reference} or $instance_ref->{$reference} != $thread_knowledge{'self_server'} ) {
+    #if ( !$instance_ref->{'Text::Editor::Easy'} ) {
+        print DBG "Ajout pour la nouvelle classe/méthode $reference de $method\n";
+        #$ref_method{$method}[OTHER]{'Text::Editor::Easy'} = $method_ref;
+        $ref_method{$method}[OTHER]{$reference} = $method_ref;
     }
     else {
+        print DBG "Ajout pour la même classe de la méthode $method (classe $reference)\n";
         $ref_method{$method} = $method_ref;
         $is_initial_reference = 1;
     }
@@ -458,6 +465,7 @@ sub simple_call {
 
     my ( $who, $id ) = split( /_/, $call_id );
 
+    # Following call not to be shown in trace
     my $response = simple_context_call( $self, $sub_name, $sub_ref, $call_id, $context, @param );
 
     #print DBG "Longueur de context  call_id $call_id|$context|\n";
@@ -496,7 +504,7 @@ sub simple_context_call {
         $response = dump @return;
     }
     else {
-        # Inter-thread call, not to be shown in trace
+        # Following call not to be shown in trace
         my $return = $sub_ref->( $self, @param );
         $response = dump $return;
     }
@@ -663,8 +671,8 @@ sub ask2 {
 sub new_ask {
     my ( $self, $method, $id, $client_tid, $server_tid, @data ) = @_;
 
-    if ( $method eq 'save_info_on_file' ) {
-        print "APPEL save_info_on... @_\n";
+    if ( $method eq 'bind_key' ) {
+        print DBG "self $self, method $method, id $id, client_tid $client_tid, server_tid $server_tid\n";
     }
 
     my $context = '';
@@ -684,6 +692,9 @@ sub new_ask {
     else {
         $context .= 'V';
     }
+    if ( ! defined $server_tid ) {
+        print "new_ask pbm : methode $method, id $id, client_tid $client_tid @data\n";
+    }
 
     if ( $client_tid == $server_tid and length($context) ne 2 ) {
         
@@ -696,6 +707,7 @@ sub new_ask {
 #        print DBG "\tSELF SERVER : $self_server\n";
 #        print DBG "\tCALL_ID     : $call_id\n";
 
+        # Following call not to be shown in trace
         return execute_task( 'sync', $self_server, $method, $call_id,
             $id || $self,
             $context, @data );
@@ -872,7 +884,7 @@ sub verify_model_thread {
 # To suppress "taint error" => "Insecure dependency in open while running with -T switch at ..."
     $name =~ m/^([a-zA-Z0-9\._]+)$/; 
 
-    manage_debug_file( __PACKAGE__, *DBG, $trace_ref );
+    manage_debug_file( __PACKAGE__, *DBG, { 'trace' => $trace_ref } );
     print DBG
 "\nThis is a multi-thread debug File as any thread knows Text::Editor::Easy::Comm\n\n";
 
@@ -904,6 +916,13 @@ sub verify_model_thread {
     return if ( defined $model_thread );    
 
 # Maintenant, on ne peut pas rendre la main tant que la création de thread n'est pas opérationnelle
+    # Redirection des print sur STDERR et SDTOUT
+    $trace_ref = {} if ( ! defined $trace_ref );    
+    if ( $trace_ref->{'trace_print'} ) {
+        tie *STDOUT, "Text::Editor::Easy::Comm::Trace", ('STDOUT');
+        tie *STDERR, "Text::Editor::Easy::Comm::Trace", ('STDERR');
+    }
+
     my $thread = threads->new( \&thread_generator );
     my $tid    = $thread->tid;
 
@@ -946,13 +965,6 @@ sub verify_model_thread {
         $method{'set_events'}    = ('Text::Editor::Easy::Events::set_events');
     }
     
-    # Redirection des print sur STDERR et SDTOUT
-    $trace_ref = {} if ( ! defined $trace_ref );    
-    if ( $trace_ref->{'trace_print'} ) {
-        tie *STDOUT, "Text::Editor::Easy::Comm::Trace", ('STDOUT');
-        tie *STDERR, "Text::Editor::Easy::Comm::Trace", ('STDERR');
-    }
-
     # Now that everything has been created, we can trace the 'new' call
     return trace_new();
 }
@@ -967,7 +979,16 @@ sub trace_new {
 }
 
 sub manage_debug_file {
-    my ( $package, $file, $trace_ref ) = @_;
+    my ( $package, $file, $options_ref ) = @_;
+    
+    if ( ! defined $options_ref ) {
+        $options_ref = Text::Editor::Easy->get_conf;
+    }
+    
+    my $trace_ref = undef;
+    if ( defined $options_ref and ref $options_ref eq 'HASH' ) {
+        $trace_ref = $options_ref->{'trace'};
+    }
 
     my $suffix = $package;
     $suffix =~ s/::/_/g;
@@ -1086,6 +1107,8 @@ sub create_data_thread {
                 'data_set_event',
                 'data_set_events',
                 'print_default_events',
+                'configure',
+                'get_conf',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data', $trace_ref],
@@ -1231,6 +1254,9 @@ sub verify_graphic {
                     'set_replace',
                     'set_insert',
                     'insert_mode',
+                    'background',
+                    'set_background',
+                    'set_highlight',
 
                     # Event generation
                     'key_press',
@@ -1484,6 +1510,7 @@ sub verify_server_queue_and_wait {
   # En cas d'échec il faut sortir avec undef et renvoyer cela au thead demandeur
             shift @param;
             shift @param;
+            # Inter-thread call, not to be shown in trace
             $sub_ref->( $editor, @param );
         }
         else {    # Thread partagé entre tous les éditeurs
@@ -1574,19 +1601,24 @@ sub init_server_thread {
           ref $self_caller, "|\n";
         $initial_reference = $com_unique{ refaddr $self_caller };
     }
+    elsif ( $self_caller =~ /^\d+$/ ) {
+        print DBG "OWNED THREAD ou MULTIPLEXED : SELF caller $self_caller|";
+        $initial_reference = $self_caller;
+    }
     else {
-
         # Shared thread
-        #print DBG "SHARED THREAD : SELF caller $self_caller|",
+        print DBG "SHARED THREAD : SELF caller $self_caller|";
         #  ref $self_caller, "|$self_server\n";
         $initial_reference = 'Text::Editor::Easy'
 #if ( $self_caller eq 'Text::Editor::Easy::Async' );
 #    $initial_reference = $self_caller;
 #}
     }
+    
+    
     $thread_knowledge{'instance'}{$initial_reference} = $self_server;
-    #print DBG "On met $self_server dans thread_knowledge de instance (tid ",
-    #  threads->tid, ") de $initial_reference\n";
+    print DBG "On met $self_server dans thread_knowledge de instance (tid ",
+      threads->tid, ") de $initial_reference\n";
     $thread_knowledge{'self_server'} = $self_server;
 
     return $self_server;
@@ -1640,14 +1672,14 @@ sub execute_task {
     my ( $call, $self_server, $method, $call_id, $reference, @param ) = @_;
 
     print DBG "Appel request2: ", threads->tid, "|$method|$call_id|$reference|context $param[0]\n";
-    my $initial_reference_ref = $thread_knowledge{'instance'};
+    my $reference_ref = $thread_knowledge{'instance'};
 
     my $string =
         "CLES de \$thread_knowledge{'instance'} : "
       . threads->tid
       . " ($method) dans execute_task\n";
-    for my $key ( keys %$initial_reference_ref ) {
-        $string .= "\t$key|" . $initial_reference_ref->{$key} . "|\n";
+    for my $key ( keys %$reference_ref ) {
+        $string .= "\t$key|" . $reference_ref->{$key} . "|\n";
     }
     print DBG $string;
     
@@ -1656,18 +1688,18 @@ sub execute_task {
       #if ( $reference eq 'Text::Editor::Easy::Async' );
 
     # Problème sous Windows, undef obligatoire (bug perl ?)
-    my $method_ref = undef
-      ;    # Bug subtil sans le "= undef" ... ==> parfois défini et tout déconne
+    # Bug subtil sans le "= undef" ... ==> parfois défini et tout déconne
+    my $method_ref = undef;
 
-    #my $object = $initial_reference_ref->{$reference};
-    my $object = $initial_reference_ref->{$reference};
+    #my $object = $reference_ref->{$reference};
+    my $object = $reference_ref->{$reference};
 
     #print DBG "On a récupéré ( tid ", threads->tid,
     #  ", méthode : $method) dans thread_knowledge de instance de $reference |";
     #print DBG "\$object défini => |$object" if ( defined $object );
     #print DBG "|\n";
     if ( defined $object ) {
-        #print DBG "Avant définition de \$method_ref\n";
+        print DBG "Avant définition de \$method_ref\n";
         $self_server = $object;
         $method_ref  = $ref_method{$method};
         #my $string = "Appel avec une référence initale |$method|";
@@ -1679,32 +1711,33 @@ sub execute_task {
         #print DBG $string;
     }
     else {
-        #print DBG "Appel avec autre ref : |$reference|$method\n";
+        print DBG "Appel avec autre ref : |$reference|$method\n";
 
 # Problème sous Linux ($method_ref devient défini de façon magique ?  bug perl ?)
         $method_ref = undef;
 
         if ( my $ref = $ref_method{$method} ) {
-            #print DBG "REF = $ref\n";
+            print DBG "REF = $ref\n";
             if ( my $other_ref = $ref->[OTHER] ) {
+                print DBG "Référence trouvée\n";
                 $method_ref = $ref_method{$method}[OTHER]{$reference};
             }
         }
         if ( !defined $method_ref and $reference =~ /\D/ )
         {    # Méthode de classe non définie
                 # On force (héritage) Text::Editor::Easy pour la classe
-            #print DBG
-#"Dans manage_...2 : on force la méthode de classe Text::Editor::Easy pour $method\n";
-            if ( $initial_reference_ref->{'Text::Editor::Easy'} )
+            print DBG
+"Dans manage_...2 : on force la méthode de classe Text::Editor::Easy pour $method\n";
+            if ( $reference_ref->{'Text::Editor::Easy'} )
             {    # Shared thread
                 $method_ref = $ref_method{$method};
-#                print DBG
-#"méthode de classe Text::Editor::Easy trouvée en standard...$method_ref\n";
+                print DBG
+"méthode de classe Text::Editor::Easy trouvée en standard...$method_ref\n";
             }
             elsif ( my $ref = $ref_method{$method} ) {    # Owned thread
-                #print DBG "OWNED THREAD...\n";
+                print DBG "OWNED THREAD...\n";
                 if ( my $other_ref = $ref->[OTHER] ) {
-                    #print DBG "Trouvé other_ref : $other_ref pout $method\n";
+                    print DBG "Trouvé other_ref : $other_ref pout $method\n";
                     $method_ref = $other_ref->{'Text::Editor::Easy'};
                 }
             }
@@ -1716,7 +1749,7 @@ sub execute_task {
     {    # Methode de thread : eval, add_method, overload_method ...
          # Tester l'appartenance à un sous-ensemble de méthodes autorisées => il ne faut pas lancer n'importe quoi
          # en cas d'erreur réelle
-        #print DBG "Appel d'une fonction non définie par défaut : $method\n";
+        print DBG "Appel d'une fonction non définie par défaut : $method\n";
         
         if ( $method !~ /::/ and ! $com_method{$method} ) {
             # La méthode est donnée sans nom de package

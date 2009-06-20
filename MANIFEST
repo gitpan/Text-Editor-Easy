@@ -10,6 +10,7 @@ demo1.pl
 demo10.pl
 demo11.pl
 demo12.pl
+demo13.pl
 demo2.pl
 demo3.pl
 demo4.pl
@@ -61,6 +62,7 @@ t/class_thread_creation.t
 t/events.t
 t/insert.t
 t/insert_mode.t
+t/instance_thread_add_method.t
 t/instance_thread_add_object.t
 t/instance_thread_creation.t
 t/multiplexed_thread_creation.t

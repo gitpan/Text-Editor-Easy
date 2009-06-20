@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 =head1 WHY ANOTHER EDITOR ?
 
@@ -406,7 +406,7 @@ might be useful to have 'prints' from further BEGIN blocs (other 'use' calls...)
 analysis...
 
 So, the 'configure' class method accepts a hash as single parameter. The 'configure' method can be called
-automatically with the 'use' syntax : the 'use' parameter is the same as the configure method.
+automatically with the 'use' syntax : the 'use' parameter is the same as the one in the configure method.
 
 For the 'trace mecanism', only the 'trace' key is used. The value of this key is another hash. This inside
 hash accepts 'print' and 'full' keys :
@@ -448,7 +448,7 @@ or trace them independantly (trace 'Foo.pm' and 'Bar.pm' only).
 
 =item *
 
-There can be 'redirection sequences' in order to debug a special funtion of 
+There can be 'redirection sequences' in order to debug a special function of 
 the module : in this case, a new single file will contain the 'debug prints'
 of the function and for only one call. After the sequence, prints are made
 as usual on the global 'debug file' of the module.
@@ -520,6 +520,10 @@ sub import {
     
     if ( defined $shortcut ) {
         eval "package $shortcut;our \@ISA = 'Text::Editor::Easy'";
+    }
+    
+    if ( defined $options_ref ) {
+        Text::Editor::Easy->configure( $options_ref );
     }
 }
 

@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.47
+Version 0.48
 
 =cut
 
@@ -21,6 +21,10 @@ if ( ! -d 'tmp' ) {
     print STDERR "Need a tmp directory under your current directory : can't go on\n";
     exit 1;
 }
+
+my %demo = (
+    'demo12.pl' => 1,
+);
 
 sub demo8 {
     my $editor = Text::Editor::Easy->whose_name('demo8.pl');
@@ -50,7 +54,7 @@ autoflush EXEC;
 
 # List of main tab files (loading delayed)
 my @files_session;
-for my $demo ( 1 .. 11 ) {
+for my $demo ( 1 .. 12 ) {
     $file_name = "${file_path}demo${demo}.pl";
     push @files_session,
       {
@@ -153,6 +157,7 @@ sub main {
         }
     );
     Editor->ask_thread('add_thread_method', $tab_tid,
+    #Text::Editor::Easy->ask_thread('add_thread_method', $tab_tid,
         {
                 'use' => 'Text::Editor::Easy::Program::Tab',
                 'package' => 'Text::Editor::Easy::Program::Tab',
@@ -298,7 +303,7 @@ sub main {
     my $who = Editor->new(
         {
             'zone'        => $zone3,
-            'name'        => 'stack_calls',
+            'name'        => 'call_stack',
             'events' => {
                 'motion' => {
                     'use'     => 'Text::Editor::Easy::Motion',
@@ -372,7 +377,7 @@ sub main {
                     'use'     => 'Text::Editor::Easy::Program::Search',
                     'package' => 'Text::Editor::Easy::Program::Search',
                     'sub'     => 'modify_pattern',
-                    'thread' => 'Motion',
+                    'thread' => 'Macro',
                     'init' => [ 'Text::Editor::Easy::Program::Search::init_eval', $out->id ],
                 }
             },
@@ -410,6 +415,8 @@ sub main {
     }
 }
 
+
+
 sub launch {
     # Appui sur F5
     my ($self) = @_;
@@ -421,10 +428,11 @@ sub launch {
         or $file_name eq 'demo9.pl'
         or $file_name eq 'demo10.pl' )
     {
+        Editor->whose_name('Eval')->on_top;
         my $macro_instructions;
         if ( $file_name eq 'demo7.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
-my $editor = Text::Editor::Easy->whose_name('stack_calls');
+my $editor = Text::Editor::Easy->whose_name('call_stack');
 $editor->empty;
 $editor->deselect;
 my @lines = $editor->insert("Hello world !\nIs there anybody ? body dy dy y ...");
@@ -437,7 +445,7 @@ END_PROGRAM
         }
         elsif ( $file_name eq 'demo8.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
-my $editor = Text::Editor::Easy->whose_name('stack_calls');
+my $editor = Text::Editor::Easy->whose_name('call_stack');
 $editor->add_method('demo8');
 print $editor->demo8(4, "bof");
 END_PROGRAM
@@ -453,7 +461,7 @@ $line->select($start, $end);
 $editor->visual_search( $regexp, $line, $end);
 END_PROGRAM
 
-            my $editor = Editor->whose_name('stack_calls');
+            my $editor = Editor->whose_name('call_stack');
             $editor->empty;
             my @exp = ( 
                 'qr/e.+s/', 
@@ -473,7 +481,7 @@ END_PROGRAM
             $self->bind_key({ 'package' => 'main', 'sub' => 'up_demo9', 'key' => 'Up' } );
             $self->bind_key({ 'package' => 'main', 'sub' => 'down_demo9', 'key' => 'Down' } );
         }
-        else { #demo10.pl
+        elsif ( $file_name eq 'demo10.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
 for my $demo ( 1 .. 6 ) {
     print "demo$demo.pl\n";
@@ -487,6 +495,18 @@ END_PROGRAM
         $eval_editor->empty;
         $eval_editor->insert($macro_instructions);
         return;
+    }
+    if ( $demo{$file_name} ) {
+        print "Dans le traitement spécifique\n";
+        my $hash_ref = do "${file_path}$file_name";
+        print $@ if ( $@ );
+        $hash_ref->{'F5'}->( $self, $hash_ref );
+        print "Fin du traitement spécifique\n";
+        return;
+    }
+    else { 
+        print "file_name = $file_name\n";
+        print "demo{$file_name} = $demo{$file_name}\n";
     }
     if ( defined $file_name ) {
         #print "fichier $file_name\n";
@@ -540,7 +560,7 @@ sub demo8 {
 }
 
 sub up_demo9 {
-    my $editor = Editor->whose_name('stack_calls');
+    my $editor = Editor->whose_name('call_stack');
     my ( $line ) = $editor->cursor->get;
     #print "Dans up_demo9 : trouvé $line | ", $line->text, "\n";
     if ( my $previous = $line->previous ) {
@@ -552,7 +572,7 @@ sub up_demo9 {
 }
 
 sub down_demo9 {
-    my $editor = Editor->whose_name('stack_calls');
+    my $editor = Editor->whose_name('call_stack');
     my ( $line ) = $editor->cursor->get;
     #print "Dans down_demo9 : trouvé $line | ", $line->text, "\n";
     if ( my $next = $line->next ) {

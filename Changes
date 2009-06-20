@@ -1,6 +1,13 @@
 Revision history for Text-Editor-Easy
 
 --------------------------+
+0.48  : 20 June 2009      !
+--------------------------+
+    - Dynamic event management, continued :
+        - code can be written on the fly and used to manage the events ('dynamic designing')
+         => demo 12 added.
+
+--------------------------+
 0.47  : 29 May 2009       !
 --------------------------+
     - true initialization made with a 'use Text::Editor::Easy;' :
