@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Tab - Tab simulation with a Text::Editor::Easy obje
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Text::Editor::Easy::Comm;
 
@@ -147,12 +147,6 @@ sub new_on_top {
    #print "Création d'un éditeur par motion sur tab : ", dump ($file_ref), "\n";
         return if ( !$file_ref->{'zone'} );
         $file_ref->{'focus'} = 'yes';
-        $file_ref->{'events'} = {
-            'motion' => { 
-                'action' => 'nop',
-                'thread' => 'Motion',
-            },
-        };
         #$new_on_top = Text::Editor::Easy->new($file_ref);
 
 # Appel asynchrone obligatoire : la création d'un éditeur peut obliger le thread 0 à appeler le thread motion
@@ -169,7 +163,7 @@ sub new_on_top {
             $new_on_top->async->focus;
         }
         else {
-            $new_on_top->async->on_top;
+            $new_on_top->async->at_top;
         }
     }
 }

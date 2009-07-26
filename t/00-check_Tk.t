@@ -15,7 +15,7 @@ while ( <TK> ) {
     if ( /couldn't connect to display/ ) {
         kill $pid;
 	    print "In parent, received $_";
-	    print STDERR "Tk is not working properly : server X is not started or DISPLAY variable is unfit";
+	    print STDERR "Tk is not working properly : server X is not started or DISPLAY variable is unfit\n";
 	    exit 0;
     }
     if ( /TK is OK/ ) {

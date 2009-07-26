@@ -10,7 +10,7 @@ Editor.pl - An editor written using Text::Editor::Easy objects.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
@@ -23,6 +23,9 @@ if ( ! -d 'tmp' ) {
 }
 
 my %demo = (
+    'demo7.pl'  => 1,
+    'demo9.pl'  => 1,
+    'demo10.pl' => 1,
     'demo12.pl' => 1,
 );
 
@@ -35,6 +38,7 @@ sub demo8 {
     #print "End of execution\n";
 }
 
+sub main;
 
 use Text::Editor::Easy { 
     'trace' => {
@@ -51,6 +55,15 @@ my ( $file_name, $file_path ) = fileparse($0);
 # Start of launching perl process (F5 key management)
 open EXEC, "| perl ${file_path}exec.pl" or die "Fork impossible\n";
 autoflush EXEC;
+
+Text::Editor::Easy->set_event(
+    'motion',
+    {
+        'action' => 'nop',
+        'thread' => 'Motion',
+    },
+    { 'values' => 'undefined' }
+);
 
 # List of main tab files (loading delayed)
 my @files_session;
@@ -251,12 +264,6 @@ sub main {
     );
     my $new_ref = $files_session[$main_tab_info_ref->{'selected'}];
     $new_ref->{'focus'} = 'yes';
-    $new_ref->{'events'} = {
-        'motion' => { 
-            'action' => 'nop',
-            'thread' => 'Motion',
-        },
-    };
 			
     Editor->new( $new_ref );
 
@@ -369,10 +376,6 @@ sub main {
                 'sub'     => 'syntax',
             },
            'events' => {
-                'motion' => { 
-                    'action' => 'nop',
-                    'thread' => 'Motion',
-                },
                 'change' => {
                     'use'     => 'Text::Editor::Easy::Program::Search',
                     'package' => 'Text::Editor::Easy::Program::Search',
@@ -422,72 +425,16 @@ sub launch {
     my ($self) = @_;
 
     my $file_name = $self->file_name;
-    #print "In sub 'launch' : $self|$file_name\n";
-    if (   $file_name eq 'demo7.pl'
-        or $file_name eq 'demo8.pl'
-        or $file_name eq 'demo9.pl'
-        or $file_name eq 'demo10.pl' )
+
+    if (   $file_name eq 'demo8.pl' )
     {
-        Editor->whose_name('Eval')->on_top;
+        Editor->whose_name('Eval')->at_top;
         my $macro_instructions;
-        if ( $file_name eq 'demo7.pl' ) {
-            $macro_instructions = << 'END_PROGRAM';
-my $editor = Text::Editor::Easy->whose_name('call_stack');
-$editor->empty;
-$editor->deselect;
-my @lines = $editor->insert("Hello world !\nIs there anybody ? body dy dy y ...");
-print "\nWritten lines :\n\t", join ("\n\t", @lines), "\n";
-$editor->insert ("\n\n\n\n" . $lines[0]->text);
-my $next = $lines[0]->next;
-print "\nNEXT LINE =\n\n", $next->text;
-$next->select;
-END_PROGRAM
-        }
-        elsif ( $file_name eq 'demo8.pl' ) {
+        if ( $file_name eq 'demo8.pl' ) {
             $macro_instructions = << 'END_PROGRAM';
 my $editor = Text::Editor::Easy->whose_name('call_stack');
 $editor->add_method('demo8');
 print $editor->demo8(4, "bof");
-END_PROGRAM
-        }
-        elsif ( $file_name eq 'demo9.pl' ) {
-            $macro_instructions = << 'END_PROGRAM';
-my $editor = Text::Editor::Easy->whose_name('demo9.pl');
-my $exp = qr/e.+s/;
-my ( $line, $start, $end, $regexp ) = $editor->search($exp);
-$editor->deselect;
-return if ( ! defined $line );
-$line->select($start, $end);
-$editor->visual_search( $regexp, $line, $end);
-END_PROGRAM
-
-            my $editor = Editor->whose_name('call_stack');
-            $editor->empty;
-            my @exp = ( 
-                'qr/e.+s/', 
-                'qr/e.+?s/', 
-                '\'is\'', 
-                'qr/\\bis\\b/', 
-                'qr/F.*n/', 
-                'qr/F.*n/i', 
-                'qr/f[er]+[^e]+/'
-            );
-            for ( @exp ) {
-                    $editor->insert( "$_\n");
-            }
-            my $first = $editor->number(1);
-            $first->select;
-            $editor->cursor->set( 0, $first);
-            $self->bind_key({ 'package' => 'main', 'sub' => 'up_demo9', 'key' => 'Up' } );
-            $self->bind_key({ 'package' => 'main', 'sub' => 'down_demo9', 'key' => 'Down' } );
-        }
-        elsif ( $file_name eq 'demo10.pl' ) {
-            $macro_instructions = << 'END_PROGRAM';
-for my $demo ( 1 .. 6 ) {
-    print "demo$demo.pl\n";
-    Text::Editor::Easy->on_editor_destroy('zone1', "demo${demo}.pl");
-}
-Text::Editor::Easy->restart;
 END_PROGRAM
         }
 
@@ -497,16 +444,10 @@ END_PROGRAM
         return;
     }
     if ( $demo{$file_name} ) {
-        print "Dans le traitement spécifique\n";
         my $hash_ref = do "${file_path}$file_name";
         print $@ if ( $@ );
         $hash_ref->{'F5'}->( $self, $hash_ref );
-        print "Fin du traitement spécifique\n";
         return;
-    }
-    else { 
-        print "file_name = $file_name\n";
-        print "demo{$file_name} = $demo{$file_name}\n";
     }
     if ( defined $file_name ) {
         #print "fichier $file_name\n";
@@ -546,7 +487,6 @@ END_PROGRAM
             $out_editor->empty;
             $out_editor->set_at_end;
         }
-
     }
 }
 
@@ -557,41 +497,6 @@ sub demo8 {
     return $sub_ref->(@_);
 
     #print "End of execution\n";
-}
-
-sub up_demo9 {
-    my $editor = Editor->whose_name('call_stack');
-    my ( $line ) = $editor->cursor->get;
-    #print "Dans up_demo9 : trouvé $line | ", $line->text, "\n";
-    if ( my $previous = $line->previous ) {
-        $editor->deselect;
-        my $exp = $previous->select;
-        $editor->cursor->set(0, $previous);
-        new_search ( $exp );
-    }
-}
-
-sub down_demo9 {
-    my $editor = Editor->whose_name('call_stack');
-    my ( $line ) = $editor->cursor->get;
-    #print "Dans down_demo9 : trouvé $line | ", $line->text, "\n";
-    if ( my $next = $line->next ) {
-        $editor->deselect;
-        my $exp = $next->select;
-        $editor->cursor->set(0, $next);
-        new_search ( $exp );
-    }
-}
-
-sub new_search {
-    my ( $exp ) = @_;
-
-    my $macro_ed = Editor->whose_name('macro');
-    
-    # Hoping the automatic inserted lines are still there and in the right order !
-    # ==> the line number 2 of the macro editor will be set to "my \$exp = $exp;" and this will cause
-    # new execution of the macro instructions
-    $macro_ed->number(2)->set("my \$exp = $exp;");
 }
 
 sub restart {

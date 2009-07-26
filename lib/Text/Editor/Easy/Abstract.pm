@@ -11,11 +11,11 @@ Text::Editor::Easy::Abstract - The module that manages everything that is displa
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 =head1 SYNOPSIS
 
@@ -36,7 +36,7 @@ more explanations about the object interface.
 There are 2 (or 3 if we include the L<Text::Editor::Easy::File_manager> module) complex modules in the "Text::Editor::Easy" tree.
 This module and the L<Text::Editor::Easy::Comm> which handles communication between threads.
 
-If you create a "Text::Editor::Easy" object, this module will be called very often. Lots of methods are
+If you create a "Text::Editor::Easy" object, this 'Abstract' module will be called very often. Lots of methods are
 redirected here (but you don't even have to know that this module exists).
 
 At the beginning (in 2006), there was only this "module-program". Little by little, this module has grown and
@@ -180,6 +180,7 @@ use constant {
     SELECTION => 17,
     AT_END => 18,
     EVENTS => 19,
+    SEQUENCES => 20,
 };
 
 use Text::Editor::Easy::Key;
@@ -274,18 +275,22 @@ my %key = (
     'alt_F4' => \&Text::Editor::Easy::Abstract::exit,
 );
 
+Text::Editor::Easy::Comm::manage_debug_file( __PACKAGE__, *DBG );
+
 my %color;
 my @window; # For now, only one window managed (the main window)
 my $window_destroyed;
 
 # A une référence d'éditeur unique, on fait correspondre un objet Abstract
 my %abstract;
-
+my $pointed_by_mouse;
 my %zone_events;
 my %use;
 
 sub new {
     my ( $classe, $hash_ref, $editor, $id ) = @_;
+    
+    print DBG "Dans new de Abstract, classe $classe, id = $id\n";
 
     #print "Dans Abstract::new : force_resize = $force_resize\n";
 
@@ -307,6 +312,7 @@ sub new {
 
     #print "Création dans abstract growing = ", $hash_ref->{'growing'}, "\n";
     $edit_ref->[EVENTS] = $hash_ref->{'events'};
+    $edit_ref->[SEQUENCES] = $hash_ref->{'sequences'};
 
     $abstract{$id} = $edit_ref;
 
@@ -356,8 +362,10 @@ sub new {
             'motion'                  => \&motion,
             'drag'                     => \&drag,
             'resize'                      => \&resize,
-            'key_press'                   => \&key_press,
-            'mouse_wheel_event'           => \&mouse_wheel_event,
+            'key_press'                   => \&key,
+            'mouse_wheel_event'           => \&wheel,
+            'double_clic'                 => \&double_clic,
+            'right_clic'                 => \&right_clic,
 
             #'key_release' => \&key_release,
             %{$hash_ref},
@@ -736,8 +744,9 @@ sub create_text_in_line {
 
     my $total_letters = 0;
   ELT: for my $element_ref (@text_element) {
-        my $text_ref
-          ; # Cette variable est locale, mais elle subsitera après le 'for' (références créées)
+        
+        my $text_ref;
+         # Cette variable est locale, mais elle subsitera après le 'for' (références créées)
 
         $text_ref->[TEXT] = $element_ref->[0];
         if (    ( length( $text_ref->[TEXT] ) == 0 )
@@ -1116,11 +1125,96 @@ sub suppress_text {
 # Hash of default labels
 
 my %label = (
-    'calc_line_pos' => \&calc_line_pos,
-    'init_resize'   => \&init_resize,
-    'zone_resize'   => \&zone_resize,
-    'select'        => \&drag_select,
+    '_calc_line_pos' => \&calc_line_pos,
+    '_test_resize'   => \&test_resize,
+    '_set_cursor'    => \&set_cursor,
+    '_update_cursor' => \&update_cursor,
+    '_show_editor'   => \&show_editor,
+    '_zone_resize'   => \&zone_resize,
+    '_drag_select'   => \&drag_select,
+    '_wheel_move'    => \&wheel_move,
+    '_key_code'      => \&key_code,
+    '_key_default'   => \&key_default,
+    '_exit',         => \&sequence_exit,
+    '_jump',         => \&jump,
 );
+
+sub jump {
+    my ( $self, $info_ref ) = @_;
+    
+    my $jump = $info_ref->{'jump'};
+    if ( defined $jump ) {
+        return ( $info_ref, $jump );
+    }
+    return ( $info_ref, q{} );
+}
+
+sub manage_sequence {
+    my ( $edit_ref, $info_ref, $name, $default_ref ) = @_;
+    
+    my $sequence_ref = $default_ref;
+    my $forced_ref = $edit_ref->[SEQUENCES]{$name};
+    if ( defined $forced_ref and ref $forced_ref eq 'ARRAY' ) {
+        $sequence_ref = $forced_ref;
+    }
+    execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
+}
+
+sub execute_sequence {
+    my ( $edit_ref, $sequence_ref, $info_ref ) = @_;
+
+    return if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' );
+
+    my $event_ref = $edit_ref->[EVENTS];
+    my $editor = $edit_ref->[PARENT];
+    my $label = q{}; # Avoid warning when testing undef value
+
+    for my $step ( @$sequence_ref ) {
+        #print STDERR "SEQUENCE $step\n";
+        if ( ! ref $step ) {        
+            if ( $label and $step ne $label ) {
+                next;
+            }
+            my $sub_ref = undef;
+            if ( $step =~ /^_/ ) {
+                $sub_ref = $label{$step};
+            
+                return ($info_ref, q{}) if ( ! defined $sub_ref );
+                
+                # Séquence nommée
+                ( $info_ref, $label ) = $sub_ref->( $edit_ref, $info_ref );
+                return ( undef, $label ) if ( ! defined $info_ref );
+                
+            }
+            elsif ( my $event = $event_ref->{$step} ) {
+                $info_ref->{'label'} = $step;
+                ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
+                if ( ref $label ) {
+                    ( $info_ref, $label ) = execute_sequence ( $edit_ref, $label, $info_ref );
+                }
+                return ( undef, $label ) if ( ! defined $info_ref );
+            }
+            else {
+                $label = q{};
+            }
+        }
+        else {
+            next if ( ref $step ne 'HASH' );
+            my $dyn_label = $step->{'label'};
+            next if ( $label and ( ! defined $dyn_label or $dyn_label ne $label ) );
+            # Séquence dynamique : faire un reference_event suivi d'un execute_event
+            # Tester aussi le libellé $step->{'label'}
+        }
+    }
+    return ( $info_ref, $label );
+}
+
+sub wheel_move {
+    my ( $edit_ref, $info_ref ) = @_;
+    
+    screen_move( $edit_ref, 0, $info_ref->{'move'} );
+    return ( $info_ref, q{} );
+}
 
 sub calc_line_pos {
    my ( $edit_ref, $info_ref ) = @_;
@@ -1136,144 +1230,204 @@ sub calc_line_pos {
     return ( $info_ref, q{} );
 }
 
-sub clic {
+sub update_cursor {
     my ( $edit_ref, $info_ref ) = @_;
+
+    my $x = $info_ref->{'x'};
+    my $y = $info_ref->{'y'};
+    
+    if ( $x < 5 or $x > ( $edit_ref->[SCREEN][WIDTH] - 5 ) ) {
+        #print "Il faut changer le curseur\n";
+        cursor_set_shape ( $edit_ref, 'sb_h_double_arrow' );
+    }
+    elsif ( $y < 5 or $y > ( $edit_ref->[SCREEN][HEIGHT] - 5 ) ) {
+        cursor_set_shape ( $edit_ref, 'sb_v_double_arrow' );
+    }
+    else {
+        cursor_set_shape ( $edit_ref, 'arrow' );
+    }
+
+    return ( $info_ref, q{} );
+}
+
+sub show_editor {
+    my ( $edit_ref, $info_ref ) = @_;
+
+    make_visible( $edit_ref );
+
+    return ( $info_ref, q{} );
+}
+
+sub wheel {
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
+
+    $edit_ref = $pointed_by_mouse if ( defined $pointed_by_mouse );
+    # Un peu trop lié à Tk... à revoir
+    $info_ref->{'move'} = ( 3 * $info_ref->{'unit'} * $edit_ref->[SCREEN][LAST][HEIGHT] ) / 120;
+
+    my $meta = $info_ref->{'meta'};
+    $info_ref->{'true'} = $meta . 'wheel';
+    
+    my $caller = Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[ID], 
+        "User rolls the mouse wheel",
+        $info_ref
+    );
+    $info_ref->{'caller'} = $caller;
+
+    if ( defined $sequence_ref and ref $sequence_ref eq 'ARRAY' ) {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
+    }
+    elsif ( $meta ) {
+        manage_sequence( $edit_ref, $info_ref, "${meta}wheel", [ 'any_wheel', "${meta}wheel" ] );
+    }
+    else {
+        manage_sequence( $edit_ref, $info_ref, 'wheel', [ 'any_wheel', 'wheel', '_wheel_move', 'after_wheel' ] );
+    }
+    return $caller;
+}
+
+sub test_resize {
+    my ( $edit_ref, $info_ref ) = @_;
+    
+    my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;
+
+    if ( defined $shape and $shape =~ /^sb/ ) {
+        # start of drag sequence for resize according to cursor shape
+        if ( $shape eq 'sb_h_double_arrow' ) {
+            if ( $info_ref->{'x'} < 5 ) {
+                $edit_ref->[CURSOR][RESIZE] = 'left';
+            }
+            else {
+                $edit_ref->[CURSOR][RESIZE] = 'right';
+            }
+        }
+        else {
+            if ( $info_ref->{'y'} < 5 ) {
+                $edit_ref->[CURSOR][RESIZE] = 'top';
+            }
+            else {
+                $edit_ref->[CURSOR][RESIZE] = 'bottom';
+            }
+        }
+        $info_ref->{'resize'} = 1;
+        return ($info_ref, 'any_after_clic');
+    }
+    return ( $info_ref, q{} );
+}
+
+sub set_cursor {
+    my ( $edit_ref, $info_ref ) = @_;
+    
+    cursor_set( $edit_ref, $info_ref->{'pos'}, $info_ref->{'line'} );
+    $edit_ref->[GRAPHIC]->canva_focus;
+    Text::Editor::Easy::Abstract::Key::delete_start_selection_point ( $edit_ref );
+    cursor_make_visible($edit_ref);
+    
+    return ( $info_ref, q{} );
+}
+
+sub double_clic {
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
 
     my $x     = $info_ref->{'x'};
     my $y     = $info_ref->{'y'};
     my $meta = $info_ref->{'meta'};
     
+    my $name = $meta . 'double_clic';
+    $info_ref->{'true'} = $name;
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
         $edit_ref->[ID], 
-        "User clicked at X = $x and Y = $y", {
-            'x' => $x,
-            'y' => $y,
-            'meta' => $meta,
-        }
+        "User double-clicked at X = $x and Y = $y",
+        $info_ref,
+    );
+    if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' ) {
+        $sequence_ref = [ 'calc_line_pos', 'any_any_clic', 'any_double_clic', "${meta}double_clic" ];
+        manage_sequence( $edit_ref, $info_ref, $name, $sequence_ref );
+    }
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
+    }
+}
+
+sub right_clic {
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
+
+    my $x     = $info_ref->{'x'};
+    my $y     = $info_ref->{'y'};
+    my $meta = $info_ref->{'meta'};
+    
+    my $name = $meta . 'right_clic';
+    $info_ref->{'true'} = $name;
+    $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[ID], 
+        "User right-clicked at X = $x and Y = $y",
+        $info_ref,
+    );
+    if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' ) {
+        $sequence_ref = [ 'calc_line_pos', 'any_any_clic', 'any_right_clic', "${meta}right_clic" ];
+        manage_sequence( $edit_ref, $info_ref, $name, $sequence_ref );
+    }
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
+    }
+}
+
+sub clic {
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
+
+    my $x     = $info_ref->{'x'} || 0; # Valeur 0 inutile.. àterme
+    my $y     = $info_ref->{'y'} || 0; # Valeur 0 inutile.. àterme
+    my $meta = $info_ref->{'meta'} || '';
+    
+    my $name = $meta . 'clic';
+    $info_ref->{'true'} = $name;
+    $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
+        $edit_ref->[ID], 
+        "User clicked at X = $x and Y = $y",
+        $info_ref
     );
 
-    if ( $origin eq 'graphic' and !$sub_origin ) {
-        $sub_origin = 'clic';
-    }
-
-    my $editor = $edit_ref->[PARENT];
-    my $event_ref = $edit_ref->[EVENTS];
-    my $label = q{}; # Avoid warning when testing undef value
-
-    my $step = 'any_hard_clic';
-    if ( my $event = $event_ref->{$step} ) {
-        ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-        return if ( ! defined $info_ref );
-        $meta = $info_ref->{'meta'};
-    }
-
-    $step = "${meta}hard_clic";
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
+    if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' ) {
+        if ( $meta ) {
+            $sequence_ref = [ 
+                '_calc_line_pos', 
+                'any_any_clic',
+                'any_clic',
+                "${meta}clic",
+                'any_after_clic',
+            ];
         }
-    }
-
-    $x = $info_ref->{'x'};
-    $y = $info_ref->{'y'};
-
-    # Default 'hard_clic' management
-    if ( ( ! $label and ! $meta ) or $label eq 'hard_clic' ){
-        $label = q{};
-        my $shape = $edit_ref->[GRAPHIC]->cursor_get_shape;
-
-        if ( defined $shape and $shape =~ /^sb/ ) {
-            # start of drag sequence for resize according to cursor shape
-            if ( $shape eq 'sb_h_double_arrow' ) {
-                if ( $info_ref->{'x'} < 5 ) {
-                    $edit_ref->[CURSOR][RESIZE] = 'left';
-                }
-                else {
-                    $edit_ref->[CURSOR][RESIZE] = 'right';
-                }
-            }
-            else {
-                if ( $info_ref->{'y'} < 5 ) {
-                    $edit_ref->[CURSOR][RESIZE] = 'top';
-                }
-                else {
-                    $edit_ref->[CURSOR][RESIZE] = 'bottom';
-                }
-            }
-            return;
+        else {
+            $sequence_ref = [ 
+                '_calc_line_pos', 
+                'any_any_clic',
+                'any_clic',
+                'clic',
+                '_test_resize',
+                '_set_cursor',
+                'any_after_clic',
+                'after_clic',
+            ];
         }
-    }
-    
-    # Computing new info_ref ...
-    # ... unless info_ref is already provided by a jump in a former event
-    if ( ! $label or $label eq $step ) {
-        # Changing info_ref content
-        $label = q{};
-        my $line_ref = get_line_ref_from_ord( $edit_ref, $info_ref->{'y'} );
-        my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $info_ref->{'x'} );
-        while ( $line_ref->[PREVIOUS_SAME] ) {
-            $line_ref = $line_ref->[PREVIOUS];
-            $pos += length ( $line_ref->[TEXT] );
-        }
-        $info_ref->{'line'} = $line_ref->[REF];
-        $info_ref->{'pos'} = $pos;
-    }
-    
-    $step = 'any_clic';
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    $step = "${meta}clic";
-    if ( ! $label or $label eq $step ) {
-        #print "step = $step\n";
-        if ( my $event = $event_ref->{$step} ) {
-            #print "Un évènement ${meta}clic défini...\n";
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    # Default clic management
-    if ( ( ! $label and ! $meta ) or $label eq 'clic' ){
-        $label = q{};
-        cursor_set( $edit_ref, $info_ref->{'pos'}, $info_ref->{'line'} );
-        $edit_ref->[GRAPHIC]->canva_focus;
-        Text::Editor::Easy::Abstract::Key::delete_start_selection_point ( $edit_ref );
-        cursor_make_visible($edit_ref);
-    }
-    
-    $step = 'any_after_clic';
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    $step = "${meta}after_clic";
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            execute_events( $event, $editor, $info_ref );
-        }
+        manage_sequence( $edit_ref, $info_ref, $name, $sequence_ref );
+    } 
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
     }
 }
 
 sub motion {
-    my ( $edit_ref, $info_ref ) = @_;
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
+    
+    $pointed_by_mouse = $edit_ref;
     
     my $x     = $info_ref->{'x'};
     my $y     = $info_ref->{'y'};
-    my $meta = $info_ref->{'meta'};
+    my $meta = $info_ref->{'meta'} || '';
     
+    my $name = $meta . 'motion';
+    $info_ref->{'true'} = $name;
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
         $edit_ref->[ID], 
         "User moved mouse to X = $x and Y = $y", {
@@ -1283,99 +1437,44 @@ sub motion {
         }
     );
 
-    if ( $origin eq 'graphic' and ! $sub_origin ) {
-        $sub_origin = 'motion';
-    }
-
-    my $editor = $edit_ref->[PARENT];
-    my $event_ref = $edit_ref->[EVENTS];
-    my $label = q{}; # Avoid warning when testing undef value
-
-    my $step = 'any_hard_motion';
-    if ( my $event = $event_ref->{$step} ) {
-        ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-        return if ( ! defined $info_ref );
-        $meta = $info_ref->{'meta'};
-    }
-
-    if ( ! $label or $label eq 'any_hard_motion' ){
-        make_visible( $edit_ref );
-    }
-
-    $meta = $info_ref->{'meta'};
-    $step =  $meta . 'hard_motion';
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    $x = $info_ref->{'x'};
-    $y = $info_ref->{'y'};
-
-    # Default 'hard_motion' management
-    if ( ( ! $label and ! $meta ) or $label eq 'hard_motion' ){
-        $label = q{};
-        if ( $x < 5 or $x > ( $edit_ref->[SCREEN][WIDTH] - 5 ) ) {
-            #print "Il faut changer le curseur\n";
-            cursor_set_shape ( $edit_ref, 'sb_h_double_arrow' );
-        }
-        elsif ( $y < 5 or $y > ( $edit_ref->[SCREEN][HEIGHT] - 5 ) ) {
-            cursor_set_shape ( $edit_ref, 'sb_v_double_arrow' );
+    if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' ) {
+        if ( $meta ) {
+            $sequence_ref = [ 
+                '_calc_line_pos', 
+                'any_motion',
+                "${meta}motion",
+                'any_after_motion',
+            ];
         }
         else {
-            cursor_set_shape ( $edit_ref, 'arrow' );
+            $sequence_ref = [ 
+                '_calc_line_pos', 
+                'any_motion',
+                'motion',
+                '_show_editor',
+                '_update_cursor',
+                'any_after_motion',
+                'after_motion',
+            ];
         }
+        manage_sequence( $edit_ref, $info_ref, $name, $sequence_ref );
+    }
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
     }
 
-    # Computing new info_ref ...
-    # ... unless info_ref is already provided by a jump in a former event
-    if ( ! $label or $label eq $step ) {
-        # Changing info_ref content
-        $label = q{};
-
-        my $line_ref = get_line_ref_from_ord( $edit_ref, $y );
-        my $pos = get_position_from_line_and_abs( $edit_ref, $line_ref, $x );
-        while ( $line_ref->[PREVIOUS_SAME] ) {
-            $line_ref = $line_ref->[PREVIOUS];
-            $pos += length( $line_ref->[TEXT] );
-        }
-
-        $info_ref->{'line'} = $line_ref->[REF];
-        $info_ref->{'pos'} = $pos;
-    }
-
-    $step = 'any_motion';
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    $step = "${meta}motion";
-    if ( ! $label or $label eq $step ) {
-        #print "Evènement $step définir pour ", $editor->name, "\n";
-        if ( my $event = $event_ref->{$step} ) {
-            execute_events( $event, $editor, $info_ref );
-        }
-    }
-
-    return 'motion';
 }
 
 sub drag {
-    my ( $edit_ref, $info_ref ) = @_;
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
 
     $info_ref->{'shape'} = $edit_ref->[GRAPHIC]->cursor_get_shape;    
     my $x     = $info_ref->{'x'};
     my $y     = $info_ref->{'y'};
     
     my $meta = $info_ref->{'meta'};
-    ( $info_ref ) = calc_line_pos ( $edit_ref, $info_ref );
+    my $name = $meta . 'drag';
+    $info_ref->{'true'} = $name;
 
     $info_ref->{'caller'} = Text::Editor::Easy->trace_user_event( 
         $edit_ref->[ID], 
@@ -1385,51 +1484,30 @@ sub drag {
             'meta' => $meta,
         }
     );
-
-    my $editor = $edit_ref->[PARENT];
-    my $event_ref = $edit_ref->[EVENTS];
-    my $label = q{}; # Avoid warning when testing undef value
-    
-    my $step = 'any_drag';
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    $step = "${meta}drag";
-    if ( ! $label or $label eq $step ) {
-        if ( my $event = $event_ref->{$step} ) {
-            ( $info_ref, $label ) = execute_events( $event, $editor, $info_ref );
-            return if ( ! defined $info_ref );
-            $meta = $info_ref->{'meta'};
-        }
-    }
-
-    my @labels;
-    if ( ! ref $label and ! $meta ) {
-        @labels = ( 'zone_resize', 'select' );
-    }
-    
-    if ( ref $label ) {
-        if ( ref $label ne 'ARRAY' ) {
-            print STDERR "Label should be an array reference, drag event aborted\n";
-            return;
-        }
-        @labels = @$label;
-    }
-
-    for my $step ( @labels ) {
-        next if ( $label and $label ne $step );
-        $label = q{};
-        if ( $step =~ /drag$/ ) {
-            ( $info_ref, $label ) = test_events ( $edit_ref, $info_ref, $step );
+    if ( ! defined $sequence_ref or ref $sequence_ref ne 'ARRAY' ) {
+        if ( $meta ) {
+            $sequence_ref = [ 
+                '_calc_line_pos',
+                'any_drag', 
+                "${meta}drag",
+                'any_after_drag',
+            ];
         }
         else {
-            ( $info_ref, $label ) = $label{$step}->( $edit_ref, $info_ref );
+            $sequence_ref = [ 
+                '_calc_line_pos', 
+                'any_drag', 
+                'drag',
+                '_zone_resize',
+                '_drag_select',
+                'any_after_drag',
+                'after_drag',
+            ];
         }
+        manage_sequence( $edit_ref, $info_ref, $name, $sequence_ref );
+    } 
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
     }
 }
 
@@ -1446,6 +1524,7 @@ sub zone_resize {
             $edit_ref->[CURSOR][RESIZE],
             $info_ref,
         );
+        return ( $info_ref, 'any_after_drag' );
     }
     
     return ( $info_ref, q{} );
@@ -1465,6 +1544,11 @@ sub drag_select {
     if ( defined $shape and $shape !~ /^sb/ ) {
         Text::Editor::Easy::Abstract::Key::motion_select( $edit_ref, $info_ref );
     }
+    return ( $info_ref, q{} );
+}
+
+sub sequence_exit {
+    return;
 }
 
 sub deselect {
@@ -1808,64 +1892,57 @@ sub clear_screen {
     $edit_ref->[GRAPHIC]->clear_screen;
 }
 
-sub key_press {
-    my ( $edit_ref, $key, $ascii, $options_ref ) = @_;
+sub key {
+    my ( $edit_ref, $info_ref, $sequence_ref ) = @_;
+
+
+    #print STDERR "Dans l'évènement key de Abstract\n";
+    my $key   = $info_ref->{'key'};
 
     if ( $origin eq 'graphic' and !$sub_origin ) {
-        $sub_origin = 'key_press';
+        $sub_origin = 'key';
     }
 
     my $special;
-    #clear_screen ( $edit_ref );
-    #$edit_ref->[GRAPHIC]->clear_screen;
-    #print "KEY |$key| ASCII |", ord($ascii), "| CTRL |";
-    my $key_code;
-    if ( $options_ref->{'ctrl'} ) {
-
-        #print "OUI";
+    if ( $info_ref->{'meta_hash'}{'ctrl'} or $info_ref->{'meta_hash'}{'alt'} ) {
         $special = 1;
-        $key_code = 'ctrl';
     }
-    else {
-
-        #print "NON";
-    }
-
-    #print "| ALT |";
-    if ( $options_ref->{'alt'} ) {
-
-        #print "OUI";
-        $special = 1;
-        $key_code .= '_' if ($key_code);
-        $key_code .= 'alt';
-    }
-    else {
-
-        #print "NON";
-    }
-
-    #print "| SHIFT |";
-    if ( $options_ref->{'shift'} ) {
-
-        #print "OUI";
-        $key_code .= '_' if ($key_code);
-        $key_code .= 'shift';
-    }
-    else {
-
-        #print "NON";
-    }
-    $key_code .= '_' if ($key_code);
-    $key_code .= $key;
-
+    my $key_code = $info_ref->{'meta'} . $key;
+    $info_ref->{'key_code'} = $key_code;
+    $info_ref->{'true'} = $key_code . '_key';
     #print "KEY CODE : $key_code\n";
     #return;
-    Text::Editor::Easy->trace_user_event( 
+    my $caller = Text::Editor::Easy->trace_user_event( 
         $edit_ref->[ID],
         "User pressed key $key_code",
+        $info_ref
     );
     $sub_sub_origin = $key_code;
+    $info_ref->{'caller'} = $caller;
+    
+    if ( ! defined $sequence_ref or $sequence_ref ne 'ARRAY' ) {
+        $sequence_ref = [
+            'any_any_key',
+            "any_${key}_key",
+            "${key_code}_key",
+            '_key_code',
+            '_key_default',
+        ];
+        manage_sequence( $edit_ref, $info_ref, $key_code, $sequence_ref );
+    }
+    else {
+        execute_sequence ( $edit_ref, $sequence_ref, $info_ref );
+    }
+    return $caller;
+}
 
+sub key_code {
+    my ( $edit_ref, $info_ref ) = @_;
+    
+    my $key_code = $info_ref->{'key_code'};
+    
+    #print STDERR "Dans key_code $key_code\n";
+    
     my $reference = $edit_ref->[KEY]{$key_code};
     if ( ! $reference ) {
         $reference = $key{$key_code};
@@ -1876,14 +1953,15 @@ sub key_press {
         # Une touche speciale a ete appuyee
         if ( ref( $reference ) eq "CODE" ) {
 
-            #print "Touche spéciale...\n";
+            #print STDERR "Touche spéciale...\n";
             #$key{$key_code}->( $edit_ref );
-            eval {
-                $reference->( $edit_ref->[PARENT] );
-            };
-            print "Wrong code for key $key_code : $@\n" if ( $@ );
+            #eval {
+                $reference->( $edit_ref->[PARENT], $info_ref );
+            #};
+            #print "Wrong code for key $key_code : $@\n" if ( $@ );
         }
         else {
+            #print STDERR "Touche spéciale...avec tableau\n";
             my @tab      = @{ $reference };
             my $code_ref = shift @tab;
 
@@ -1898,17 +1976,28 @@ sub key_press {
             $code_ref->( $first_parameter, @tab );
         }
         #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
-        return $key_code;
+        return;
     }
-    #else {
-    #    print "Aucune action associée à $key_code\n";
-    #}
+    return ( $info_ref, q{} );
+}
 
-    #print "|$key|$ascii|" if ( $alt_key );
-    #print "|$key|$ascii|";
-    if ( length($ascii) != 1 or $special ) {
+sub key_default {
+    my ( $edit_ref, $info_ref ) = @_;
+    
+    my $text = $info_ref->{'text'};
+    my $special;
+    if ( $info_ref->{'meta_hash'}{'ctrl'} or $info_ref->{'meta_hash'}{'alt'} ) {
+        $special = 1;
+    }
+
+    #if ( length($text) != 1 or $special ) {
+    if ( $special ) {
         #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
-        return $key_code;
+        return ( $info_ref, q{} );
+    }
+    else {
+        #print STDERR "Ascii = $ascii\n";
+        #print STDERR "special = $special\n";
     }
     
     if ( defined $edit_ref->[SELECTION] ) {
@@ -1916,10 +2005,10 @@ sub key_press {
     }
     
     # assist doit pointer sur une référence à un package ou une fonction
-    insert( $edit_ref, $ascii,
+    insert( $edit_ref, $text,
         { 'assist' => $edit_ref->[ASSIST], 'indent' => 'auto' } );
     #Text::Editor::Easy::Async->end_of_user_event( $edit_ref->[ID] );
-    return $key_code;
+    return ( $info_ref, q{} );
 }
 
 sub cursor_make_visible {
@@ -2181,15 +2270,6 @@ sub suppress_bottom_invisible_lines {
     }
 }
 
-sub mouse_wheel_event {
-    my ( $edit_ref, $obj, $d ) = @_;
-
-    my $unit = 1;
-    if ( $d == 4 ) {
-        $unit = -1;
-    }
-    scrollbar_move( $edit_ref, 'scroll', $unit, 'units' );
-}
 
 sub screen_set_wrap {
     my ($edit_ref) = @_;
@@ -2469,7 +2549,7 @@ sub insert {
     my ( $edit_ref, $text, $options_ref ) = @_;
 
     if ( ! defined( $text ) or $text eq q{} ) {
-        print STDERR "No text to insert, no insert execution...\n";
+        #print STDERR "No text to insert, no insert execution...\n";
         return;
     }
     
@@ -2483,7 +2563,6 @@ sub insert {
     my $display_options = $options_ref->{'display'};
     my $search_ref = {};
 
-    $text =~ s/\t/    /g;    # Suppression des tabulations    
     my @lines = split( /\n/, $text, -1 );
     my $size_line = scalar(@lines);
 
@@ -2594,7 +2673,7 @@ sub insert {
             $answer_ref = non_visual_insertion( $edit_ref, $ref, $initial_text, $pos, $replace, $search_ref, @lines );            
         }
         else {
-            #print "Insertion visuelle\n";
+            #visual_slurp( $edit_ref, 1 );
             $answer_ref = visual_insertion ( $edit_ref, $ref, $line_ref, $pos, $replace, $search_ref, @lines );
         }
     }
@@ -2761,7 +2840,7 @@ sub identical_display {
 sub visual_insertion {
     my ( $edit_ref, $ref, $line_ref, $pos, $replace, $search_ref, @lines ) = @_;
     
-    #print "LINES = ", dump(@lines), "\n";
+    print DBG "Début visual_insertion : LINES = ", dump(@lines), "\n";
     my $editor = $edit_ref->[PARENT];
     
     my ( $top_ord, $bottom_ord ) = get_line_ords( $line_ref );
@@ -2780,17 +2859,28 @@ sub visual_insertion {
 
     my $answer_ref = {};
     if ( scalar(@lines) ) {
-        #print "Modif de la ligne 1 avec ref $ref\n $text\n";
+        print DBG "Modif de la ligne 1 avec ref $ref\n $text\n", dump(@lines), "\n";
+        
         $editor->modify_line( $ref, $text );
         $first_line_done = 1;
         $line_ref->[TEXT] = $text;
         create_text_in_line( $edit_ref, $line_ref );
-        $bottom_line_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord, 'no_cursor' );
+        
+        my $set_cursor = 'no_cursor';
+        if ( $ref == $edit_ref->[CURSOR][LINE_REF][REF] ) {
+            if ( $edit_ref->[CURSOR][POSITION_IN_LINE] <= length( $text ) ) {
+                $set_cursor = undef;
+            }
+        }
+        $bottom_line_ref = display_line_from_top( $edit_ref, $line_ref, $top_ord, $set_cursor );
+        
         if ( defined $search_ref->{$inserted} ) {
             $search_ref->{$inserted} = $ref;
         }
         $answer_ref->{'first_text'} = $text;
         $text = pop( @lines );
+        
+        print DBG "visual_insertion, après ligne 1 : LINES = ", dump(@lines), "\n";
     }
     if ( ! $replace ) {
         $text .= substr ( $complete_text , $pos );
@@ -2802,7 +2892,7 @@ sub visual_insertion {
         }
     }
     if ( ! $first_line_done ) {
-        #print "Modif l'unique ligne $ref\n $text\n";
+        print DBG "Modif l'unique ligne $ref\n $text\n";
         $editor->modify_line( $ref, $text );
         $line_ref->[TEXT] = $text;
         create_text_in_line( $edit_ref, $line_ref );
@@ -2823,8 +2913,9 @@ sub visual_insertion {
     
     my @return = ( $ref );
     # Intermediate lines
+    print DBG "visual_insertion, avant while : LINES = ", dump(@lines), "\n";
     while ( @lines ) {
-        #print "Ajout nouvelle ligne situé après $ref\n";
+        print DBG "Ajout nouvelle ligne situé après $ref\n";
         $top_ord = $bottom_line_ref->[ORD];
         my $new_text = shift( @lines );
         $ref = $editor->new_line( $ref, 'after', $new_text );
@@ -2849,7 +2940,8 @@ sub visual_insertion {
     }
     
     # Last line
-    #print "Ajout dernière ligne après $ref\n $text\n";
+    print DBG "Ajout dernière ligne après $ref\n $text\n";
+    
     $ref = $editor->new_line( $ref, 'after', $text );
     $inserted += 1;
     if ( defined $search_ref->{$inserted} ) {
@@ -2857,7 +2949,11 @@ sub visual_insertion {
     }
     push @return, $ref;
     $top_ord = $bottom_line_ref->[ORD];
+        
     my $new_line_ref;
+    $new_line_ref->[REF] = $ref;
+    $new_line_ref->[TEXT] = $text;
+
     my $next_ref = $bottom_line_ref->[NEXT];
     if ( defined $next_ref ) {
         $next_ref->[PREVIOUS] = $new_line_ref;
@@ -2865,17 +2961,18 @@ sub visual_insertion {
     }
     $bottom_line_ref->[NEXT] = $new_line_ref;
     $new_line_ref->[PREVIOUS] = $bottom_line_ref;
-    $new_line_ref->[REF] = $ref;
-
-    $new_line_ref->[TEXT] = $text;
+    
     create_text_in_line( $edit_ref, $new_line_ref );
     $bottom_line_ref = display_line_from_top( $edit_ref, $new_line_ref, $top_ord, 'no_cursor' );
     
     if ( $bottom_line_ref->[ORD] != $bottom_ord ) {
-        #print "Move de ", $bottom_line_ref->[ORD] - $bottom_ord, "\n";
+        print DBG "Move de ", $bottom_line_ref->[ORD] - $bottom_ord, "\n";
         move_bottom( $edit_ref, $bottom_line_ref->[ORD] - $bottom_ord,
             $bottom_line_ref );
     }
+
+    #visual_slurp( $edit_ref, 998 );
+    
     $answer_ref->{'found'} = $search_ref;
     $answer_ref->{'last'} = $ref;
     $answer_ref->{'return'} = \@return;
@@ -4684,7 +4781,7 @@ sub load_search {
 sub focus {
     my ( $self, $hash_ref ) = @_;
 
-    on_top( $self, $hash_ref );
+    at_top( $self, $hash_ref );
 
     #$self->deselect;
     $self->[GRAPHIC]->focus;
@@ -4705,11 +4802,11 @@ sub on_top_ref_editor {
     return $edit_ref->[ID];
 }
 
-sub on_top {
+sub at_top {
     my ( $self ) = @_;
     my $zone = $self->[GRAPHIC]->get_zone;
 
-    #print "Dans abstract on_top : zone = $zone, éditeur = ", $self->[PARENT]->name, "|self = $self\n";
+    #print "Dans abstract at_top : zone = $zone, éditeur = ", $self->[PARENT]->name, "|self = $self\n";
 
     my ( $graphic, $old_editor ) = Text::Editor::Easy::Graphic->get_editor_focused_in_zone($zone);
     my $conf_ref;
@@ -4722,13 +4819,13 @@ sub on_top {
         }
         if ( $graphic != $self->[GRAPHIC] ) {
 
-        #print "Réel changement de on_top...$graphic|", $self->[GRAPHIC], "|\n";
+        #print "Réel changement de at_top...$graphic|", $self->[GRAPHIC], "|\n";
             $graphic->forget;
         }
     }
-    $self->[GRAPHIC]->on_top;
+    $self->[GRAPHIC]->at_top;
 
-    #print "Appel de on_top pour l'éditeur ", $self->[PARENT]->name, " ZONE = $zone\n";
+    #print "Appel de at_top pour l'éditeur ", $self->[PARENT]->name, " ZONE = $zone\n";
     return if ( ! defined $zone );
     
     my $event_ref = $zone_events{$zone};
@@ -4875,7 +4972,8 @@ sub abstract_join {
     my ( $self, $tid ) = @_;
 
     print "Dans abstract_join tid = $tid\n";
-    threads->object($tid)->join;
+    my $thread = threads->object($tid);
+    $thread->join;
     return $tid;
 }
 
@@ -5124,29 +5222,59 @@ sub graphic_zone_update {
     $self->[GRAPHIC]->zone_update($name, $hash_ref);
 }
 
-
 sub make_visible {
     my ( $self ) = @_;
     
-    $self->[GRAPHIC]->put_on_top;
+    $self->[GRAPHIC]->put_at_top;
 }
 
 sub update_events {
-    my ( $self, $ref, $id_ref, $event_ref, $name ) = @_;
+    my ( $self, $ref, $id_ref, $options_ref ) = @_;
     
-    #print "Dans update_events : reçu event_ref = ", dump($event_ref), "\n";
-    #print "    ...name = $name\n" if (defined $name);
-    
-    for my $id ( @$id_ref ) {
-        #print "update_events : traitement de l'id $id\n";
-        if ( $name ) {
-            $abstract{$id}[EVENTS]{$name} = $event_ref;
-        }
-        else {
-            $abstract{$id}[EVENTS] = $event_ref;
+    # clé 'sequences'
+    my $sequence_ref = $options_ref->{'sequences'};
+    if ( defined $sequence_ref ) {
+        #print STDERR "Il faut faire un update de sequence : ", dump( $sequence_ref ), "\n";
+        for my $id ( @$id_ref ) {
+            # Affectation inutile... (travail par référence)
+            $abstract{$id}[SEQUENCES] = merge_sequence( $abstract{$id}[SEQUENCES], $sequence_ref );
         }
     }
+    
+    # clés 'event' et 'name'
+    my $event_ref = $options_ref->{'event'};
+    my $event_name = $options_ref->{'name'};
+    if ( defined $event_name ) {
+        for my $id ( @$id_ref ) {           
+            $abstract{$id}[EVENTS]{$event_name} = $event_ref;
+        }
+    }
+    
+    # clés 'events'
+    my $events = $options_ref->{'events'};
+    if ( defined $events ) {
+        for my $id ( @$id_ref ) {           
+            $abstract{$id}[EVENTS] = $events;
+        }
+    }
+
 }
+
+sub merge_sequence {
+    my ( $new_sequence_ref, $sequence_ref ) = @_;
+    
+    while ( my ( $name, $seq_ref ) = each %$sequence_ref ) {
+        if ( defined $seq_ref ) {
+            $new_sequence_ref->{$name} = $seq_ref;
+        }
+        else {
+            # La clé existe, donc suppression
+            delete $new_sequence_ref->{$name}
+        }
+    }
+    return $new_sequence_ref;
+}
+
 
 sub background {
     my ( $self ) = @_;
@@ -5160,7 +5288,27 @@ sub set_background {
     $self->[GRAPHIC]->set_background( $color );
 }
 
+sub visual_slurp {    
+    my ( $edit_ref, $sequence ) = @_;
+    
+    #print DBG "Dans méthode visual_slurp, séquence $sequence\n";
+    
+    my $slurp;
+    my $line_ref = $edit_ref->[SCREEN][FIRST];
+    my $indice = 1;
+    
+    while ( $line_ref ) {
+        print DBG "\t$indice (", $line_ref->[REF], ") - ", $line_ref->[TEXT], "\n";
+        $slurp .= $line_ref->[TEXT] . "\n";
+        $line_ref = $line_ref->[NEXT];
+    }
+    chomp $slurp;
+    return $slurp;
+}
+
 1;
+
+
 
 =head1 FUNCTIONS
 
@@ -5359,7 +5507,7 @@ Destruction is not properly done at the moment.
 
 =head2 insert
 
-=head2 key_press
+=head2 key
 
 =head2 line_deselect
 
@@ -5381,7 +5529,7 @@ Set the content of a line.
 
 =head2 motion
 
-=head2 mouse_wheel_event
+=head2 wheel
 
 =head2 move_bottom
 
@@ -5395,7 +5543,7 @@ A zone event called when an editor has been closed : useful to change the tab st
 
 Event used to update Text::Editor::Easy configuration.
 
-=head2 on_top
+=head2 at_top
 
 =head2 on_top_ref_editor
 

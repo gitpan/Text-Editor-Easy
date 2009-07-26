@@ -9,11 +9,11 @@ Text::Editor::Easy::Program::Eval::Print - Redirection of prints coming from the
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use threads;    # Pour debug
 

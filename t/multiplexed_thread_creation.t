@@ -1,13 +1,15 @@
 use Test::More;
 use Config;
-if ( ! $Config{'useithreads'} ) {
-    plan skip_all => "Perl not compiled with 'useithreads'";
-}
-elsif ( ! -f 'tk_is_ok' ) {
-    plan skip_all => "Tk is not working properly on this machine";
-}
-else {
-    plan no_plan;
+BEGIN {
+    if ( ! $Config{'useithreads'} ) {
+        plan skip_all => "Perl not compiled with 'useithreads'";
+    }
+    elsif ( ! -f 'tk_is_ok' ) {
+        plan skip_all => "Tk is not working properly on this machine";
+    }
+    else {
+        plan no_plan;
+    }
 }
 
 use strict;

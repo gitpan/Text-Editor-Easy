@@ -10,11 +10,11 @@ user event (key press, mouse move, ...). For each trace, the client thread and t
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 # Ce thread génère le fichier d'info et le hachage permettant d'y accéder rapidement
 # Ce fichier d'info contient :

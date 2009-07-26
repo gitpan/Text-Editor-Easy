@@ -1,13 +1,15 @@
 use Test::More;
 use Config;
-if ( ! $Config{'useithreads'} ) {
-    plan skip_all => "Perl not compiled with 'useithreads'";
-}
-elsif ( ! -f 'tk_is_ok' ) {
-    plan skip_all => "Tk is not working properly on this machine";
-}
-else {
-    plan no_plan;
+BEGIN {
+    if ( ! $Config{'useithreads'} ) {
+        plan skip_all => "Perl not compiled with 'useithreads'";
+    }
+    elsif ( ! -f 'tk_is_ok' ) {
+        plan skip_all => "Tk is not working properly on this machine";
+    }
+    else {
+        plan no_plan;
+    }
 }
 
 use strict;
@@ -62,7 +64,7 @@ sub test_string {
 		
 		$editor3->dump_file_manager;
 		
-		$editor3->key_press('ctrl_End');
+		$editor3->key({ 'meta' => 'ctrl_', 'key' => 'End', 'meta_hash' => {} });
 		
 		$editor3->save('return_saved3.txt');	
 		if ( ! open ( FIM,  'return_saved3.txt' ) ) {

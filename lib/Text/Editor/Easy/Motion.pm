@@ -9,11 +9,11 @@ Text::Editor::Easy::Motion - Manage various user events on "Text::Editor::Easy" 
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use threads;
 use Text::Editor::Easy::Comm;
@@ -241,12 +241,6 @@ sub manage_eval {
                         'package' => 'Text::Editor::Easy::Syntax::Perl_glue',
                         'sub'     => 'syntax',
                     },
-                    'events' => {
-                        'motion' => {
-                            'action' => 'nop',
-                            'thread' => 'Motion',
-                        }
-                    },
                     'focus' => 'no',
                 }
             );
@@ -295,12 +289,6 @@ sub manage_file {
                 'config' => {
                     'first_line_number' => $number,
                     'first_line_at' => 'middle',
-                },
-                'events' => {
-                    'motion' => {
-                        'action' => 'nop',
-                        'thread' => 'Motion',
-                    }
                 },
                 'focus' => 'no',
             };
@@ -382,7 +370,7 @@ sub cursor_set_on_who_file {
     return if ( ! defined $new_editor );
 
     #print "Appel on top pour new_editor ", $new_editor->name, "\n";
-    $new_editor->on_top;
+    $new_editor->at_top;
     #print "Fin appel on top pour new_editor\n";
     $line->select( undef, undef, 'white' );
     $editor->deselect;

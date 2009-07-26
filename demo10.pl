@@ -9,3 +9,22 @@
 # This should remove demo 1 to 6 and
 # should stop and restart the Editor in the same state.
 #
+
+{
+    'F5' => sub {
+        my ( $editor, $info_ref ) = @_;
+        
+        my $macro = Text::Editor::Easy->whose_name('macro');
+        $macro->empty;
+        $macro->insert( $info_ref->{'macro'} );
+    },
+    
+    'macro' => << 'macro'
+for my $demo ( 1 .. 6 ) {
+    print "demo$demo.pl\n";
+    Text::Editor::Easy->on_editor_destroy('zone1', "demo${demo}.pl");
+}
+Text::Editor::Easy->restart;
+macro
+    ,
+}

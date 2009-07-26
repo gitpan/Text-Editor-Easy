@@ -9,11 +9,11 @@ Text::Editor::Easy::Data - Global common data shared by all threads.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Data::Dump qw(dump);
 use threads;
@@ -48,7 +48,7 @@ use constant {
     CURRENT => 15,
     SEARCH => 16,
     ZONE => 17,
-    EVENTS => 18,
+    DEFAULT => 18,
     CONF => 19,
 
     #------------------------------------
@@ -171,6 +171,9 @@ sub reference_editor {
     if ( defined $absolute_path ) {
         ( $volume, $directory ) = File::Spec->splitpath( $absolute_path, 'no_file' );
     }
+    $volume = '' if ( ! defined $volume );
+    $directory = '' if ( ! defined $directory );
+    $file_name = '' if ( ! defined $file_name );
     my $full_absolute = File::Spec->catpath( $volume, $directory, $file_name );
     $self->[INSTANCE]{$ref}{'full_absolute'} = $full_absolute;
     my $full_relative = File::Spec->abs2rel( $full_absolute ) ;
@@ -180,10 +183,17 @@ sub reference_editor {
  
     $self->[ZONE_ORDER]{$zone} += 1;    # Valeur de retour, ordre dans la zone
     
-    # Forçage éventuel d'évènements
-
     
-    my $event_ref = init_events( $self, $options_ref->{'events'}, $name );
+    print DBG "\n\nAvant fusion, event_ref = ", dump($options_ref->{'events'}), "\n\n\n";
+    
+    my ( $event_ref, $sequence_ref ) = merge_seq_in_events( $self,  $options_ref->{'events'},  $options_ref->{'sequences'} );
+    # Forçage éventuel d'évènements
+    $event_ref = undef if ( ! %$event_ref );
+    print DBG "\n\nAvant forçages, event_ref = ", dump($event_ref), "\n\n\n";
+
+    ( $event_ref, $sequence_ref ) = force_default( $self->[DEFAULT], $event_ref, $sequence_ref, $name );
+     
+     print DBG "\n\nAprès forçages divers, event_ref = ", dump($event_ref), "\n\n\n";
     #print DB1 "1 - Event ref vaut ", dump($event_ref), "\n";
     if ( defined $event_ref ) {
         $event_ref = Text::Editor::Easy::Events::reference_events($ref, $event_ref);
@@ -194,99 +204,42 @@ sub reference_editor {
     }
     #print DB1 "3 - Event ref vaut ", dump($event_ref), "\n";
     $self->[INSTANCE]{$ref}{'events'} = $event_ref;
+    $self->[INSTANCE]{$ref}{'sequences'} = $sequence_ref;
     $options_ref->{'events'} = $event_ref;
-
+    $options_ref->{'sequences'} = $sequence_ref;
 
     #close DB1;
     return $options_ref;
 }
 
-sub update_events {
-    my ( $self, $ref, $id_ref, $event_ref, $name ) = @_;
-
-
-    for my $id ( @$id_ref ) {
-        if ( defined $name ) {
-            $self->[INSTANCE]{$id}{'events'}{$name} = $event_ref;
-        }
-        else {
-            $self->[INSTANCE]{$id}{'events'} = $event_ref;
-        }
-    }
-}
-
-sub init_events {
-    my ( $self, $event_ref, $name ) = @_;
+sub data_events {
+    my ( $self, $id, $name ) = @_;
     
-    for my $el_ref ( @{$self->[EVENTS]} ) {
-        if ( ref $el_ref->[0] ) {
-            $event_ref = force_events ( $event_ref, $el_ref, $name );
-        }
-        else {
-            $event_ref = force_event ( $event_ref, $el_ref, $name );
-        }
+    if ( ! $id ) {
+        return $self->[DEFAULT];
     }
-
-    return $event_ref;
-}
-
-sub force_event {
-    my ( $event_ref, $el_ref, $name ) = @_;
     
-    my ( $event_name, $force_ref, $options_ref ) = @$el_ref;
-    $options_ref = {} if ( ! defined $options_ref );
-    
-    my $names = $options_ref->{'names'};
-    #print "Avant test du nom name = $name, names = $names\n";
-    if ( ! defined $name or ( defined $names and $name !~ $names ) ) {
-        #print "Le nom ne correspond pas ou n'est pas défini\n";
-        return $event_ref;
-    }
-    #print "Le nom correspond ou il n'y a pas d'expression régulière\n";
-    my $values = $options_ref->{'values'};
-    if ( defined $values ) {
-        if ( $values eq 'defined' and ! defined $event_ref->{$event_name} ) {
-            return $event_ref;
-        }
-        if ( $values eq 'undefined' and defined $event_ref->{$event_name} ) {
-            return $event_ref;
-        }
-    }
-    if ( defined $force_ref ) {
-        %{$event_ref->{$event_name}} = %$force_ref;
+    if ( ! defined $name ) {
+        return $self->[INSTANCE]{$id}{'events'};
     }
     else {
-        delete $event_ref->{$event_name};
+        return $self->[INSTANCE]{$id}{'events'}{$name};
     }
-    return $event_ref;
 }
 
-sub force_events {
-    my ( $event_ref, $el_ref, $name ) = @_;
-    
-    my ( $force_ref, $options_ref ) = @$el_ref;
-    $options_ref = {} if ( ! defined $options_ref );
-    
-    my $names = $options_ref->{'names'};
-    if ( ! defined $name or ( defined $names and $name !~ $names ) ) {
-        return $event_ref;
+sub data_sequences {
+    my ( $self, $id, $name ) = @_;
+
+    if ( ! $id ) {
+        return;
     }
-    my $values = $options_ref->{'values'};
-    if ( defined $values ) {
-        if ( $values eq 'defined' and ! defined $event_ref ) {
-            return $event_ref;
-        }
-        if ( $values eq 'undefined' and defined $event_ref ) {
-            return $event_ref;
-        }
-    }
-    if ( defined $force_ref ) {
-        %$event_ref = %$force_ref;
+    
+    if ( ! defined $name ) {
+        return $self->[INSTANCE]{$id}{'sequences'};
     }
     else {
-        $event_ref = undef;
+        return $self->[INSTANCE]{$id}{'sequences'}{$name};
     }
-    return $event_ref;
 }
 
 my %true_instance_value = (
@@ -295,148 +248,420 @@ my %true_instance_value = (
     'all'      => 1,
 );
 
-sub data_set_events {
-    my ( $self, $type, $event_ref, $options_ref ) = @_;
-    
-    $options_ref = {} if ( ! defined $options_ref );
-    my $instances = $options_ref->{'instances'};
-    if ( defined $instances and ! $true_instance_value{$instances} ) {
-        print STDERR "'$instances' is an unknown value for 'instances' option of 'set_events' method\n";
+sub data_set_sequence {
+    my ( $self, $id, $sequence_ref, $options_ref ) = @_;
+
+    if ( $id ) {
+        my $instance_ref = $self->[INSTANCE]{$id};
+        my $name = $instance_ref->{'name'};
+        my $old_sequence_ref = $instance_ref->{'sequences'}; 
+        if ( sequence_is_applicable( $old_sequence_ref, $sequence_ref, $options_ref, $name ) ) {
+            my $new_sequence_ref = merge_sequences( $old_sequence_ref, $sequence_ref );
+            $self->[INSTANCE]{$id}{'sequences'} = $new_sequence_ref;
+            return ( [ $id ], { '0' => 1 }, { 'sequences' => $sequence_ref } );
+        }
         return;
     }
-    if ( ! $instances or ( $instances eq 'all' or $instances eq 'future' ) ) {
-        #print "Je change self->EVENTS\n";
-        push @{$self->[EVENTS]}, [ $event_ref, $options_ref ];
-    }
-    if ( ! $instances  or ( $instances eq 'all' or $instances eq 'existing' ) ) {
-        return internal_update_events( $self, $type, $event_ref, $options_ref->{'values'}, $options_ref->{'names'} );
-    }
-    return {};
-}
-
-sub internal_update_events {
-    my ( $self, $type, $event_ref, $values, $names ) = @_;
-    
+   
+    # Class call
+    return if ( for_future_only( $self, $options_ref->{'instances'}, 'sequence', $sequence_ref, $options_ref ) );
+      
     my $instance_ref = $self->[INSTANCE];
-    my @ids = keys %$instance_ref;
-    if ( defined $values ) {
-        my @new_ids;
-        if ( $values eq 'defined' ) {
-            for ( @ids ) {
-                if ( defined $instance_ref->{$_}{'events'} ) {
-                    push @new_ids, $_;
-                }
-            }
+    my $update_ref;   
+    for my $id ( keys %$instance_ref ) {
+        my $id_ref = $instance_ref->{$id};
+        my $name = $id_ref->{'name'};
+        my $old_sequence_ref = $id_ref->{'sequences'};
+        if ( sequence_is_applicable( $old_sequence_ref, $sequence_ref, $options_ref, $name ) ) {
+            my $new_sequence_ref = merge_sequences( $old_sequence_ref, $sequence_ref );
+            $self->[INSTANCE]{$id}{'sequences'} = $new_sequence_ref;
+            push @$update_ref, $id;
         }
-        elsif ( $values eq 'undefined' ) {
-            for ( @ids ) {
-                if ( ! defined $instance_ref->{$_}{'events'} ) {
-                    push @new_ids, $_;
-                }
-            }
-        }
-        else {
-            print STDERR "'$values' is an unknown value for 'values' option of 'set_events' method\n";
-            return;
-        }
-        @ids = @new_ids;
     }
-    if ( defined $names ) {
-        my @new_ids;
-        for ( @ids ) {
-            my $name = $instance_ref->{$_}{'name'};
-            if ( defined $name and $name =~ $names ) {
-                push @new_ids, $_;
-            }
-        }
-        @ids = @new_ids;
-    }
+    
     # Référencement du nouvel évènement dans les thread qui en ont besoin
-    if ( scalar @ids ) {
-        my $call_id = Text::Editor::Easy::Async->ask_thread( 'update_events', 0, \@ids, $event_ref );
-        for ( @ids ) {
-            $self->[INSTANCE]{$_}{'events'} = $event_ref;
-        }
-        return { 0 => $call_id };
+    if ( $update_ref ) {
+        return ( $update_ref, { 0 => 1 }, { 'sequences' => $sequence_ref } );
     }
     else {
-        return {};
+        return;
     }
 }
 
 sub data_set_event {
-    my ( $self, $type, $event_name, $event_ref, $options_ref ) = @_;
+    my ( $self, $id, $event_name, $event_ref, $options_ref ) = @_;
     
-    $options_ref = {} if ( ! defined $options_ref );
-    my $instances = $options_ref->{'instances'};
-    if ( defined $instances and ! $true_instance_value{$instances} ) {
-        print STDERR "'$instances' is an unknown value for 'instances' option of 'set_event' method\n";
+    print DBG "\n\nDans data_set_event : id = $id, name = $event_name\n\n\n";
+
+    if ( $id ) {
+        my $instance_ref = $self->[INSTANCE]{$id};
+        my $name = $instance_ref->{'name'};
+        my $old_event_ref = $instance_ref->{'events'}{$event_name};
+        if ( event_is_applicable( $old_event_ref, $event_ref, $options_ref, $name ) ) {
+            $self->[INSTANCE]{$id}{'events'}{$event_name} = $event_ref;
+            my $seq_value_ref = undef;
+            if ( exists $event_ref->{'sequence'} ) {
+                $seq_value_ref = $event_ref->{'sequence'};
+                $instance_ref->{'sequences'}{$event_name} = $seq_value_ref;
+                return ( [ $id ], { '0' => 1 }, { 
+                    'sequence' => { $event_name => $seq_value_ref },
+                    'event'    => $event_ref,
+                    'name'     => $event_name,
+                } );
+            }
+            return ( [ $id ], { '0' => 1 }, { 
+                'event'    => $event_ref,
+                'name'     => $event_name,
+            } );
+        }
         return;
     }
-    if ( ! $instances or ( $instances eq 'all' or $instances eq 'future' ) ) {
-        #print "Je change self->EVENTS\n";
-        push @{$self->[EVENTS]}, [ $event_name, $event_ref, $options_ref ];
-    }
-    if ( ! $instances  or ( $instances eq 'all' or $instances eq 'existing' ) ) {
-        return internal_update_event( $self, $type, $event_name, $event_ref, $options_ref->{'values'}, $options_ref->{'names'} );
-    }
-    return {};
-}
-
-sub internal_update_event {
-    my ( $self, $type, $event_name, $event_ref, $values, $names ) = @_;
-    
+   
+    # Class call
+    return if ( for_future_only( $self, $options_ref->{'instances'}, 'event', $event_name, $event_ref, $options_ref ) );
+      
     my $instance_ref = $self->[INSTANCE];
-    my @ids = keys %$instance_ref;
-    if ( defined $values ) {
-        my @new_ids;
-        if ( $values eq 'defined' ) {
-            for ( @ids ) {
-                if ( defined $instance_ref->{$_}{'events'}{$event_name} ) {
-                    push @new_ids, $_;
-                }
+    my $ids_ref = undef;
+    for my $id ( keys %$instance_ref ) {
+        my $id_ref = $instance_ref->{$id};
+        my $name = $id_ref->{'name'};
+        my $old_event_ref = $id_ref->{'events'}{$event_name};
+        if ( event_is_applicable( $old_event_ref, $event_ref, $options_ref, $name ) ) {
+            my $seq_value_ref = undef;
+            if ( exists $event_ref->{'sequence'} ) {
+                $seq_value_ref = $event_ref->{'sequence'};
+                $id_ref->{'sequences'}{$event_name} = $seq_value_ref;
             }
+            $old_event_ref = $event_ref;
+            push @$ids_ref, $id;
         }
-        elsif ( $values eq 'undefined' ) {
-            for ( @ids ) {
-                if ( ! defined $instance_ref->{$_}{'events'}{$event_name} ) {
-                    push @new_ids, $_;
-                }
-            }
+    }
+    
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    if ( $ids_ref ) {
+        if ( exists $event_ref->{'sequence'} ) {
+            return ( $ids_ref, { 0 => 1 }, {
+                'sequence' => { $event_name => $event_ref->{'sequence'} },
+                'event'    => $event_ref,
+                'name'     => $event_name,
+            } );                
         }
         else {
-            print STDERR "'$values' is an unknown value for 'values' option of 'set_events' method\n";
-            return;
+            return ( $ids_ref, { 0 => 1 }, {
+                'event'    => $event_ref,
+                'name'     => $event_name,
+            } );                
         }
-        @ids = @new_ids;
-    }
-    if ( defined $names ) {
-        my @new_ids;
-        for ( @ids ) {
-            my $name = $instance_ref->{$_}{'name'};
-            if ( defined $name and $name =~ $names ) {
-                push @new_ids, $_;
-            }
-        }
-        @ids = @new_ids;
-    }
-    # Référencement du nouvel évènement dans les thread qui en ont besoin
-    if ( scalar @ids ) {
-        my $call_id = Text::Editor::Easy::Async->ask_thread( 'update_events', 0, \@ids, $event_ref, $event_name );
-        for ( @ids ) {
-            $self->[INSTANCE]{$_}{'events'}{$event_name} = $event_ref;
-        }
-        return { 0 => $call_id };
     }
     else {
-        return {};
+        return;
     }
+}
+
+sub data_set_events {
+    my ( $self, $id, $events_ref, $options_ref ) = @_;
+    
+    print DBG "\n\nDans data_set_event : id = $id\n\n\n";
+
+    if ( $id ) {
+        my $instance_ref = $self->[INSTANCE]{$id};
+        if ( event_is_applicable( $instance_ref->{'events'}, $events_ref, $options_ref, $instance_ref->{'name'} ) ) {
+            
+            # Copie inutile : aucune référence utilisée en double
+            $instance_ref->{'events'} = $events_ref;
+            
+            my $sequence_ref = undef;
+            for ( my ( $event_name, $value_ref ) = each ( %$events_ref ) ) {
+                if ( exists $value_ref->{'sequence'} ) {
+                    $sequence_ref->{$event_name} = $value_ref->{'sequence'};
+                }
+            }
+            if ( defined $sequence_ref ) {
+                return ( [ $id ], { '0' => 1 }, { 
+                    'sequence' => $sequence_ref,
+                    'events'   => $events_ref,
+                } );
+            }
+            else {
+                return ( [ $id ], { '0' => 1 }, { 
+                    'events'    => $events_ref,
+                } );
+            }
+        }
+        return;
+    }
+   
+    # Class call
+    return if ( for_future_only( $self, $options_ref->{'instances'}, 'events', $events_ref, $options_ref ) );
+      
+    my $root_ref = $self->[INSTANCE];
+    my $id_ref;
+    
+    for my $id ( keys %$root_ref ) {
+        my $instance_ref = $root_ref->{$id};
+        if ( event_is_applicable( $instance_ref->{'events'}, $events_ref, $options_ref, $instance_ref->{'name'} ) ) {
+
+            # Copie indispensable : un appel a set_event d'instance (après un set_events de classe) modifierait l'ensemble des instances à tort
+            %{ $instance_ref->{'events'} } = %$events_ref;
+
+            push @$id_ref, $id;
+        }
+    }
+    
+    # Référencement du nouvel évènement dans les thread qui en ont besoin
+    if ( $id_ref ) {
+        my $sequence_ref = undef;
+        for ( my ( $event_name, $value_ref ) = each ( %$events_ref ) ) {
+            if ( exists $value_ref->{'sequence'} ) {
+                $sequence_ref->{$event_name} = $value_ref->{'sequence'};
+            }
+        }
+        if ( defined $sequence_ref ) {
+            return ( $id_ref, { 0 => 1 }, {
+                'sequences' => $sequence_ref,
+                'events'    => $events_ref,
+            } );                
+        }
+        else {
+            return ( $id_ref, { 0 => 1 }, {
+                'events'    => $events_ref,
+            } );                
+        }
+    }
+    else {
+        return;
+    }
+}
+
+sub for_future_only {
+    my ( $self, $instances, $method, @data ) = @_;
+    
+    if ( defined $instances and ! $true_instance_value{$instances} ) {
+        print STDERR "'$instances' is an unknown value for 'instances' option of 'set_$method' method\n";
+        return 1;
+    }
+    if ( ! $instances or ( $instances eq 'all' or $instances eq 'future' ) ) {
+        push @{$self->[DEFAULT]}, [ $method, @data ];
+    }
+    if ( $instances and $instances eq 'future' ) {
+        return 1;
+    }
+    return;
+}
+
+sub sequence_is_applicable {
+    my ( $old_sequence_ref, $sequence_ref, $options_ref, $name ) = @_;
+
+    # Correspondance de nom
+    $options_ref = {} if ( ! defined $options_ref );
+        
+    my $names = $options_ref->{'names'};
+    if ( defined $names and $names->isa('Regexp') ) {
+        if ( ! defined $name or $name !~ $names ) {
+            return;
+        }
+    }
+
+    # Correspondance de valeurs
+    my $values = $options_ref->{'values'};
+    if ( defined $values ) {
+        if ( $values eq 'defined' ) {
+            my $OK = 0;
+            SEQ: for my $seq_name ( keys %$sequence_ref ) {
+                if ( defined $old_sequence_ref->{$seq_name} ) {
+                    $OK = 1;
+                    last SEQ;
+                }
+            }
+            return if ( ! $OK );
+        }
+        elsif ( $values eq 'undefined' ) {
+            my $KO = 0;
+            SEQ: for my $seq_name ( keys %$sequence_ref ) {
+                if ( defined $old_sequence_ref->{$seq_name} ) {
+                    $KO = 1;
+                    last SEQ;
+                }
+            }
+            return if ( $KO );
+        }
+        else {
+            print STDERR "'$values' is an unknown value for 'values' option\n";
+            return;
+        }
+    }
+    return 1;
+}
+
+sub event_threads {
+    my ( $self, $id, $name ) = @_;
+    
+    return if ( ! defined $id or ! defined $name );
+    return ( [ 0, 2 ], $self->[INSTANCE]{$id}{'events'}{$name} );
+}
+
+sub update_events {
+    my ( $self, $ref, $id_ref, $options_ref ) = @_;
+    
+    # clé 'sequences'
+    my $instance_ref = $self->[INSTANCE];
+    my $sequence_ref = $options_ref->{'sequences'};
+    if ( defined $sequence_ref ) {
+        #print STDERR "Il faut faire un update de sequence : ", dump( $sequence_ref ), "\n";
+        for my $id ( @$id_ref ) {
+            # Affectation inutile... (travail par référence)
+            $instance_ref->{$id}{'sequences'} = merge_sequence( $instance_ref->{$id}{'sequences'}, $sequence_ref );
+        }
+    }
+    
+    # clés 'event' et 'name'
+    my $event_ref = $options_ref->{'event'};
+    my $event_name = $options_ref->{'name'};
+    if ( defined $event_name ) {
+        for my $id ( @$id_ref ) {           
+            $instance_ref->{$id}{'events'}{$event_name} = $event_ref;
+        }
+    }
+    
+    # clés 'events'
+    my $events = $options_ref->{'events'};
+    if ( defined $events ) {
+        for my $id ( @$id_ref ) {           
+            $instance_ref->{$id}{'events'} = $events;
+        }
+    }
+}
+
+
+sub merge_sequences {
+    my ( $new_sequence_ref, $sequence_ref ) = @_;
+    
+    while ( my ( $name, $seq_ref ) = each %$sequence_ref ) {
+        if ( defined $seq_ref ) {
+            $new_sequence_ref->{$name} = $seq_ref;
+        }
+        else {
+            # La clé existe, donc suppression
+            delete $new_sequence_ref->{$name}
+        }
+    }
+    return $new_sequence_ref;
+}
+
+sub force_default {
+    my ( $default_ref, $event_ref, $sequence_ref, $name ) = @_;
+    
+    print DBG "Dans force_default\n";
+    
+    return ( $event_ref, $sequence_ref ) if ( ! defined $default_ref );
+    
+    print DBG "\n\n\ndefault_ref DEFINI !!! : ", dump( $default_ref ), "\n\n\n";
+    
+    for my $el_ref ( @$default_ref ) {
+        my @data = @$el_ref;
+        my $type = shift @data;
+        print DBG "Forçage d'un type $type\n";
+        if ( $type eq 'sequence' ) {
+            $sequence_ref = force_sequence ( $sequence_ref, $name, @data );
+        }
+        elsif ( $type eq 'event' ) {
+            ( $event_ref, $sequence_ref ) = force_event ( $event_ref, $sequence_ref, $name, @data );
+        }
+        else { # type eq 'events'
+            ( $event_ref, $sequence_ref ) = force_events ( $event_ref, $sequence_ref, $name, @data );
+        }
+    }    
+    return ( $event_ref, $sequence_ref );
+}
+
+sub force_sequence {
+    my ( $old_sequence_ref, $name, $sequence_ref, $options_ref ) = @_;
+    
+    if ( sequence_is_applicable( $old_sequence_ref, $sequence_ref, $options_ref, $name ) ) {
+        my $new_sequence_ref = merge_sequences( $old_sequence_ref, $sequence_ref );
+        return $new_sequence_ref;
+    }
+}
+
+sub force_event {
+    my ( $events_ref, $sequence_ref, $name, $event_name, $event_ref, $options_ref ) = @_;
+    
+    if ( event_is_applicable( $events_ref->{$event_name}, $event_ref, $options_ref, $name ) ) {
+        if ( exists $event_ref->{'sequence'} ) {
+            $sequence_ref->{$event_name} = $event_ref->{'sequence'};
+        }
+        $events_ref->{$event_name} = $event_ref;
+    }
+    return ( $events_ref, $sequence_ref );
+}
+
+
+sub merge_seq_in_events {
+    my ( $self, $event_ref, $sequence_ref, $name ) = @_;
+    
+    # Fusion de 'events' et 'sequences' en un seul 'sequences', 'sequences' est prioritaire
+    while ( my ( $name, $value_ref ) = ( each %$event_ref ) ) {
+        if ( ref $value_ref ne 'HASH' ) {
+            $value_ref = $value_ref->[0];
+        }
+        my $seq_event = $value_ref->{'sequence'};
+        if ( defined $seq_event and ! defined $sequence_ref->{$name} ) {
+            $sequence_ref->{$name} = $seq_event;
+        }
+    }
+    
+    # A faire, forçage compte tenu des appels de classe antérieurs à 'set_sequene'
+    return ( $event_ref, $sequence_ref );
+}
+
+sub event_is_applicable{
+    my ( $old_event_ref, $event_ref, $options_ref, $name ) = @_;
+    
+    $options_ref = {} if ( ! defined $options_ref );
+    
+    my $names = $options_ref->{'names'};
+    if ( defined $names and $names->isa('Regexp') ) {
+        if ( ! defined $name or $name !~ $names ) {
+            return;
+        }
+    }
+    #print "Le nom correspond ou il n'y a pas d'expression régulière\n";
+    my $values = $options_ref->{'values'};
+    if ( defined $values ) {
+        if ( $values eq 'defined' and ! defined $old_event_ref ){
+            return;
+        }
+        if ( $values eq 'undefined' and defined $old_event_ref ) {
+            return;
+        }
+    }
+    return 1;
+}
+
+sub force_events {
+    my ( $events_ref, $sequence_ref, $name, $default_events_ref, $options_ref ) = @_;
+    
+    if ( event_is_applicable( $events_ref, $default_events_ref, $options_ref, $name ) ) {
+        for ( my ( $event_name, $value_ref ) = each ( %$default_events_ref ) ) {
+            if ( exists $value_ref->{'sequence'} ) {
+                @{$sequence_ref->{$event_name}} = @{$value_ref->{'sequence'}};
+            }
+        }
+        %$events_ref = %$default_events_ref;
+    }
+    return ( $events_ref, $sequence_ref );
+}
+
+sub set_default {
+    my ( $self, $default ) = @_;
+    
+    $self->[DEFAULT] = $default;
 }
 
 sub print_default_events {
     my ( $self ) = @_;
     
-    print "DEFAULT EVENTS = ", dump( $self->[EVENTS] ), "\n";
+    print "DEFAULT EVENTS = ", dump( $self->[DEFAULT] ), "\n";
 }
 
 sub data_zone {
@@ -592,8 +817,6 @@ my $trace_print_counter;
 
 sub trace_print {
     my ( $self, $dump_hash, @param ) = @_;
-
-    #print DBG "Début trace_print $self, $dump_hash, @param\n";
 
     #Ecriture sur fichier
     my $seek_start = tell ENC;
@@ -1180,7 +1403,10 @@ sub trace_user_event {
     my ( $self, $id, $event, $options_ref ) = @_;
     
     # Procédure appelée uniquement par le thread graphique (tid 0)
-    return if ( $self->[THREAD][0][STATUS][0] !~ /^idle/ );
+    my $thread_0_ref = $self->[THREAD][0];
+    if ( $thread_0_ref->[STATUS][0] !~ /^idle/ ) {
+        return $thread_0_ref->[CALL_ID];
+    }
     
     my $call_id = 'U_' . $event_number;
     #trace_call ( $self, $call_id, 0, $event, $id, 'void', 0, 0);
@@ -1196,6 +1422,7 @@ sub trace_user_event {
     $self->[CALL]{$call_id} = $call_id_ref;
     print DBG "Evènement $event\n\tDéclaration de call_id $call_id, ref $call_id_ref, $call_id_ref->[THREAD_LIST]\n";
     trace_start ( $self, 0, $call_id, $event, 0, 0 );
+    return $call_id;
 }
 
 sub trace_end_of_user_event {

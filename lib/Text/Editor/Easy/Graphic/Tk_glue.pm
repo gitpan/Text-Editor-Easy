@@ -26,11 +26,11 @@ Text::Editor::Easy::Graphic::Tk_glue - Link between "Text::Editor::Easy::Abstrac
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Tk;
 use Tk::Scrollbar;    # perl2exe
@@ -140,53 +140,209 @@ sub initialize {
 
 # CLIC SUBSET
     $canva->CanvasBind( '<Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 0, },
             'meta' => '',
     } ] );
     
     $canva->CanvasBind( '<Alt-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 0, },
             'meta' => 'alt_',
     } ] );
     
     $canva->CanvasBind( '<Control-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 0, },
             'meta' => 'ctrl_',
     } ] );
 
     $canva->CanvasBind( '<Shift-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 1, },
             'meta' => 'shift_',
     } ] );
     
     $canva->CanvasBind( '<Alt-Control-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 0, },
             'meta' => 'alt_ctrl_',
     } ] );
     
     $canva->CanvasBind( '<Alt-Shift-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 1, },
             'meta' => 'alt_shift_',
     } ] );
     
     $canva->CanvasBind( '<Control-Shift-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 1, },
             'meta' => 'ctrl_shift_',
     } ] );
     
     $canva->CanvasBind( '<Alt-Control-Shift-Button-1>', [
-         \&redirect_x_y, $hash_ref->{clic}, Ev('x'), Ev('y'), {
+         \&redirect_x_y, $hash_ref->{'clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'alt_ctrl_shift_',
+    } ] );
+
+# DOUBLE CLIC SUBSET
+    $canva->CanvasBind( '<Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => '',
+    } ] );
+
+    $canva->CanvasBind( '<Alt-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => 'alt_',
+    } ] );
+    
+    $canva->CanvasBind( '<Control-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'ctrl_',
+    } ] );
+
+    $canva->CanvasBind( '<Shift-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Control-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'alt_ctrl_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Shift-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'alt_shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Control-Shift-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'ctrl_shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Control-Shift-Double-Button-1>', [
+         \&redirect_x_y, $hash_ref->{'double_clic'}, Ev('x'), Ev('y'), {
             'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 1, },
             'meta' => 'alt_ctrl_shift_',
     } ] );
     
+# RIGHT CLIC SUBSET
+    $canva->CanvasBind( '<Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => '',
+    } ] );
+
+    $canva->CanvasBind( '<Alt-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => 'alt_',
+    } ] );
+    
+    $canva->CanvasBind( '<Control-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'ctrl_',
+    } ] );
+
+    $canva->CanvasBind( '<Shift-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Control-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'alt_ctrl_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Shift-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'alt_shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Control-Shift-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'ctrl_shift_',
+    } ] );
+    
+    $canva->CanvasBind( '<Alt-Control-Shift-Button-3>', [
+         \&redirect_x_y, $hash_ref->{'right_clic'}, Ev('x'), Ev('y'), {
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'alt_ctrl_shift_',
+    } ] );
+
+
+# MOUSE WHEEL SUBSET
+    $canva->CanvasBind( '<MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'}, 
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => '',
+    ] );
+
+    $canva->CanvasBind( '<Alt-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 0, },
+            'meta' => 'alt_',
+    ] );
+    
+    $canva->CanvasBind( '<Control-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'ctrl_',
+    ] );
+
+    $canva->CanvasBind( '<Shift-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'shift_',
+    ] );
+    
+    $canva->CanvasBind( '<Alt-Control-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 0, },
+            'meta' => 'alt_ctrl_',
+    ] );
+    
+    $canva->CanvasBind( '<Alt-Shift-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 1, },
+            'meta' => 'alt_shift_',
+    ] );
+    
+    $canva->CanvasBind( '<Control-Shift-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'ctrl_shift_',
+    ] );
+    
+    $canva->CanvasBind( '<Alt-Control-Shift-MouseWheel>', [
+        \&redirect, $hash_ref->{'mouse_wheel_event'},
+            'unit' => Ev('D'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 1, },
+            'meta' => 'alt_ctrl_shift_',
+    ] );
+
 # MOTION SUBSET
     $canva->CanvasBind( '<Motion>', [
          \&redirect_x_y, $hash_ref->{motion}, Ev('x'), Ev('y'), {
@@ -288,75 +444,91 @@ sub initialize {
 
     $canva->CanvasBind( '<Configure>',
         [ \&resize, $hash_ref->{resize}, Ev('w'), Ev('h') ] );
+
+# KEY_PRESS SUBSET
+    $canva->CanvasBind( '<KeyPress>' =>
+        [ \&redirect,$hash_ref->{key_press}, 
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'ctrl'  => 0, 'alt'   => 0, 'shift' => 0},
+            'meta'      => '',
+        ]
+    );
     $canva->CanvasBind( '<Alt-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 0,
-                'alt'   => 1,
-                'shift' => 0,
-            }
+        [ \&redirect,$hash_ref->{key_press}, 
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 0},
+            'meta'      => 'alt_',
         ]
     );
     $canva->CanvasBind( '<Control-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 1,
-                'alt'   => 0,
-                'shift' => 0,
-            }
+        [ \&redirect,$hash_ref->{key_press}, 
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 0},
+            'meta'      => 'ctrl_',
         ]
     );
     $canva->CanvasBind( '<Shift-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 0,
-                'alt'   => 0,
-                'shift' => 1,
-            }
+        [ \&redirect, $hash_ref->{key_press},
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 0, 'shift' => 1},
+            'meta'      => 'shift_',
         ]
     );
     $canva->CanvasBind( '<Control-Shift-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 1,
-                'alt'   => 0,
-                'shift' => 1,
-            }
+        [ \&redirect, $hash_ref->{key_press},
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 0, 'ctrl'  => 1, 'shift' => 1 },
+            'meta'      => 'ctrl_shift_',
         ]
     );
     $canva->CanvasBind( '<Control-Alt-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 1,
-                'alt'   => 1,
-                'shift' => 0,
-            }
+        [ \&redirect, $hash_ref->{key_press},
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 0},
+            'meta'      => 'alt_ctrl_',
         ]
     );
 
     $canva->CanvasBind( '<Shift-Alt-KeyPress>' => 
-        [ \&redirect, $hash_ref->{key_press}, Ev('K'), Ev('A'), 
-            {
-                'ctrl'  => 0,
-                'alt'   => 1,
-                'shift' => 1,
-            }
+        [ \&redirect, $hash_ref->{key_press},
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 0, 'shift' => 1},
+            'meta'      => 'alt_shift_',
         ]
     );
 
-
- #   $canva->CanvasBind( '<Control-KeyPress>' =>
- #         [ \&key_ctrl, $self, $hash_ref->{key_press}, Ev('K'), Ev('A') ] );
-    $canva->CanvasBind( '<KeyPress>' =>
-          [ \&key_press, $self, $hash_ref->{key_press}, Ev('K'), Ev('A') ] );
-
-    $canva->CanvasBind( '<4>',
-        [ \&redirect, $hash_ref->{mouse_wheel_event}, Ev('D') ] );
-    $canva->CanvasBind( '<5>',
-        [ \&redirect, $hash_ref->{mouse_wheel_event}, Ev('D') ] );
-    $canva->CanvasBind( '<KeyRelease>' => [ \&key_release, $self, Ev('K') ] );
-
-
+    $canva->CanvasBind( '<Shift-Alt-Control-KeyPress>' => 
+        [ \&redirect, $hash_ref->{key_press},
+            'key'       => Ev('K'),
+            'text'      => Ev('A'),
+            'uni'       => Ev('N'),
+            'ascii'     => Ev('k'),
+            'meta_hash' => { 'alt'   => 1, 'ctrl'  => 1, 'shift' => 1},
+            'meta'      => 'alt_ctrl_shift_',
+        ]
+    );
+    
     $canva->xviewMoveto(0);
     $canva->yviewMoveto(0);
 
@@ -380,7 +552,9 @@ sub redirect {
     my ( $canva, $sub_ref, @data ) = @_;
 
     my $editor_ref = $editor{ refaddr $canva};
-    my $return = $sub_ref->( $editor_ref, @data );
+    my %info = @data;
+    #my $return = $sub_ref->( $editor_ref, @data );
+    my $return = $sub_ref->( $editor_ref, \%info );
     $return = 'event not yet traced' if ( ! defined $return );
     Text::Editor::Easy->trace_end_of_user_event( $return );
 }
@@ -395,19 +569,6 @@ sub redirect_x_y {
     my $return = $sub_ref->( $editor_ref, $info_ref );
     $return = 'event not yet traced' if ( ! defined $return );
     Text::Editor::Easy->trace_end_of_user_event( $return );
-}
-
-sub key_ctrl {
-    my ( $canva, $self, $sub_ref, $key, $ascii ) = @_;
-    my $editor_ref = $editor{ refaddr $canva};
-    $sub_ref->(
-        $editor_ref,
-        $key, $ascii,
-        {
-            'ctrl'  => 1,
-            'alt'   => 0,
-            'shift' => 0,
-        } );
 }
 
 sub key_press {
@@ -746,14 +907,14 @@ sub canva_focus {
     $self->[CANVA]->CanvasFocus;
 }
 
-sub on_top {
+sub at_top {
     my ($self) = @_;
 
     $self->[CANVA]->CanvasRaise;
     #my %local_zone = %{ $self->[ZONE] };
     my $zone_name = $self->[ZONE];
 
-    #print "Appel de on_top pour l'objet graphique $self, nom de zone : $zone_name\n";
+    #print "Appel de at_top pour l'objet graphique $self, nom de zone : $zone_name\n";
 
     return if ( ! defined $zone_name );
 
@@ -769,7 +930,7 @@ sub on_top {
 sub focus {
     my ($self) = @_;
 
-    on_top($self);
+    at_top($self);
     $self->[CANVA]->CanvasFocus;
 }
 
@@ -1003,10 +1164,10 @@ sub zone_update {
         return;
     }
     $self->forget;
-    $self->on_top;
+    $self->at_top;
 }
 
-sub put_on_top {
+sub put_at_top {
     my ( $self ) = @_;
     
     $self->[CANVA]->CanvasRaise;

@@ -8,11 +8,11 @@ Text::Editor::Easy::Comm - Thread communication mecanism of "Text::Editor::Easy"
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 =head1 SYNOPSIS
 
@@ -293,6 +293,7 @@ use Time::HiRes qw(gettimeofday);
 use threads;
 use Thread::Queue;
 use threads::shared;
+use Scalar::Util qw(refaddr weaken);
 
 use Text::Editor::Easy::Events;
 
@@ -656,7 +657,7 @@ sub ask2 {
 
         if ( !defined $sub ) {
              print DBG "Impossible de trouver la sub pour la méthode $method...\n";
-             #print STDERR "Can't handle method $method for object $self ($id)\n";
+             print STDERR "Can't handle method $method for object $self ($id)\n";             
              return;
         }
     }
@@ -749,29 +750,37 @@ sub new_ask {
 # Pour l'instant on ne traite pas les demandes synchrones ou asynchrones (pas de modification de who)
 # Horrible verrue pour rendre "synchrone" le join de thread, par principe asynchrone
     if ( $method eq 'stop_thread' ) {
-
+        print DBG "Dans l'attente stop_thread de new_ask, tid = ", threads->tid, "\n";
 # Procédure qui bloque le thread appelant : à revoir (gérer l'erreur qui peut provenir de $message)
 #print "Fin demandée pour le serveur $server_tid\n";
         while ( !$stop_server{$server_tid} ) {
         }
-        my $call_id = $stop_server{$server_tid};
+        my $abstract_call_id = $stop_server{$server_tid};
 
         #print "On va attendre la fin de la requête $call_id\n";
         # Récupération du message initial
-        my $message = get_message_for( $client_tid, $server_tid, $method, $call_id, $context );
-        my $status = Text::Editor::Easy->async_status($call_id);
+        #my $message = get_message_for( $client_tid, $server_tid, $method, $call_id, $context );
+        my $status = Text::Editor::Easy->async_status($abstract_call_id);
         while ( $status ne 'ended' ) {
             print DBG "Statut reçu : $status\n";
-            $status = Text::Editor::Easy->async_status($call_id);
+            if ( anything_for_me() ) {
+                have_task_done();
+            }
+            $status = Text::Editor::Easy->async_status($abstract_call_id);
         }
-        
+
         # Nettoyage
-        my $response = Text::Editor::Easy->async_response($call_id);
+        my $response = Text::Editor::Easy->async_response($abstract_call_id);
         delete $server_queue_by_tid{$server_tid};
         delete $queue_by_tid{$server_tid};
         
         print DBG "Le statut est a ended, on renvoie la main au thread appelant\n";
-        return 1;
+        if ( $context =~ /^A/ ) {
+            return $call_id;
+        }
+        else {
+            return 1;
+        }
     }
 
     if ( length($context) == 2 ) {
@@ -843,7 +852,7 @@ sub ask_named_thread {
 sub create_thread {
     my ( undef, @param ) = @_;
 
-    #print "Dans create_thread : $id\n" if ( defined $id );
+    print DBG "Dans create_thread : tid = ", threads->tid, "\n";
 
     my $thread = threads->new( \&verify_server_queue_and_wait, @param );
 
@@ -943,6 +952,19 @@ sub verify_model_thread {
         # Suppression des queue (ou recyclage ?) à faire
     }
     else {
+        for my $method ( 'model_method', 'trace_create' ) {
+            my %hash;
+            share(%hash);
+            my $hash_ref = $get_tid_from_class_method{$method};
+            if ( defined $hash_ref ) {
+                %hash = %{$hash_ref};
+            }
+            #$hash{$reference} = threads->tid;
+            $hash{'Text::Editor::Easy'} = $model_thread;
+            #print "Ajout de la méthode $method pour la classe $reference\n";
+            $get_tid_from_class_method{$method} = \%hash;
+        }
+        
         $method{'explain_method'}   = ('explain_method');
         $method{'display_instance'} = ('display_instance');
         $method{'display_class'}    = ('display_class');
@@ -963,6 +985,7 @@ sub verify_model_thread {
         create_data_thread( $trace_ref );
         $method{'set_event'}     = ('Text::Editor::Easy::Events::set_event');
         $method{'set_events'}    = ('Text::Editor::Easy::Events::set_events');
+        $method{'set_sequence'}    = ('Text::Editor::Easy::Events::set_sequence');
     }
     
     # Now that everything has been created, we can trace the 'new' call
@@ -1106,9 +1129,15 @@ sub create_data_thread {
                 'update_full_trace',
                 'data_set_event',
                 'data_set_events',
+                'data_set_sequence',
+                'data_events',
+                'data_sequences',
                 'print_default_events',
                 'configure',
                 'get_conf',
+                'get_event_threads',
+                'set_default',
+                'event_threads',
             ],
             'object' => [],
             'init'   => ['Text::Editor::Easy::Data::init_data', $trace_ref],
@@ -1182,7 +1211,7 @@ sub verify_graphic {
                     'eval',
                     'save_search',
                     'focus',
-                    'on_top',
+                    'at_top',
                     'width',
                     'height',
 
@@ -1257,13 +1286,18 @@ sub verify_graphic {
                     'background',
                     'set_background',
                     'set_highlight',
+                    'visual_slurp',
 
-                    # Event generation
-                    'key_press',
+                    # Event management
+                    'key',
                     'clic',
                     'motion',
                     'resize',
                     'drag',
+                    'wheel',
+                    'double_clic',
+                    'right_clic',
+                    'execute_sequence',
                 ],
             }
         );
@@ -1423,6 +1457,7 @@ sub create_client_thread {
 # Cette méthode de top bas niveau devrait être masquée de l'interface : juste un exemple de thread "shared" entre les éditeurs
     $package = 'main' if ( !defined $package );
     my $tid = create_thread( $self, $id, $package );
+    #my $tid = Text::Editor::Easy->trace_create( $self, $id, $package );
 
     #print "TID = $tid\n";
     my $queue = $server_queue_by_tid{$tid};
@@ -1449,13 +1484,30 @@ sub thread_generator {
     if ( !$queue_by_tid{$tid} ) {
         $queue_by_tid{$tid} = Thread::Queue->new;
     }
-    while ( my ( $what, @param ) = get_task_to_do ) {
+    
+    init_server_thread('Text::Editor::Easy', {
+        'package' => 'Text::Editor::Easy::Comm',
+        'methods' => [ 'model_method', 'trace_create' ],
+        'object'  => [],
+    } );
+    
+    print DBG "Thread générator démarré...\n";
+    
+    while ( my ( $what, $call_id, @param ) = get_task_to_do ) {
         last if ( !defined $what );
 
-  # La seule chose que sait faire le thread_generator, c'est générer des threads
-  #print "Dans thread générator : $what|@param\n";
-        simple_call( undef, 'create_thread', \&create_thread, @param );
+        # La seule chose que sait faire le thread_generator, c'est générer des threads
+        #print DBG "Dans thread générator : $what|$call_id|@param\n";
+        execute_this_task( $what, $call_id, @param );
+        #if ( $what eq 'create_thread' ) {
+        #    simple_call( undef, 'create_thread', \&create_thread, @param );
+        #}
+        #else {
+            #my $tid = shift @param;
+        #    print "Dans thread_generator, tid = $tid, param = @param\n";
+        #}
     }
+    print DBG "Thread générator fini...\n";
 }
 
 sub verify_server_queue_and_wait {
@@ -1519,9 +1571,9 @@ sub verify_server_queue_and_wait {
 
             $sub_ref->(@param);
         }
-
-        #print "Dans Comm, mort du thread $tid\n";
     }
+    print "Dans Comm, mort du thread $tid\n";
+    return 1;
 }
 
 sub set_synchronize {
@@ -1615,6 +1667,8 @@ sub init_server_thread {
 #}
     }
     
+    # A revoir (paramètres d'appels de model thread)
+    $initial_reference = 'Text::Editor::Easy' if ( ! defined $initial_reference );
     
     $thread_knowledge{'instance'}{$initial_reference} = $self_server;
     print DBG "On met $self_server dans thread_knowledge de instance (tid ",
@@ -1655,10 +1709,9 @@ sub manage_requests2 {
     print DBG "Fin du thread ", threads->tid, "\n";
 
     # Nettoyage
-
-    $stop_server{ threads->tid } =
-      Text::Editor::Easy::Async->abstract_join( threads->tid, "useless" )
-      ;    # Préférable de faire un "auto-join" pour éviter les blocages
+    my $call_id = Text::Editor::Easy::Async->abstract_join( threads->tid, "useless" );
+    $stop_server{ threads->tid } = $call_id;
+    print DBG "On quitte avec call_id $call_id\n";
 }
 
 my %com_method = (
@@ -1666,6 +1719,7 @@ my %com_method = (
     'add_thread_method' => 1,    
     'get_tid' => 1,
     'add_thread_object' => 1,    
+    'stop_thread' => 1,
 );
 
 sub execute_task {
@@ -1834,6 +1888,7 @@ sub execute_task {
 sub stop_thread {
     my ( $self_server, $reference, $options_ref ) = @_;
 
+    print DBG "Dans stop_thread, tid = ", threads->tid, "\n";
     $thread_knowledge{'stop_wanted'} = 1;
 }
 
@@ -1846,6 +1901,7 @@ sub add_thread_object {    # Permet de rendre un thread multi-plexed
     if ( $initial_instance_ref->{$reference} ) {
         print STDERR
 "Can't add object to thread for the already existing reference $reference\n";
+        print STDERR "ini..ref = ", dump( $initial_instance_ref ), "\n";
         return;
     }
     if ( my $object = $options_ref->{'object'} ) {
@@ -1927,7 +1983,8 @@ sub create_new_server {
     }
     my $tid = threads->tid;
     if ( !$options_ref->{'do_not_create'} ) {
-        $tid = create_thread( $self, $self_caller, $package );
+        #$tid = create_thread( $self, $self_caller, $package );
+        $tid = Text::Editor::Easy->trace_create( $self, $self_caller, $package );
     }
     {
         my $key;
@@ -1968,7 +2025,7 @@ sub create_new_server {
             }
         }
         else
-        { # Appel de classe ($self est une chaine de caractères représentant la classe)
+        { # Appel de classe ($self ne compte plus => 'Text::Editor::Easy' est forcé)
             for my $method ( @{$tab_methods_ref} ) {
                 print DBG "Ajout dans \%get_tid_from_class_method de $method\n";
                 my $hash_ref = $get_tid_from_class_method{$method};
@@ -1977,7 +2034,7 @@ sub create_new_server {
                 if ($hash_ref) {
                     %hash = %{$hash_ref};
                 }
-                $hash{$self}                        = $tid;
+                $hash{'Text::Editor::Easy'} = $tid;
                 $get_tid_from_class_method{$method} = \%hash;
             }
             # On renseigne le nom éventuel...
@@ -2123,11 +2180,13 @@ sub get_tid_from_name_and_instance {
     my $hash_ref = $get_tid_from_thread_name{$name};
     my $server_tid = $hash_ref->{$id};
     if ( defined $server_tid ) {
+        #print "Dans get_tid... 1 : renvoie server_tid = $server_tid\n";
         return $server_tid;
     }
     if ( defined $id ) {
         $server_tid = $hash_ref->{''};
     }
+    #print "Dans get_tid... 2 : renvoie server_tid = $server_tid\n";
     return $server_tid;
 }
 
@@ -2139,6 +2198,19 @@ sub use_module {
         # Lire les lignes et ajouter une origine supplémentaire (les lignes du module responsable du message)
         print STDERR "Wrong code for module $module :\n$@\n";
     }
+}
+
+sub model_method {
+    my ( $self, @param ) = @_;
+    
+    print DBG "Dans model_method, tid = ", threads->tid, "\n";
+    return @param;
+}
+
+sub trace_create {
+    my ( $self, @param ) = @_;
+    
+    create_thread ( $self, @param );
 }
 
 =head1 FUNCTIONS

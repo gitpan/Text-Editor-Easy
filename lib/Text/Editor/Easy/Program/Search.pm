@@ -10,11 +10,11 @@ user modification in the Eval tab of the Editor.pl program.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Text::Editor::Easy::Comm;
 
@@ -74,7 +74,7 @@ sub init_eval {
 sub modify_pattern {
     my ( $editor ) = @_;
 
-    print "Dans modify_pattern de Search.pm\n";
+    #print "Dans modify_pattern de Search.pm\n";
 
     #return;
     Text::Editor::Easy::Async->idle_eval_exec($eval_print);
@@ -109,7 +109,7 @@ sub modify_pattern {
     $out->empty;
     return if ( anything_for_me() );
 
-    #$out->async->on_top;
+    #$out->async->at_top;
     $out->async->make_visible;
     Text::Editor::Easy::Async->exec_eval($program);
     return;

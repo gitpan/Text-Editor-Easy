@@ -9,11 +9,11 @@ Text::Editor::Easy::Test::Test1 - Used for tests.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Text::Editor::Easy::Comm;
 
@@ -35,7 +35,7 @@ sub test2 {
 sub new {
     my ( $first, $second ) = @_;
 
-    print "Dans Test1::new |$first|$second|\n";
+    print "Dans Test1::new |$first|$second|   tid = ", threads->tid, "\n";
 
     return [ $first + 2, $second . "bof" ];
 }
@@ -43,7 +43,7 @@ sub new {
 sub test11 {
     my ( $self, @param ) = @_;
 
-    print "Dans test1 : $self|", threads->tid, "@param\n";
+    print "Dans test11 : $self|", threads->tid, "@param\n";
     print "SELF 1 : ", $self->[0], "\n";
     print "SELF 2 : ", $self->[1], "\n";
     return (

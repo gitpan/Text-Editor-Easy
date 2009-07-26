@@ -8,8 +8,7 @@
 # of the 'call_stack' editor.
 #
 # In order to know which editor the 'call_stack' is, press F5.
-# 
-
+#
 
 {
     'F5' => sub {
@@ -134,28 +133,28 @@ blink
     
     'clic_1' => << 'clic_1'
 
-    my ( $self ) = @_;
-    
-    $self->empty;
+my ( $self ) = @_;
 
-    print "Dans clic 1... tid = ", threads->tid, ", self = $self\n";
-    my $info_ref = $self->load_info;
-    $info_ref->{'sequence'} = 2;
-    $self->save_info( $info_ref );
-    
-    print "couleur trouvée dans save_info $info_ref->{'color'}\n";
-    $self->set_background( $info_ref->{'color'} );
-    
-    my $clic_ed = Text::Editor::Easy->whose_name('clic');
-    $clic_ed->empty;
-    $clic_ed->insert( $info_ref->{'comment_2'}, {
-        'display' => [ 'line_0' => { 'at' => 'top' } ]
-    } );
-    $clic_ed->on_top;
-    
-    my $macro = Text::Editor::Easy->whose_name('macro');
-    $macro->empty;
-    $macro->insert( $info_ref->{'macro'} );
+$self->empty;
+
+print "Dans clic 1... tid = ", threads->tid, ", self = $self\n";
+my $info_ref = $self->load_info;
+$info_ref->{'sequence'} = 2;
+$self->save_info( $info_ref );
+
+print "couleur trouvée dans save_info $info_ref->{'color'}\n";
+$self->set_background( $info_ref->{'color'} );
+
+my $clic_ed = Text::Editor::Easy->whose_name('clic');
+$clic_ed->empty;
+$clic_ed->insert( $info_ref->{'comment_2'}, {
+    'display' => [ 'line_0' => { 'at' => 'top' } ]
+} );
+$clic_ed->at_top;
+
+my $macro = Text::Editor::Easy->whose_name('macro');
+$macro->empty;
+$macro->insert( $info_ref->{'macro'} );
 
 clic_1
     ,
@@ -189,8 +188,11 @@ comment_1
 
 my ( $editor, $info_ref ) = @_;
 
-$info_ref->{'line'}->set( 
-    "Clic at x = $info_ref->{'x'}, y = $info_ref->{'y'}",
+$editor->insert( 
+    "\nClic at x = $info_ref->{'x'}, y = $info_ref->{'y'}",
+    {
+        'line' => $info_ref->{'line'},
+    }
 );
 comment_2
     ,
@@ -238,7 +240,7 @@ macro
         $clic_ed->insert( $new_code, {
             'display' => [ 'line_0' => { 'at' => 'top' } ]
         } );
-        $clic_ed->on_top;
+        $clic_ed->at_top;
 
         my $macro = Text::Editor::Easy->whose_name('macro');
         $macro->empty;
@@ -319,7 +321,7 @@ my ( $editor, $info_ref ) = @_;
 
 # Make the dynamic log visible (if hidden and/or not at end)
 my $log_ed = Text::Editor::Easy->whose_name('Editor');
-$log_ed->on_top;
+$log_ed->at_top;
 $log_ed->set_at_end;
 
 
@@ -334,5 +336,6 @@ while ( my ($key, $value) = each %$info_ref ) {
 
 
 comment_5
+    ,
     
 }

@@ -46,3 +46,26 @@
 # the code. Well, this maybe dangerous is
 # only for responsible users.
 #
+
+{
+    'F5' => sub {
+        my ( $editor, $info_ref ) = @_;
+        
+        my $macro = Text::Editor::Easy->whose_name('macro');
+        $macro->empty;
+        $macro->insert( $info_ref->{'macro'} );
+    },
+    
+    'macro' => << 'macro'
+my $editor = Text::Editor::Easy->whose_name('call_stack');
+$editor->empty;
+$editor->deselect;
+my @lines = $editor->insert("Hello world !\nIs there anybody ? body dy dy y ...");
+print "\nWritten lines :\n\t", join ("\n\t", @lines), "\n";
+$editor->insert ("\n\n\n\n" . $lines[0]->text);
+my $next = $lines[0]->next;
+print "\nNEXT LINE =\n\n", $next->text;
+$next->select;
+macro
+    ,
+}

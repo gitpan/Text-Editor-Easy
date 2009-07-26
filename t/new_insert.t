@@ -1,13 +1,15 @@
 use Test::More;
 use Config;
-if ( ! $Config{'useithreads'} ) {
-    plan skip_all => "Perl not compiled with 'useithreads'";
-}
-elsif ( ! -f 'tk_is_ok' ) {
-    plan skip_all => "Tk is not working properly on this machine";
-}
-else {
-    plan no_plan;
+BEGIN {
+    if ( ! $Config{'useithreads'} ) {
+        plan skip_all => "Perl not compiled with 'useithreads'";
+    }
+    elsif ( ! -f 'tk_is_ok' ) {
+        plan skip_all => "Tk is not working properly on this machine";
+    }
+    else {
+        plan no_plan;
+    }
 }
 
 use strict;
@@ -98,3 +100,17 @@ $added_text = "a\nb";
 	'display' => [ 'line_1', { 'at' => 1, 'from' => 'bottom'} ],
 } );
 is ( $last_insert->bottom_ord, 1, 'Ordinate of inserted line, insertion 8');
+
+$editor = Text::Editor::Easy->new( {
+    #'sub' => 'main',
+    'width' => 500,
+    'height' => 400,
+} );
+
+$text = "0123456789\nAZERTYUIOP";
+$editor->insert( $text,
+    { 'line' => $editor->first }
+);
+
+my $displayed_text = $editor->visual_slurp;
+is ( $displayed_text, $text, "Abstract visual insert");

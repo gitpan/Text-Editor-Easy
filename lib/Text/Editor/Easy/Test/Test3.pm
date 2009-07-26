@@ -9,11 +9,11 @@ Text::Editor::Easy::Test::Test3 - Used for tests.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 sub test3 {
     my ( $self, @param ) = @_;

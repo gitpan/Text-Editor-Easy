@@ -9,11 +9,11 @@ Text::Editor::Easy - A perl module to edit perl code with syntax highlighting an
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 =head1 WHY ANOTHER EDITOR ?
 
@@ -43,10 +43,14 @@ with the program. To run them and have a glance at the capabilities of this modu
 
 The demos (10 demos to be tested from the "Editor.pl" program) will show you better examples of how to call this module.
 
-    use Text::Editor::Easy;
+ use Text::Editor::Easy;
+ 
+ my $editor = Text::Editor::Easy->new;
+ 
+ $editor->insert("Hello world\nSecond line\nlast line");
+ 
+ $editor->save("my_file.tst");
 
-    my $editor = Text::Editor::Easy->new();
-    ...
 
 =head1 WHY MULTI-THREAD ?
 
@@ -74,12 +78,13 @@ mecanism.
 
 =head1 GRAPHIC
 
-The graphical part of the module is handled mainly by L<Text::Editor::Easy::Asbtract>. The "Abstract" name has been given because,
+The graphical part of the module is handled mainly by L<Text::Editor::Easy::Abstract>. The "Abstract" name has been given because,
 even if I use Tk for now, there is no Tk calls in all the Abstract module. Tk calls are concentrated in L<Text::Editor::Easy::Graphic::Tk_Glue>
 module : other "Graphic glue" modules are possible. I think of "Gtk", "Console", and why not "Qt" or "OpenGl" ? There is a limited 
 communicating object (a "Text::Editor::Easy::Graphic") between the Abstract module and the glue module : this is the interface.
-This interface may change a little in order to allow other "Glue module" to be written, but, of course, all graphic glue modules would
+This interface may change a little in order to allow other "Glue module" to be written, but, of course, all graphic glue modules will
 have to use the same interface.
+
 You can see the "Text::Editor::Easy" as a super graphical layer above other layers. I imagine a generator where you design an
 application in your preferred graphical user interface but the generated application could run (maybe in a limited way) in "Console mode".
 Constant re-use is the key to hyper-productivity.
@@ -88,24 +93,23 @@ Constant re-use is the key to hyper-productivity.
 
 =head2 NEW
 
-    use Text::Editor::Easy;
+ my $editor = Text::Editor::Easy->new(
+     {
+         'file'   => 'my_file.t3d',
+         'events' => {
+             'clic' => {
+                 'sub' => 'my_clic_sub',
+             },
+         }
+     }
+ );
 
-    my $editor = Text::Editor::Easy->new(
-        {
-            name_option1 => value_option1,
-            name_option2 => value_option2,
-            ...,
-        }
-    );
-    ...
 
 This function creates and returns a Text::Editor::Easy instance. A Text::Editor::Easy instance is a scalar reference so that you can't do anything
 with it... except call any object method.
 This function accepts either no parameter or a hash reference which defines the options for the creation. Here are these options :
 
 =head3 zone
-
-=head3 trace
 
 =head3 file
 
@@ -119,7 +123,7 @@ This function accepts either no parameter or a hash reference which defines the 
 
 =head3 sub
 
-=head3 Events management
+=head3 'events' option, event management
 
 If you want to define a special behavior in response to user events you have to write special code and reference this code so that it can be
 executed. You can reference this code during the instance creation.
@@ -270,7 +274,7 @@ The display method needs at least one parameter : the L<'line' instance|Text::Ed
 The second, a hash reference, is optionnal.
 
 If your editor is not visible because it's under another one (see L<Text::Editor::Easy::Zone>), you'll make it visible using L</FOCUS> 
-or L</ON_TOP> methods.
+or L</AT_TOP> methods.
 The display method is used to show the editor in a precise way. Displaying an editor doesn't mean much if you don't take a reference. The reference
 is the first parameter which is a line or a part of it with wrap mode enabled ('display'). When you have defined this reference, you can add options
 to precise where to put this reference in the screen.
@@ -284,7 +288,7 @@ You can change where to display the reference line with 'at' and 'from' options.
 
 This option gives the ordinate (which is, by default, one quarter of the screen height). You can use 'top', 'bottom' or 'middle' values or an integer.
 The integer value will position the line precisely in the screen. But you should have receveid the number you give
-by another method rather than having chosen it yourself : this integer is the number of pixels from the top for graphical interface but
+by another method rather than have chosen it yourself : this integer is the number of pixels from the top for graphical interface but
 will be the line number in console mode (in console mode, you can't be more precise than a line height).
 
     $editor->display( 
@@ -307,7 +311,7 @@ your precise positioning will be changed. You can avoid adjustments by setting t
 Set the focus to the editor. It will be placed on top of the screen to be visible and will have the 'focus'. Any pressed key will be redirected to it : if
 the cursor belongs to a line that is displayed, it should be visible.
 
-=head2 ON_TOP
+=head2 AT_TOP
 
 Place the editor on top of the screen to make it visible. No action is made if editor was already on top or had the focus.
 
@@ -619,9 +623,9 @@ sub new {
     $editor->set_synchronize();
     my $focus = $hash_ref->{'focus'};
     if ( ! defined $focus ) {
-        #print "Création de l'éditeur ", $editor->name, " : mise au premier plan (appel on_top)\n";
-        #print "    ===> id de cet éditeur avant appel on_top : ", $editor->id, "\n";
-        $editor->on_top($hash_ref);
+        #print "Création de l'éditeur ", $editor->name, " : mise au premier plan (appel at_top)\n";
+        #print "    ===> id de cet éditeur avant appel at_top : ", $editor->id, "\n";
+        $editor->at_top($hash_ref);
         #print "Fin de la mise au premier plan pour $editor\n";
     }
     elsif ( $focus eq 'yes' ) {
@@ -678,6 +682,24 @@ sub name {
     my ($self) = @_;
 
     return Text::Editor::Easy->data_name($self->id);
+}
+
+sub events {
+    my ($self, $name) = @_;
+    
+    my $id = '';
+    $id = $self->id if ( ref $self );
+
+    return Text::Editor::Easy->data_events($id, $name);
+}
+
+sub sequences {
+    my ($self, $name) = @_;
+    
+    my $id = '';
+    $id = $self->id if ( ref $self );
+
+    return Text::Editor::Easy->data_sequences($self->id, $name);
 }
 
 sub revert {
@@ -1337,7 +1359,7 @@ you want to drive them from a private program (yet, interactively, it's often ve
 productive point of view, most softwares should be written again...
 
 This is the reason why I'm designing the editor module and the editor program at the same time : the program asks for new needs, and the
-editor module grows according to these needs. When the editor program will be finished, the module should be powerful enough to be used
+editor module grows according to these needs. When the editor program will be usable, the module should be powerful enough to be used
 by anybody, including the RAD tool and the applications generated by the RAD tool.
 
 =head1 COPYRIGHT & LICENSE

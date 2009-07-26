@@ -9,11 +9,11 @@ Text::Editor::Easy::File_manager - Management of the data that is edited.
 
 =head1 VERSION
 
-Version 0.48
+Version 0.49
 
 =cut
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 =head1 SYNOPSIS
 
@@ -212,7 +212,7 @@ sub growing_update {
         print DBG "SEGMENT_FILE_DESC : $segment_ref->[FILE_DESC]\n";
         return;
     }
-    #print "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
+    print DBG "Dans update_growing : taille actuelle $actual_size, ancienne : $old_size\n";
     
     if ( $actual_size != $old_size ) {
         if ( defined $segment_ref->[FILE_DESC] ) {
@@ -220,6 +220,18 @@ sub growing_update {
         }
         open( $segment_ref->[FILE_DESC], $file_name );
         $self->[FILE_DESC] = $segment_ref->[FILE_DESC];
+        
+        my $last_ref = $segment_ref->[LAST];
+        if ( defined $last_ref and $last_ref->[SEEK_END] == $old_size ) {
+            seek $segment_ref->[FILE_DESC], $last_ref->[SEEK_START], 0;
+            my $text = readline( $segment_ref->[FILE_DESC] );
+            my $end_line = tell $segment_ref->[FILE_DESC];
+            if ( chomp $text ) {
+                $one_more_line = $end_line;
+            }
+            $last_ref->[TEXT] = $text;
+            $last_ref->[SEEK_END] = $end_line;
+        }
 
         $segment_ref->[SEEK_END] = $actual_size;
         print DBG "Appel à growing_check, nouvelle taille $actual_size\n";
@@ -468,7 +480,7 @@ sub prev_line {
         }
     }
 
-    print DBG "Fin de prev_line $pos, $text\n";
+    print DBG "Fin de prev_line $pos |$text| $end_position\n";
     
     #
     if ( ! chomp $text ) {
@@ -482,6 +494,8 @@ sub prev_line {
         return ( $pos, $text );
     }
     print DBG "Il faut créer une ligne vide supplémentaire (fin de fichier)\n";
+    
+    
     my $prev_line_ref;
     
     # Pour le cas où $parent_ref aurait été modifié
@@ -1147,9 +1161,10 @@ sub first_ {
 sub read_ {
     my ($line_ref) = @_;
 
-    my $file_desc = $line_ref->[PARENT][FILE_DESC];
+    my $parent_ref = $line_ref->[PARENT];
+    my $file_desc = $parent_ref->[FILE_DESC];
     if ( ! $file_desc ) {
-        print DBG "Le segment parent $line_ref->[PARENT] de $line_ref ne contient pas de descripteur de fichier !\n";
+        print DBG "Le segment parent $parent_ref de $line_ref ne contient pas de descripteur de fichier !\n";
         return;
     }
     if ( ref $file_desc eq 'ARRAY' ) {
@@ -1182,7 +1197,18 @@ sub read_ {
     }
     
     if ( chomp $line_ref->[TEXT] ) {
-        $one_more_line = tell $file_desc;
+        my $last_ref = $parent_ref->[LAST];
+        my $current_end = tell $file_desc;
+        if ( defined $last_ref ) {
+            my $seek_end = $last_ref->[SEEK_END];
+            if ( defined $seek_end and $seek_end >= $current_end ) {
+                # On a déjà récupéré la dernière ligne : il ne faut pas ajouter une ligne
+                # supplémentaire à la fin à cause d'un retour chariot déjà compté (par lecture
+                # arrière par exemple)
+                $current_end = 0;
+            }
+        }
+        $one_more_line = $current_end;
     }
 
     # Suppression des retours chariots
@@ -1212,17 +1238,17 @@ sub previous_ {
     }
     if ( $segment_ref->[PARENT] ) {
         if ( $segment_ref->[PARENT][SEEK_START] < $segment_ref->[SEEK_START] ) {
-                my $line_ref;
+            my $line_ref;
 
-        # OK mais seulement car il n'existe pas de procédure de parcours arrière sans mémorisation
-        #  ==> différence importante par rapport à "sub next_"
-                $line_ref->[NEXT] = $segment_ref;
+    # OK mais seulement car il n'existe pas de procédure de parcours arrière sans mémorisation
+    #  ==> différence importante par rapport à "sub next_"
+            $line_ref->[NEXT] = $segment_ref;
 
-                $line_ref->[PREVIOUS] =
-                  $segment_ref->[PREVIOUS];    # Peut être affectation vide
-                $line_ref->[SEEK_END] = $segment_ref->[SEEK_START];
-                $line_ref->[PARENT]   = $segment_ref->[PARENT];
-                return ( read_previous_($line_ref) );
+            $line_ref->[PREVIOUS] =
+              $segment_ref->[PREVIOUS];    # Peut être affectation vide
+            $line_ref->[SEEK_END] = $segment_ref->[SEEK_START];
+            $line_ref->[PARENT]   = $segment_ref->[PARENT];
+            return ( read_previous_($line_ref) );                
         }
         return ( previous_( $segment_ref->[PARENT] ) );
     }
@@ -1747,8 +1773,19 @@ sub dump_file_manager {
     print DBG "=" x 80;
     my $root = $self->[ROOT];
     print DBG "\nROOT : ", $self->[ROOT], "\n";
-    if ( defined $root->[FILE_NAME] ) {
-        print DBG "FILE_NAME  : ", $root->[FILE_NAME], "\n";        
+    
+    my $file_name = $root->[FILE_NAME];
+    if ( defined $file_name and $file_name ne '.' ) {
+        print DBG "FILE_NAME  : ", $root->[FILE_NAME], "\n";
+        print DBG "\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
+        open (TOT, $root->[FILE_NAME] ) or die "dfdfd : $!\n";
+        my $enreg = <TOT>;
+        while ( defined $enreg ) {
+            print DBG $enreg;
+            $enreg = <TOT>;
+        }
+        CORE::close( TOT );
+        print DBG "\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n";
     }
     else {
         print DBG "undefined FILE_NAME\n";        
